@@ -1,26 +1,145 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-border: var(--surface-border);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  /* Custom Glossy Utilities */
+  --shadow-glossy: 0 4px 30px rgba(0, 0, 0, 0.1);
+  --shadow-glossy-primary: 0 4px 20px rgba(220, 38, 38, 0.3);
+  --shadow-glossy-primary-dark: 0 4px 20px rgba(239, 68, 68, 0.4);
 }
 
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #f8fafc;
+    --foreground: #020617;
+    
+    --surface: rgba(255, 255, 255, 0.8);
+    --surface-hover: rgba(241, 245, 249, 0.9);
+    --surface-border: rgba(226, 232, 240, 0.6);
+    
+    /* Modern Red */
+    --primary: #dc2626;
+    --primary-foreground: #ffffff;
+    --primary-hover: #b91c1c;
+
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+  }
+
+  /* Dark mode */
+  .dark {
+    --background: #09090b; /* Deep black/zinc */
+    --foreground: #fafafa;
+    
+    --surface: rgba(24, 24, 27, 0.5); /* Glassy zinc-900 */
+    --surface-hover: rgba(39, 39, 42, 0.7);
+    --surface-border: rgba(63, 63, 70, 0.4);
+    
+    /* Bright Red for dark mode contrast */
+    --primary: #ef4444;
+    --primary-foreground: #ffffff;
+    --primary-hover: #dc2626;
+
+    --muted: #27272a;
+    --muted-foreground: #a1a1aa;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-surface-border;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+/* Custom Glossy Classes */
+@layer utilities {
+  .glass {
+    @apply bg-surface backdrop-blur-md border border-surface-border shadow-glossy;
+  }
+  .glass-panel {
+    @apply bg-surface backdrop-blur-xl border border-surface-border shadow-glossy rounded-2xl;
+  }
+  .btn-glossy {
+    @apply relative overflow-hidden transition-all duration-300 ease-out;
+  }
+  .btn-glossy::after {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 opacity-0 transition-opacity duration-300;
+  }
+  .btn-glossy:hover::after {
+    @apply opacity-100;
+  }
+}
+
+/* Mobile-responsive utilities */
+@layer utilities {
+  /* iOS safe area support */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Better touch targets */
+  @media (max-width: 1023px) {
+    .glass-panel {
+      @apply rounded-xl;
+    }
+
+    /* Make tables scroll horizontally on mobile */
+    table {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Reduce visual weight on mobile */
+    h1 {
+      font-size: 1.5rem !important;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════
+   PRINT STYLES — Halaman Cetak SPK
+   ═══════════════════════════════════════ */
+@media print {
+  @page { size: A4; margin: 1.5cm; }
+  html, body { background: white !important; color: black !important; font-size: 12pt !important; }
+  nav, aside, header, footer, [data-sidebar], [data-no-print] { display: none !important; }
+  button, a[href^="/"] { display: none !important; }
+  /* Show print-only elements */
+  .print-only { display: block !important; }
+  /* Fix layout */
+  main { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+  .glass-panel, .glass { background: white !important; border: 1px solid #e2e8f0 !important; box-shadow: none !important; backdrop-filter: none !important; }
+  table { display: table !important; overflow-x: visible !important; width: 100% !important; }
+  tr, td, th { break-inside: avoid; }
+  /* Hide interactive elements */
+  input, select, textarea { border: none !important; background: none !important; }
 }
