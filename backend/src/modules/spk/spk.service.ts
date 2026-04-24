@@ -82,13 +82,56 @@ export class SpkService {
 
     // Semua operasi dalam satu transaksi untuk menjaga data konsisten
     const spk = await prisma.$transaction(async (tx) => {
-      // Generate nomor SPK di dalam transaksi agar race-condition safe
-      const lastSpk = await tx.spk.findFirst({
-        orderBy: { id: 'desc' },
-        select: { id: true },
-      });
-      const counter = lastSpk ? lastSpk.id + 1 : 1;
-      const noSpk = generateSpkNo(counter);
+      // Generate nomor SPK — pakai timestamp ms + random agar race-condition safe
+      const noSpk = generateSpkNo();
+
+      // Siapkan item dan sinkronisasi HPP & stok terlebih dahulu
+      const itemsToCreate: any[] = [];
+      const logsToCreate: any[] = [];
+
+      if (input.items?.length) {
+        for (const item of input.items) {
+          let hpp = 0;
+          if (item.type === 'sparepart' && item.sparepartId) {
+            // Cek stok dulu sebelum dikurangi
+            const sp = await tx.sparepart.findUnique({
+              where: { id: item.sparepartId },
+              select: { stok: true, name: true, hargaBeli: true }, // Ambil hargaBeli untuk HPP
+            });
+            if (!sp) throw new BadRequestError(`Sparepart ID ${item.sparepartId} tidak ditemukan`);
+            if (sp.stok < item.qty) {
+              throw new BadRequestError(`Stok "${sp.name}" tidak mencukupi (tersisa ${sp.stok}, butuh ${item.qty})`);
+            }
+            hpp = Number(sp.hargaBeli) || 0;
+
+            const updated = await tx.sparepart.updateMany({
+              where: { id: item.sparepartId, stok: { gte: item.qty } },
+              data: { stok: { decrement: item.qty } },
+            });
+            if (updated.count === 0) {
+              throw new BadRequestError(`Stok "${sp.name}" tidak mencukupi saat proses simultan (tersisa ${sp.stok}, butuh ${item.qty})`);
+            }
+
+            logsToCreate.push({
+              sparepartId: item.sparepartId,
+              type: 'keluar',
+              qty: item.qty,
+              keterangan: `Dipakai SPK ${noSpk}`,
+            });
+          }
+
+          itemsToCreate.push({
+            type: item.type,
+            sparepartId: item.sparepartId || null,
+            jasaId: item.jasaId || null,
+            nama: item.nama,
+            qty: item.qty,
+            hargaModal: hpp,
+            hargaSatuan: item.hargaSatuan,
+            subtotal: item.hargaSatuan * item.qty,
+          });
+        }
+      }
 
       // Buat SPK utama
       const created = await tx.spk.create({
@@ -108,16 +151,8 @@ export class SpkService {
           estimasiSelesai,
           prioritas: input.prioritas || 'normal',
           catatan: input.catatan,
-          items: input.items?.length ? {
-            create: input.items.map(item => ({
-              type: item.type,
-              sparepartId: item.sparepartId || null,
-              jasaId: item.jasaId || null,
-              nama: item.nama,
-              qty: item.qty,
-              hargaSatuan: item.hargaSatuan,
-              subtotal: item.hargaSatuan * item.qty,
-            })),
+          items: itemsToCreate.length ? {
+            create: itemsToCreate,
           } : undefined,
           stages: input.stages?.length ? {
             create: input.stages.map((stage, i) => ({
@@ -137,37 +172,11 @@ export class SpkService {
         },
       });
 
-      // Kurangi stok dan catat log inventaris untuk setiap sparepart
-      if (input.items?.length) {
-        for (const item of input.items) {
-          if (item.type === 'sparepart' && item.sparepartId) {
-            // Cek stok dulu sebelum dikurangi
-            const sp = await tx.sparepart.findUnique({
-              where: { id: item.sparepartId },
-              select: { stok: true, name: true },
-            });
-            if (!sp) throw new BadRequestError(`Sparepart ID ${item.sparepartId} tidak ditemukan`);
-            if (sp.stok < item.qty) {
-              throw new BadRequestError(`Stok "${sp.name}" tidak mencukupi (tersisa ${sp.stok}, butuh ${item.qty})`);
-            }
-
-            const updated = await tx.sparepart.updateMany({
-              where: { id: item.sparepartId, stok: { gte: item.qty } },
-              data: { stok: { decrement: item.qty } },
-            });
-            if (updated.count === 0) {
-              throw new BadRequestError(`Stok "${sp.name}" tidak mencukupi saat proses simultan (tersisa ${sp.stok}, butuh ${item.qty})`);
-            }
-            await tx.inventarisLog.create({
-              data: {
-                sparepartId: item.sparepartId,
-                type: 'keluar',
-                qty: item.qty,
-                keterangan: `Dipakai SPK ${noSpk}`,
-              },
-            });
-          }
-        }
+      // Catat log inventaris secara massal
+      if (logsToCreate.length > 0) {
+        await tx.inventarisLog.createMany({
+          data: logsToCreate,
+        });
       }
 
       // Update pelanggan lastVisit
@@ -183,8 +192,8 @@ export class SpkService {
         data: {
           noInvoice: generateInvoiceNo(),
           spkId: created.id,
-          totalTagihan: totalHarga - diskon,
-          sisaBayar: totalHarga - diskon,
+          totalTagihan: Math.max(0, totalHarga - diskon),
+          sisaBayar: Math.max(0, totalHarga - diskon),
           jatuhTempo,
         },
       });
@@ -272,15 +281,15 @@ export class SpkService {
                 where: { id: item.sparepartId },
                 data: { stok: { increment: item.qty } },
               });
+              await tx.inventarisLog.create({
+                data: {
+                  sparepartId: item.sparepartId,
+                  type: 'masuk',
+                  qty: item.qty,
+                  keterangan: `Stok dikembalikan dari pembatalan SPK ${spk.noSpk}`,
+                },
+              });
             }
-            await tx.inventarisLog.create({
-              data: {
-                sparepartId: item.sparepartId,
-                type: 'masuk',
-                qty: item.qty,
-                keterangan: `Stok dikembalikan dari pembatalan SPK ${spk.noSpk}${!sp ? ' (Master data tidak ada)' : ''}`,
-              },
-            });
           }
         }
       }
@@ -393,28 +402,32 @@ export class SpkService {
     }
 
     await prisma.$transaction(async (tx) => {
-      // Kembalikan stok sparepart yang pernah dipakai
-      const items = await tx.spkItem.findMany({
-        where: { spkId: id },
-        select: { type: true, sparepartId: true, qty: true },
-      });
-      for (const item of items) {
-        if (item.type === 'sparepart' && item.sparepartId) {
-          const sp = await tx.sparepart.findUnique({ where: { id: item.sparepartId } });
-          if (sp) {
-            await tx.sparepart.update({
-              where: { id: item.sparepartId },
-              data: { stok: { increment: item.qty } },
-            });
+      // Kembalikan stok sparepart yang pernah dipakai HANYA jika SPK belum dibatalkan
+      // (status dibatalkan sudah mengembalikan stok di updateStatus)
+      if (spk.status !== 'dibatalkan') {
+        const items = await tx.spkItem.findMany({
+          where: { spkId: id },
+          select: { type: true, sparepartId: true, qty: true },
+        });
+        for (const item of items) {
+          if (item.type === 'sparepart' && item.sparepartId) {
+            const sp = await tx.sparepart.findUnique({ where: { id: item.sparepartId } });
+            if (sp) {
+              await tx.sparepart.update({
+                where: { id: item.sparepartId },
+                data: { stok: { increment: item.qty } },
+              });
+              await tx.inventarisLog.create({
+                data: {
+                  sparepartId: item.sparepartId,
+                  type: 'masuk',
+                  qty: item.qty,
+                  keterangan: `Stok dikembalikan dari penghapusan SPK ${spk.noSpk}`,
+                },
+              });
+            }
+            // Jika sp null (master dihapus), skip inventarisLog agar tidak FK violation
           }
-          await tx.inventarisLog.create({
-            data: {
-              sparepartId: item.sparepartId,
-              type: 'masuk',
-              qty: item.qty,
-              keterangan: `Stok dikembalikan dari pembatalan SPK ${spk.noSpk}${!sp ? ' (Master data tidak ada)' : ''}`,
-            },
-          });
         }
       }
 
@@ -461,13 +474,18 @@ export class SpkService {
     await tx.spk.update({ where: { id: spkId }, data: { totalHarga, minimumDp } });
 
     // Sinkronisasi otomatis ke Modul Pembayaran jika harganya melambung/susut di tengah jalan
-    const pembayaran = await tx.pembayaran.findFirst({ where: { spkId } });
+    const [pembayaran, spkDiskon] = await Promise.all([
+      tx.pembayaran.findFirst({ where: { spkId } }),
+      tx.spk.findUnique({ where: { id: spkId }, select: { diskon: true } }),
+    ]);
     if (pembayaran) {
-      const sisaBayar = totalHarga - Number(pembayaran.totalBayar);
+      const diskon = Number(spkDiskon?.diskon ?? 0);
+      const totalTagihan = Math.max(0, totalHarga - diskon);
+      const sisaBayar = totalTagihan - Number(pembayaran.totalBayar);
       await tx.pembayaran.update({
         where: { id: pembayaran.id },
         data: { 
-          totalTagihan: totalHarga, 
+          totalTagihan,
           sisaBayar: Math.max(0, sisaBayar),
           status: sisaBayar <= 0 ? 'lunas' : (Number(pembayaran.totalBayar) > 0 ? 'parsial' : 'belum_bayar')
         }
@@ -515,11 +533,12 @@ export class SpkService {
     const subtotal = input.hargaSatuan * input.qty;
 
     await prisma.$transaction(async (tx) => {
+      let hpp = 0;
       // Cek dan kurangi stok untuk sparepart
       if (input.type === 'sparepart' && input.sparepartId) {
         const sp = await tx.sparepart.findUnique({
           where: { id: input.sparepartId },
-          select: { name: true, stok: true },
+          select: { name: true, stok: true, hargaBeli: true },
         });
         if (!sp) throw new BadRequestError('Sparepart tidak ditemukan');
         if (sp.stok < input.qty) {
@@ -527,6 +546,9 @@ export class SpkService {
             `Stok "${sp.name}" tidak mencukupi (tersisa ${sp.stok}, butuh ${input.qty})`
           );
         }
+        
+        hpp = Number(sp.hargaBeli) || 0;
+
         const updated = await tx.sparepart.updateMany({
           where: { id: input.sparepartId, stok: { gte: input.qty } },
           data: { stok: { decrement: input.qty } },
@@ -555,10 +577,14 @@ export class SpkService {
         const newQty = existingItem.qty + input.qty;
         const newHargaSatuan = existingItem.hargaSatuan; // Gunakan harga existing untuk cegah efek retroaktif (BUG-02)
         const newSubtotal = newQty * Number(newHargaSatuan);
+        // Weighted-average HPP: (hargaModal lama * qty lama + hargaModal baru * qty baru) / total qty
+        const oldHpp = Number(existingItem.hargaModal) * existingItem.qty;
+        const newHppContrib = hpp * input.qty;
+        const weightedHpp = newQty > 0 ? Math.round((oldHpp + newHppContrib) / newQty) : 0;
         
         await tx.spkItem.update({
           where: { id: existingItem.id },
-          data: { qty: newQty, subtotal: newSubtotal }
+          data: { qty: newQty, subtotal: newSubtotal, hargaModal: weightedHpp }
         });
       } else {
         await tx.spkItem.create({
@@ -569,6 +595,7 @@ export class SpkService {
             jasaId: input.type === 'jasa' ? (input.jasaId ?? null) : null,
             nama: input.nama,
             qty: input.qty,
+            hargaModal: hpp,
             hargaSatuan: input.hargaSatuan,
             subtotal,
           },
@@ -614,15 +641,15 @@ export class SpkService {
             where: { id: item.sparepartId },
             data: { stok: { increment: item.qty } },
           });
+          await tx.inventarisLog.create({
+            data: {
+              sparepartId: item.sparepartId,
+              type: 'masuk',
+              qty: item.qty,
+              keterangan: `Item dihapus dari SPK ${spk.noSpk}`,
+            },
+          });
         }
-        await tx.inventarisLog.create({
-          data: {
-            sparepartId: item.sparepartId,
-            type: 'masuk',
-            qty: item.qty,
-            keterangan: `Item dihapus dari SPK ${spk.noSpk}${!sp ? ' (Master data tidak ada)' : ''}`,
-          },
-        });
       }
 
       await tx.spkItem.delete({ where: { id: itemId } });
@@ -673,7 +700,13 @@ export class SpkService {
               `Stok "${sp?.name}" tidak mencukupi (tersisa ${sp?.stok ?? 0}, butuh tambahan ${qtyDelta})`
             );
           }
-          await tx.sparepart.update({ where: { id: item.sparepartId }, data: { stok: { decrement: qtyDelta } } });
+          const updated = await tx.sparepart.updateMany({
+            where: { id: item.sparepartId, stok: { gte: qtyDelta } },
+            data: { stok: { decrement: qtyDelta } },
+          });
+          if (updated.count === 0) {
+            throw new BadRequestError(`Stok "${sp.name}" tidak mencukupi saat proses simultan (tersisa ${sp.stok}, butuh tambahan ${qtyDelta})`);
+          }
           await tx.inventarisLog.create({
             data: { sparepartId: item.sparepartId, type: 'keluar', qty: qtyDelta, keterangan: `Edit item SPK ${spk.noSpk}` },
           });

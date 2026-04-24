@@ -16,10 +16,25 @@ const createSchema = z.object({
   address: z.string().optional(),
 });
 
-// GET /supplier — list all with sparepart count
-router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
+const updateSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  address: z.string().optional(),
+});
+
+// GET /supplier — list all with sparepart count + search
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { search } = req.query;
+    const where: any = search ? {
+      OR: [
+        { name: { contains: String(search) } },
+        { phone: { contains: String(search) } },
+      ],
+    } : {};
     const data = await prisma.supplier.findMany({
+      where,
       orderBy: { name: 'asc' },
       include: { _count: { select: { sparepart: true, inventarisLog: true } } },
     });
@@ -53,14 +68,37 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.supplier.create({ data: req.body });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'create', module: 'master',
+      targetId: data.id, targetName: data.name,
+    }});
     sendCreated(res, data, 'Supplier berhasil ditambahkan');
   } catch (e) { next(e); }
 });
 
 // PUT /supplier/:id
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.supplier.update({ where: { id: Number(req.params.id) }, data: req.body });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'update', module: 'master',
+      targetId: data.id, targetName: data.name,
+    }});
+    sendSuccess(res, data, 'Supplier berhasil diperbarui');
+  } catch (e) { next(e); }
+});
+
+// PATCH /supplier/:id
+router.patch('/:id', validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await prisma.supplier.update({ where: { id: Number(req.params.id) }, data: req.body });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'update', module: 'master',
+      targetId: data.id, targetName: data.name,
+    }});
     sendSuccess(res, data, 'Supplier berhasil diperbarui');
   } catch (e) { next(e); }
 });
@@ -86,7 +124,13 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
       );
     }
 
+    const supplier = await prisma.supplier.findUnique({ where: { id }, select: { name: true } });
     await prisma.supplier.delete({ where: { id } });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'delete', module: 'master',
+      targetId: id, targetName: supplier?.name,
+    }});
     sendSuccess(res, null, 'Supplier berhasil dihapus');
   } catch (e) { next(e); }
 });

@@ -76,6 +76,11 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.pelanggan.create({ data: req.body });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'create', module: 'pelanggan',
+      targetId: data.id, targetName: data.name,
+    }});
     sendCreated(res, data, 'Pelanggan berhasil ditambahkan');
   } catch (e) { next(e); }
 });
@@ -84,6 +89,11 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
 router.put('/:id', requireRole('Admin'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.pelanggan.update({ where: { id: Number(req.params.id) }, data: req.body });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'update', module: 'pelanggan',
+      targetId: data.id, targetName: data.name,
+    }});
     sendSuccess(res, data, 'Pelanggan berhasil diperbarui');
   } catch (e) { next(e); }
 });
@@ -103,9 +113,15 @@ router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, 
       throw new BadRequestError(`Pelanggan ini memiliki ${kendaraanCount} kendaraan dan tidak dapat dihapus.`);
     }
 
+    const pelanggan = await prisma.pelanggan.findUnique({ where: { id }, select: { name: true } });
     await prisma.$transaction(async (tx) => {
       await tx.loyaltyPoint.deleteMany({ where: { pelangganId: id } });
       await tx.pelanggan.delete({ where: { id } });
+      await tx.activityLog.create({ data: {
+        userId: (req as any).user?.id ?? null,
+        action: 'delete', module: 'pelanggan',
+        targetId: id, targetName: pelanggan?.name,
+      }});
     });
 
     sendSuccess(res, null, 'Pelanggan berhasil dihapus');

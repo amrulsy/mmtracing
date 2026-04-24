@@ -64,7 +64,8 @@ export interface Pelanggan {
   email?: string | null;
   address?: string | null;
   type: 'kendaraan' | 'bubut' | 'both';
-  loyaltyPoints?: number;
+  loyaltyPoints?: LoyaltyPoint[];
+  loyaltyBalance?: number;
   loyaltyTier?: LoyaltyTier | null;
   kendaraan?: Kendaraan[];
   spk?: Spk[];
@@ -147,6 +148,7 @@ export interface Spk {
   spesifikasi?: string | null;
   // Pricing — sesuai dengan field di DB
   totalHarga: number;
+  totalTagihan?: number;
   totalBayar: number;
   minimumDp: number;
   // Progress
@@ -260,7 +262,7 @@ export interface InventarisLog {
   id: number;
   sparepartId: number;
   supplierId?: number | null;
-  type: 'masuk' | 'keluar' | 'opname';
+  type: 'masuk' | 'keluar' | 'opname' | 'retur';
   qty: number;
   hargaSatuan: number;
   totalHarga: number;
@@ -289,23 +291,21 @@ export interface Pembayaran {
   totalTagihan: number;
   totalBayar: number;
   sisaBayar: number;
-  sisa?: number;
   status: string;
   jatuhTempo?: string | null;
   spk?: Spk;
   detail?: PembayaranDetail[];
-  details?: PembayaranDetail[];
   createdAt: string;
   updatedAt: string;
 }
 
 export interface PembayaranDetail {
   id: number;
-  pembayaranId: number;
+  pembayaranId?: number;
   jumlah: number;
   metode: string;
-  tanggal: string;
   keterangan?: string | null;
+  tanggal: string;
 }
 
 // ==========================================
@@ -317,6 +317,17 @@ export interface LoyaltyTier {
   name: string;
   minPoints: number;
   discount: number;
+}
+
+export interface LoyaltyPoint {
+  id: number;
+  pelangganId: number;
+  type: 'earn' | 'redeem';
+  points: number;
+  description?: string | null;
+  refType?: string | null;
+  refId?: number | null;
+  createdAt: string;
 }
 
 // ==========================================

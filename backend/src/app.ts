@@ -28,11 +28,26 @@ import notifikasiRoutes from './modules/notifikasi/notifikasi.routes';
 import inspeksiRoutes from './modules/inspeksi/inspeksi.routes';
 import approvalRoutes from './modules/approval/approval.routes';
 import settingsRoutes from './modules/settings/settings.routes';
+import exportRoutes from './modules/settings/export.routes';
+import whatsappRoutes from './modules/whatsapp/whatsapp.routes';
 import logAktivitasRoutes from './modules/log-aktivitas/logAktivitas.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import eventsRoutes from './modules/events/events.routes';
+import searchRoutes from './modules/search/search.routes';
+import landingRoutes from './modules/landing/landing.routes';
+import bookingRoutes from './modules/booking/booking.routes';
+import { initializeEventListeners } from './modules/events/event.listener';
+import { initBackgroundJobs } from './jobs/cron';
+import { startCronJobs } from './jobs/index';
 
 const app = express();
+
+// Initialize Event Listeners for Decoupling
+initializeEventListeners();
+
+// Initialize Background Cron Jobs
+initBackgroundJobs();
+startCronJobs();
 
 // ==========================================
 // MIDDLEWARE
@@ -56,6 +71,7 @@ app.get(`${API}/health`, (_req, res) => {
   res.json({ success: true, message: 'MM Tracing API is running', timestamp: new Date().toISOString() });
 });
 
+app.use(`${API}`, exportRoutes);
 app.use(`${API}/auth`, authRoutes);
 app.use(`${API}/dashboard`, dashboardRoutes);
 app.use(`${API}/spk`, spkRoutes);
@@ -77,8 +93,12 @@ app.use(`${API}/notifikasi`, notifikasiRoutes);
 app.use(`${API}/inspeksi`, inspeksiRoutes);
 app.use(`${API}/approval`, approvalRoutes);
 app.use(`${API}/settings`, settingsRoutes);
+app.use(`${API}/whatsapp`, whatsappRoutes);
 app.use(`${API}/log-aktivitas`, logAktivitasRoutes);
 app.use(`${API}/events`, eventsRoutes);
+app.use(`${API}/search`, searchRoutes);
+app.use(`${API}/landing`, landingRoutes);
+app.use(`${API}/booking`, bookingRoutes);
 
 // ==========================================
 // ERROR HANDLING

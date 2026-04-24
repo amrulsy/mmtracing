@@ -7,6 +7,7 @@ import { sendSuccess, sendCreated, sendPaginated, parsePagination, generateInvoi
 import { sseManager } from '../../shared/sse';
 import { releaseGatePass } from '../../shared/gate-pass';
 import { NotFoundError } from '../../shared/errors';
+import { notifyReminderPembayaran } from '../whatsapp/whatsapp.notification';
 
 const router = Router();
 router.use(authMiddleware);
@@ -62,9 +63,9 @@ router.get('/summary', async (_req: Request, res: Response, next: NextFunction) 
       }),
     ]);
     sendSuccess(res, {
-      menunggu: { total: menunggu._sum.sisaBayar || 0, count: menunggu._count },
-      hariIni: { total: hariIni._sum.jumlah || 0, count: hariIni._count },
-      bulanIni: totalBulan._sum.jumlah || 0,
+      menunggu: { total: Number(menunggu._sum.sisaBayar || 0), count: menunggu._count },
+      hariIni: { total: Number(hariIni._sum.jumlah || 0), count: hariIni._count },
+      bulanIni: Number(totalBulan._sum.jumlah || 0),
     });
   } catch (e) { next(e); }
 });
@@ -85,17 +86,28 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /pembayaran/:id/bayar — Bayar (parsial / lunas)
-router.post('/:id/bayar', validate(bayarSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/bayar', requireRole('Admin', 'Kasir'), validate(bayarSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const pembayaran = await prisma.pembayaran.findUnique({ where: { id: Number(req.params.id) }, include: { spk: true } });
     if (!pembayaran) throw new NotFoundError('Pembayaran');
 
     const jumlah = Number(req.body.jumlah);
-    const newTotalBayar = pembayaran.totalBayar.toNumber() + jumlah;
-    const newSisa = pembayaran.totalTagihan.toNumber() - newTotalBayar;
-    const newStatus = newSisa <= 0 ? 'lunas' : 'parsial';
+    if (pembayaran.status === 'lunas') {
+      throw new Error('Invoice ini sudah lunas dan tidak dapat menerima pembayaran lagi');
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
+      // Re-fetch di dalam transaksi untuk cegah TOCTOU race condition
+      const freshPay = await tx.pembayaran.findUnique({ where: { id: pembayaran.id } });
+      if (!freshPay) throw new Error('Invoice tidak ditemukan');
+      if (freshPay.status === 'lunas') throw new Error('Invoice ini sudah lunas');
+      if (jumlah > freshPay.sisaBayar.toNumber()) {
+        throw new Error(`Jumlah pembayaran (Rp ${jumlah.toLocaleString('id-ID')}) melebihi sisa tagihan (Rp ${freshPay.sisaBayar.toNumber().toLocaleString('id-ID')})`);
+      }
+      const newTotalBayar = freshPay.totalBayar.toNumber() + jumlah;
+      const newSisa = freshPay.totalTagihan.toNumber() - newTotalBayar;
+      const newStatus = newSisa <= 0 ? 'lunas' : 'parsial';
+
       await tx.pembayaranDetail.create({
         data: {
           pembayaranId: pembayaran.id,
@@ -135,6 +147,18 @@ router.post('/:id/bayar', validate(bayarSchema), async (req: Request, res: Respo
         }
       }
 
+      // Activity log
+      await tx.activityLog.create({
+        data: {
+          userId: (req as any).user?.id ?? null,
+          action: 'bayar',
+          module: 'pembayaran',
+          targetId: pembayaran.id,
+          targetName: pembayaran.noInvoice,
+          detail: JSON.stringify({ jumlah, metode: req.body.metode, newStatus }),
+        },
+      });
+
       return updatedPay;
     });
 
@@ -143,6 +167,11 @@ router.post('/:id/bayar', validate(bayarSchema), async (req: Request, res: Respo
     sseManager.broadcast(sseEvent as any, { pembayaranId: updated.id, noInvoice: updated.noInvoice, status: updated.status });
 
     sendSuccess(res, updated, `Pembayaran Rp ${jumlah.toLocaleString('id-ID')} berhasil dicatat.`);
+
+    // 🔔 WhatsApp: Send payment reminder if partially paid (still has remaining balance)
+    if (updated.status === 'parsial') {
+      notifyReminderPembayaran(updated.id);
+    }
   } catch (e) { next(e); }
 });
 
@@ -172,10 +201,10 @@ router.post('/:id/refund', requireRole('Admin'), async (req: Request, res: Respo
         },
       });
 
-      // 3. Reset totalBayar di SPK
+      // 3. Kurangi totalBayar di SPK (decrement, bukan hard reset — aman untuk multi-invoice)
       await tx.spk.update({
         where: { id: pembayaran.spkId },
-        data: { totalBayar: 0 },
+        data: { totalBayar: { decrement: pembayaran.totalBayar.toNumber() } },
       });
 
       // 4. Reset totalTrx pelanggan (cegah nilai negatif)

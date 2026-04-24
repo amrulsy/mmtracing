@@ -12,6 +12,7 @@ router.get('/pendapatan', async (req: Request, res: Response, next: NextFunction
     const { startDate, endDate } = req.query;
     const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const end = endDate ? new Date(endDate as string) : new Date();
+    end.setHours(23, 59, 59, 999); // Inklusif hingga akhir hari
 
     const payments = await prisma.pembayaranDetail.findMany({
       where: { tanggal: { gte: start, lte: end } },
@@ -19,14 +20,16 @@ router.get('/pendapatan', async (req: Request, res: Response, next: NextFunction
       orderBy: { tanggal: 'asc' },
     });
 
-    // Group by date
+    // Group by date (WIB = UTC+7)
     const grouped = payments.reduce((acc: any, p) => {
-      const day = p.tanggal.toISOString().split('T')[0];
+      const day = p.tanggal.toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' }); // 'sv-SE' gives YYYY-MM-DD format
       if (!acc[day]) acc[day] = { date: day, rutin: 0, modifikasi: 0, total: 0 };
       const amount = Number(p.jumlah);
       acc[day].total += amount;
-      if (p.pembayaran.spk.mode === 'rutin') acc[day].rutin += amount;
-      else acc[day].modifikasi += amount;
+      const mode = p.pembayaran.spk.mode;
+      if (mode === 'rutin') acc[day].rutin += amount;
+      else if (mode === 'modifikasi') acc[day].modifikasi += amount;
+      else acc[day].bubut = (acc[day].bubut || 0) + amount;
       return acc;
     }, {});
 
@@ -34,32 +37,52 @@ router.get('/pendapatan', async (req: Request, res: Response, next: NextFunction
   } catch (e) { next(e); }
 });
 
-// GET /laporan/laba-rugi — Menghitung Laba Kotor (Pendapatan - Pengeluaran)
+// GET /laporan/laba-rugi — Menghitung Laba Rugi (Pendapatan - HPP - Pengeluaran)
 router.get('/laba-rugi', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { startDate, endDate } = req.query;
     const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const end = endDate ? new Date(endDate as string) : new Date();
+    end.setHours(23, 59, 59, 999); // Inklusif hingga akhir hari
 
-    const [pendapatan, pengeluaran] = await Promise.all([
+    const [pendapatan, pengeluaran, spkItems] = await Promise.all([
+      // Cash In: Pembayaran yang masuk
       prisma.pembayaranDetail.aggregate({
         where: { tanggal: { gte: start, lte: end } },
         _sum: { jumlah: true },
       }),
+      // Cash Out: Pengeluaran operasional
       prisma.pengeluaran.aggregate({
         where: { tanggal: { gte: start, lte: end } },
         _sum: { jumlah: true },
+      }),
+      // HPP: Harga modal sparepart dari SPK yang telah selesai dalam rentang waktu
+      prisma.spkItem.findMany({
+        where: {
+          spk: {
+            status: 'selesai',
+            completedAt: { gte: start, lte: end },
+          },
+          type: 'sparepart',
+        },
+        select: { hargaModal: true, qty: true },
       }),
     ]);
 
     const totalPendapatan = Number(pendapatan._sum.jumlah || 0);
     const totalPengeluaran = Number(pengeluaran._sum.jumlah || 0);
+    const totalHpp = spkItems.reduce((sum, item) => sum + (Number(item.hargaModal) * item.qty), 0);
+
+    const labaKotor = totalPendapatan - totalHpp;
+    const labaBersih = labaKotor - totalPengeluaran;
 
     sendSuccess(res, {
       periode: { start, end },
       pendapatan: totalPendapatan,
+      hpp: totalHpp,
+      labaKotor: labaKotor,
       pengeluaran: totalPengeluaran,
-      labaKotor: totalPendapatan - totalPengeluaran
+      labaBersih: labaBersih,
     });
   } catch (e) { next(e); }
 });
@@ -67,17 +90,33 @@ router.get('/laba-rugi', async (req: Request, res: Response, next: NextFunction)
 // GET /laporan/mekanik — top mekanik performance
 router.get('/mekanik', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await prisma.mekanik.findMany({
-      orderBy: { totalSpk: 'desc' },
-      include: {
-        _count: { select: { spk: true } },
-        spk: { where: { status: 'selesai' }, select: { totalHarga: true } },
-      },
-    });
-    const enriched = data.map(m => ({
-      ...m,
-      totalPendapatan: m.spk.reduce((s, spk) => s + Number(spk.totalHarga), 0),
-    }));
+    const [data, revenueRaw, selesaiRaw] = await Promise.all([
+      prisma.mekanik.findMany({
+        orderBy: { totalSpk: 'desc' },
+        include: { _count: { select: { spk: true } } },
+      }),
+      prisma.spk.groupBy({
+        by: ['mekanikId'],
+        where: { status: 'selesai' },
+        _sum: { totalHarga: true },
+      }),
+      prisma.spk.groupBy({
+        by: ['mekanikId'],
+        where: { status: 'selesai' },
+        _count: { id: true },
+      }),
+    ]);
+
+    const revenueMap = new Map(revenueRaw.map(r => [r.mekanikId, Number(r._sum.totalHarga || 0)]));
+    const selesaiMap = new Map(selesaiRaw.map(r => [r.mekanikId, r._count.id]));
+
+    const enriched = data
+      .map(m => ({
+        ...m,
+        totalPendapatan: revenueMap.get(m.id) || 0,
+        spkSelesai: selesaiMap.get(m.id) || 0,
+      }))
+      .sort((a, b) => b.totalPendapatan - a.totalPendapatan);
     sendSuccess(res, enriched);
   } catch (e) { next(e); }
 });
@@ -112,11 +151,17 @@ router.get('/layanan', async (_req: Request, res: Response, next: NextFunction) 
 });
 
 // GET /laporan/top-items — Top 5 Jasa & Sparepart
-router.get('/top-items', async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/top-items', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { startDate, endDate } = req.query;
+    const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const end = endDate ? new Date(endDate as string) : new Date();
+    end.setHours(23, 59, 59, 999);
+
     const items = await prisma.spkItem.findMany({
-      where: { spk: { status: 'selesai' } },
+      where: { spk: { status: 'selesai', completedAt: { gte: start, lte: end } } },
       select: { type: true, nama: true, qty: true, subtotal: true },
+      take: 1000, // Batasi untuk performa
     });
 
     const grouped = items.reduce((acc: any, item) => {

@@ -41,14 +41,14 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
         )}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-surface-border">
-            <h2 className="text-lg font-bold">{title}</h2>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-surface-border shrink-0">
+            <h2 className="text-base sm:text-lg font-bold">{title}</h2>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors">
               <X size={20} />
             </button>
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(85vh-60px)]">{children}</div>
       </div>
     </div>
   );

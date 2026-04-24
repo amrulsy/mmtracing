@@ -43,12 +43,18 @@ export function generateInvoiceNo(): string {
   const y = String(now.getFullYear()).slice(-2);
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
-  const rand = String(Math.floor(Math.random() * 100)).padStart(2, '0');
-  return `INV-${y}${m}${d}-${rand}`;
+  // Gunakan millisecond + random 3 digit untuk menghindari collision (1000 * 1000 = 1jt kombinasi/hari)
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  const rand = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  return `INV-${y}${m}${d}-${ms}${rand}`;
 }
 
-export function generateSpkNo(counter: number): string {
+export function generateSpkNo(): string {
   const now = new Date();
-  const y = now.getFullYear();
-  return `SPK-${y}-${String(counter).padStart(4, '0')}`;
+  const y = String(now.getFullYear()).slice(-2);
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  const rand = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  return `SPK-${y}${m}${d}-${ms}${rand}`;
 }

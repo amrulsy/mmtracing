@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import prisma from '../../config/database';
-import { sendSuccess } from '../../shared/utils';
+import { sendSuccess, generateInvoiceNo } from '../../shared/utils';
 import { NotFoundError } from '../../shared/errors';
 
 const router = Router();
@@ -51,20 +51,25 @@ router.post('/:token', async (req: Request, res: Response, next: NextFunction) =
       data: { status: action, respondedAt: new Date() },
     });
 
-    // If approved, create pembayaran entry for the SPK
+    // If approved, buat pembayaran HANYA jika belum ada invoice untuk SPK ini
     if (action === 'approved') {
       const spk = await prisma.spk.findUnique({ where: { id: approvalToken.spkId } });
       if (spk) {
-        const now = new Date();
-        const noInv = `INV-${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
-        await prisma.pembayaran.create({
-          data: {
-            noInvoice: noInv,
-            spkId: spk.id,
-            totalTagihan: spk.totalHarga,
-            sisaBayar: spk.totalHarga,
-          },
-        });
+        const existingPembayaran = await prisma.pembayaran.findFirst({ where: { spkId: spk.id } });
+        if (!existingPembayaran) {
+          const totalTagihan = Math.max(0, spk.totalHarga.toNumber() - spk.diskon.toNumber());
+          const jatuhTempo = new Date();
+          jatuhTempo.setDate(jatuhTempo.getDate() + 30);
+          await prisma.pembayaran.create({
+            data: {
+              noInvoice: generateInvoiceNo(),
+              spkId: spk.id,
+              totalTagihan,
+              sisaBayar: totalTagihan,
+              jatuhTempo,
+            },
+          });
+        }
       }
     }
 

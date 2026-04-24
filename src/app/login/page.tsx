@@ -16,7 +16,7 @@ export default function LoginPage() {
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
-    if (isAuthenticated) router.replace("/");
+    if (isAuthenticated) router.replace("/app");
   }, [isAuthenticated, router]);
 
   if (isAuthenticated) return null;
@@ -33,7 +33,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(username, password);
-      router.replace("/");
+      router.replace("/app");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login gagal";
       setError(msg);

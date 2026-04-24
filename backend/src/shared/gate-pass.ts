@@ -10,7 +10,11 @@
 export async function releaseGatePass(tx: any, spkId: number): Promise<void> {
   const spk = await tx.spk.findUnique({
     where: { id: spkId },
-    include: { items: true, stages: true },
+    include: {
+      items: { include: { jasa: true } },
+      stages: true,
+      pembayaran: { select: { totalTagihan: true } },
+    },
   });
   if (!spk) return;
 
@@ -27,6 +31,10 @@ export async function releaseGatePass(tx: any, spkId: number): Promise<void> {
     if ('type' in item && item.type === 'sparepart') {
       daysGaransi = 180;
       typeGaransi = 'part';
+    } else if ('type' in item && item.type === 'jasa' && item.jasa?.garansiHari) {
+      // Gunakan garansiHari dari master data Jasa jika tersedia
+      daysGaransi = item.jasa.garansiHari;
+      typeGaransi = 'jasa';
     }
     if (spk.mode === 'modifikasi') {
       daysGaransi = 90;
@@ -49,7 +57,11 @@ export async function releaseGatePass(tx: any, spkId: number): Promise<void> {
   }
 
   // ── 2. Terbitkan Loyalty Points (1 poin per Rp 10.000) ───────
-  const totalNum = spk.totalHarga.toNumber();
+  // Gunakan totalTagihan (setelah diskon) dari invoice, fallback ke totalHarga
+  const pembayaran = spk.pembayaran?.[0];
+  const totalNum = pembayaran
+    ? Number(pembayaran.totalTagihan)
+    : spk.totalHarga.toNumber();
   if (totalNum > 0) {
     const points = Math.floor(totalNum / 10000);
     if (points > 0) {

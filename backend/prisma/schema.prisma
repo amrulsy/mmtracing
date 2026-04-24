@@ -245,6 +245,10 @@ model Spk {
   jadwal        Jadwal[]
   approvalToken ApprovalToken[]
 
+  @@index([status])
+  @@index([pelangganId])
+  @@index([mekanikId])
+
   @@map("spk")
 }
 
@@ -256,6 +260,7 @@ model SpkItem {
   jasaId      Int?
   nama        String   @db.VarChar(150)
   qty         Int      @default(1)
+  hargaModal  Decimal  @default(0) @db.Decimal(12, 2)
   hargaSatuan Decimal  @default(0) @db.Decimal(12, 2)
   subtotal    Decimal  @default(0) @db.Decimal(12, 2)
   status      String   @default("pending") @db.VarChar(20) // pending, done
@@ -611,3 +616,42 @@ model Setting {
 
   @@map("settings")
 }
+
+// ==========================================
+// BOOKING ONLINE (from Landing Page)
+// ==========================================
+
+model Booking {
+  id             Int       @id @default(autoincrement())
+  nama           String    @db.VarChar(150)
+  whatsapp       String    @db.VarChar(20)
+  jenisKendaraan String    @db.VarChar(50)
+  merkTipe       String?   @db.VarChar(100)
+  layanan        String    @db.VarChar(50)
+  tanggal        DateTime? @db.Date
+  keluhan        String?   @db.Text
+  status         String    @default("baru") @db.VarChar(20) // baru, dikonfirmasi, selesai, dibatalkan
+  catatan        String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@map("bookings")
+}
+
+// ==========================================
+// PUSAT REKAMAN (ANALYTICS)
+// ==========================================
+
+model DashboardStats {
+  date             DateTime @id @db.Date
+  totalPendapatan  Decimal  @default(0) @db.Decimal(15, 2)
+  jumlahService    Int      @default(0)
+  sparepartKeluar  Int      @default(0)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("dashboard_stats")
+}
+

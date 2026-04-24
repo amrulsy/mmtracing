@@ -12,6 +12,7 @@ export interface AuthRequest extends Request {
     email: string | null;
     roleId: number;
     roleName: string;
+    permissions: string[];
   };
 }
 
@@ -41,6 +42,7 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
       email: user.email,
       roleId: user.roleId,
       roleName: user.role.name,
+      permissions: Array.isArray(user.role.permissions) ? user.role.permissions as string[] : [],
     };
 
     next();
@@ -64,5 +66,21 @@ export function requireRole(...roles: string[]) {
       return next(new UnauthorizedError('Tidak memiliki akses untuk role ini'));
     }
     next();
+  };
+}
+
+export function requirePermission(permission: string) {
+  return (req: AuthRequest, _res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new UnauthorizedError());
+    }
+    // Owner / Admin bypass
+    if (req.user.roleName === 'Admin') {
+      return next();
+    }
+    if (req.user.permissions && req.user.permissions.includes(permission)) {
+      return next();
+    }
+    return next(new UnauthorizedError(`Akses ditolak: Membutuhkan izin '${permission}'`));
   };
 }

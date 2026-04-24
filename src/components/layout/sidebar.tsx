@@ -16,6 +16,7 @@ import {
   Boxes,
   Users,
   Calendar,
+  CalendarCheck,
   Star,
   ScrollText,
   HelpCircle,
@@ -29,43 +30,44 @@ const navGroups = [
   {
     label: "",
     items: [
-      { name: "Dashboard", href: "/", icon: LayoutDashboard },
-      { name: "Kendaraan", href: "/kendaraan", icon: CarFront },
-      { name: "SPK", href: "/spk", icon: FileText },
-      { name: "Monitoring", href: "/monitoring", icon: Wrench },
-      { name: "Pembayaran", href: "/pembayaran", icon: Wallet },
+      { name: "Dashboard", href: "/app", icon: LayoutDashboard },
+      { name: "Kendaraan", href: "/app/kendaraan", icon: CarFront },
+      { name: "SPK", href: "/app/spk", icon: FileText },
+      { name: "Monitoring", href: "/app/monitoring", icon: Wrench },
+      { name: "Pembayaran", href: "/app/pembayaran", icon: Wallet },
+      { name: "Booking", href: "/app/booking", icon: CalendarCheck },
     ],
   },
   {
     label: "Master Data",
     items: [
-      { name: "Sparepart", href: "/master/sparepart", icon: Package },
-      { name: "Jasa & Layanan", href: "/master/jasa", icon: Hammer },
-      { name: "Supplier", href: "/master/supplier", icon: Truck },
-      { name: "Inventaris", href: "/inventaris", icon: Boxes },
+      { name: "Sparepart", href: "/app/master/sparepart", icon: Package },
+      { name: "Jasa & Layanan", href: "/app/master/jasa", icon: Hammer },
+      { name: "Supplier", href: "/app/master/supplier", icon: Truck },
+      { name: "Inventaris", href: "/app/inventaris", icon: Boxes },
     ],
   },
   {
     label: "Tim & Jadwal",
     items: [
-      { name: "Mekanik", href: "/mekanik", icon: Users },
-      { name: "Jadwal", href: "/jadwal", icon: Calendar },
+      { name: "Mekanik", href: "/app/mekanik", icon: Users },
+      { name: "Jadwal", href: "/app/jadwal", icon: Calendar },
     ],
   },
   {
     label: "Operasional",
     items: [
-      { name: "Inspeksi", href: "/inspeksi", icon: ClipboardCheck },
-      { name: "Garansi", href: "/garansi", icon: Shield },
-      { name: "Pengeluaran", href: "/pengeluaran", icon: Receipt },
+      { name: "Inspeksi", href: "/app/inspeksi", icon: ClipboardCheck },
+      { name: "Garansi", href: "/app/garansi", icon: Shield },
+      { name: "Pengeluaran", href: "/app/pengeluaran", icon: Receipt },
     ],
   },
   {
     label: "Bisnis",
     items: [
-      { name: "Laporan", href: "/laporan", icon: BarChart3 },
-      { name: "Loyalty", href: "/loyalty", icon: Star },
-      { name: "Log Aktivitas", href: "/log-aktivitas", icon: ScrollText },
+      { name: "Laporan", href: "/app/laporan", icon: BarChart3 },
+      { name: "Loyalty", href: "/app/loyalty", icon: Star },
+      { name: "Log Aktivitas", href: "/app/log-aktivitas", icon: ScrollText },
     ],
   },
 ];
@@ -76,7 +78,7 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-surface-border glass hidden lg:flex flex-col">
       <div className="h-16 flex items-center px-6 border-b border-surface-border">
-        <Link href="/" className="flex items-center gap-2 group">
+        <Link href="/app" className="flex items-center gap-2 group">
           <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-white font-bold group-hover:scale-105 transition-transform shadow-glossy-primary">
             M
           </div>
@@ -92,7 +94,7 @@ export function Sidebar() {
             )}
             <div className="space-y-0.5">
               {group.items.map((item) => {
-                const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                const isActive = item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href);
                 return (
                   <Link
                     key={item.name}
@@ -116,20 +118,20 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-surface-border space-y-0.5">
         <Link
-          href="/bantuan"
+          href="/app/bantuan"
           className={cn(
             "flex items-center gap-3 px-3 py-2 rounded-xl transition-colors text-sm",
-            pathname === "/bantuan" ? "bg-primary text-primary-foreground font-medium shadow-glossy-primary" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"
+            pathname === "/app/bantuan" ? "bg-primary text-primary-foreground font-medium shadow-glossy-primary" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"
           )}
         >
           <HelpCircle size={18} />
           <span>Bantuan</span>
         </Link>
         <Link
-          href="/settings"
+          href="/app/settings"
           className={cn(
             "flex items-center gap-3 px-3 py-2 rounded-xl transition-colors text-sm",
-            pathname.startsWith("/settings") ? "bg-primary text-primary-foreground font-medium shadow-glossy-primary" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"
+            pathname.startsWith("/app/settings") ? "bg-primary text-primary-foreground font-medium shadow-glossy-primary" : "text-muted-foreground hover:text-foreground hover:bg-surface-hover"
           )}
         >
           <Settings size={18} />
@@ -139,4 +141,3 @@ export function Sidebar() {
     </aside>
   );
 }
-

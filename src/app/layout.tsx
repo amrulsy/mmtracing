@@ -1,8 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { AdminLayout } from "@/components/layout/admin-layout";
 import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "sonner";
 
@@ -14,7 +13,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "MM Tracing | Manajemen Bengkel",
   description: "Sistem Manajemen Bengkel Terpadu",
-  viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -24,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body className={`${inter.variable} antialiased selection:bg-primary/20 selection:text-primary`}>
+      <body className={`${inter.variable} antialiased overflow-x-hidden selection:bg-primary/20 selection:text-primary`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -32,7 +38,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <AdminLayout>{children}</AdminLayout>
+            {children}
             <Toaster position="top-center" richColors />
           </AuthProvider>
         </ThemeProvider>

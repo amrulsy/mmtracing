@@ -31,6 +31,33 @@ const stokReturSchema = z.object({
   keterangan: z.string().optional(),
 });
 
+const opnameItemSchema = z.object({
+  sparepartId: z.number().int().positive(),
+  stokFisik: z.number().int().min(0),
+  keterangan: z.string().optional(),
+});
+
+const opnameSchema = z.object({
+  items: z.array(opnameItemSchema).min(1, 'Minimal 1 item diperlukan untuk opname'),
+  catatan: z.string().optional(),
+});
+
+// GET /inventaris/opname — history stok opname
+router.get('/opname', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { page, limit, skip } = parsePagination(req.query);
+    const [data, total] = await Promise.all([
+      prisma.stokOpname.findMany({
+        skip, take: limit,
+        orderBy: { tanggal: 'desc' },
+        include: { items: true },
+      }),
+      prisma.stokOpname.count(),
+    ]);
+    sendPaginated(res, data, total, page, limit);
+  } catch (e) { next(e); }
+});
+
 // GET /inventaris — recent logs
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -87,6 +114,11 @@ router.post('/masuk', requireRole('Admin'), validate(stokMasukSchema), async (re
           hargaBeli: hargaSatuan, // Update harga beli terbaru
         },
       });
+      await tx.activityLog.create({ data: {
+        userId: (req as any).user?.id ?? null,
+        action: 'stok_masuk', module: 'inventaris',
+        targetId: sparepartId, detail: JSON.stringify({ qty, hargaSatuan, noPo }),
+      }});
       return log;
     });
     sendCreated(res, result, `Stok masuk ${qty} pcs berhasil`);
@@ -126,6 +158,11 @@ router.post('/keluar', requireRole('Admin'), validate(stokKeluarSchema), async (
       if (updated.count === 0) {
         throw new BadRequestError(`Stok tidak mencukupi untuk dikeluarkan saat permintaan diproses secara simultan.`);
       }
+      await tx.activityLog.create({ data: {
+        userId: (req as any).user?.id ?? null,
+        action: 'stok_keluar', module: 'inventaris',
+        targetId: sparepartId, detail: JSON.stringify({ qty, keterangan }),
+      }});
       return log;
     });
     sendCreated(res, result, `Stok keluar ${qty} pcs berhasil`);
@@ -169,6 +206,11 @@ router.post('/retur', requireRole('Admin'), validate(stokReturSchema), async (re
       if (updated.count === 0) {
         throw new BadRequestError(`Stok tidak mencukupi untuk diretur saat permintaan diproses secara simultan.`);
       }
+      await tx.activityLog.create({ data: {
+        userId: (req as any).user?.id ?? null,
+        action: 'stok_retur', module: 'inventaris',
+        targetId: sparepartId, detail: JSON.stringify({ qty, supplierId }),
+      }});
       return log;
     });
     sendCreated(res, result, `Retur ${qty} pcs berhasil`);
@@ -176,33 +218,77 @@ router.post('/retur', requireRole('Admin'), validate(stokReturSchema), async (re
 });
 
 // POST /inventaris/opname
-router.post('/opname', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/opname', requireRole('Admin'), validate(opnameSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { items, catatan } = req.body;
+    const operatorName = (req as any).user?.name || 'Admin';
+
     const opname = await prisma.$transaction(async (tx) => {
+      // Fetch stok sistem dari DB untuk setiap sparepartId (bukan percaya client)
+      const sparepartIds = items.map((i: any) => i.sparepartId);
+      const spareparts = await tx.sparepart.findMany({
+        where: { id: { in: sparepartIds } },
+        select: { id: true, stok: true, name: true },
+      });
+      const stokMap = new Map(spareparts.map((sp: any) => [sp.id, sp]));
+
+      // Validasi semua sparepartId valid
+      for (const item of items) {
+        if (!stokMap.has(item.sparepartId)) {
+          throw new BadRequestError(`Sparepart ID ${item.sparepartId} tidak ditemukan`);
+        }
+      }
+
       const created = await tx.stokOpname.create({
         data: {
           catatan,
           status: 'selesai',
           items: {
-            create: items.map((item: any) => ({
-              sparepartId: item.sparepartId,
-              stokSistem: item.stokSistem,
-              stokFisik: item.stokFisik,
-              selisih: item.stokFisik - item.stokSistem,
-              keterangan: item.keterangan,
-            })),
+            create: items.map((item: any) => {
+              const sp = stokMap.get(item.sparepartId)!;
+              const stokSistem = Number(sp.stok);
+              const stokFisik = Number(item.stokFisik);
+              return {
+                sparepartId: item.sparepartId,
+                stokSistem,
+                stokFisik,
+                selisih: stokFisik - stokSistem,
+                keterangan: item.keterangan,
+              };
+            }),
           },
         },
         include: { items: true },
       });
+
       // Adjust stock based on physical count
       for (const item of items) {
-        await tx.sparepart.update({
-          where: { id: item.sparepartId },
-          data: { stok: item.stokFisik },
-        });
+        const sp = stokMap.get(item.sparepartId)!;
+        const stokSistem = Number(sp.stok);
+        const stokFisik = Number(item.stokFisik);
+        const selisih = stokFisik - stokSistem;
+        if (selisih !== 0) {
+          await tx.sparepart.update({
+            where: { id: item.sparepartId },
+            data: { stok: stokFisik },
+          });
+
+          const ket = `[Opname] ${selisih > 0 ? '+' : ''}${selisih}: ${stokSistem}→${stokFisik}${item.keterangan ? ` - ${item.keterangan}` : ''}`.slice(0, 195);
+          await tx.inventarisLog.create({
+            data: {
+              sparepartId: item.sparepartId,
+              type: 'opname',
+              qty: Math.abs(selisih),
+              keterangan: ket,
+            },
+          });
+        }
       }
+      await tx.activityLog.create({ data: {
+        userId: (req as any).user?.id ?? null,
+        action: 'opname', module: 'inventaris',
+        detail: JSON.stringify({ itemCount: items.length, catatan }),
+      }});
       return created;
     });
     sendCreated(res, opname, 'Stok opname berhasil');

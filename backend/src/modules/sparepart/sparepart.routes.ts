@@ -49,7 +49,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       ];
     }
     if (kategoriId) where.kategoriId = Number(kategoriId);
-    if (lowStock === 'true') where.stok = { lte: prisma.sparepart.fields.stokMinimum };
+    if (lowStock === 'true') where.AND = [{ stok: { gt: 0 } }]; // handled via raw on /low-stock endpoint
     const [data, total] = await Promise.all([
       prisma.sparepart.findMany({
         where, skip, take: limit, orderBy: { name: 'asc' },
@@ -78,6 +78,11 @@ router.get('/categories', async (_req: Request, res: Response, next: NextFunctio
 router.post('/categories', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.kategoriSparepart.create({ data: { name: req.body.name } });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'create_kategori', module: 'master',
+      targetId: data.id, targetName: data.name,
+    }});
     sendCreated(res, data);
   } catch (e) { next(e); }
 });
@@ -88,6 +93,11 @@ router.put('/categories/:id', requireRole('Admin'), async (req: Request, res: Re
       where: { id: Number(req.params.id) },
       data: { name: req.body.name },
     });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'update_kategori', module: 'master',
+      targetId: data.id, targetName: data.name,
+    }});
     sendSuccess(res, data, 'Kategori berhasil diperbarui');
   } catch (e) { next(e); }
 });
@@ -95,11 +105,17 @@ router.put('/categories/:id', requireRole('Admin'), async (req: Request, res: Re
 router.delete('/categories/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
+    const kategori = await prisma.kategoriSparepart.findUnique({ where: { id }, select: { name: true } });
     const inUse = await prisma.sparepart.count({ where: { kategoriId: id } });
     if (inUse > 0) {
       throw new BadRequestError(`Kategori ini masih digunakan oleh ${inUse} sparepart dan tidak dapat dihapus.`);
     }
     await prisma.kategoriSparepart.delete({ where: { id } });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'delete_kategori', module: 'master',
+      targetId: id, targetName: kategori?.name,
+    }});
     sendSuccess(res, null, 'Kategori berhasil dihapus');
   } catch (e) { next(e); }
 });
@@ -118,9 +134,14 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requireRole('Admin'), validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.sparepart.create({ data: req.body });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'create', module: 'master',
+      targetId: data.id, targetName: data.name,
+    }});
     sendCreated(res, data, 'Sparepart berhasil ditambahkan');
   } catch (e) { next(e); }
 });
@@ -128,11 +149,16 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
 router.put('/:id', requireRole('Admin'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.sparepart.update({ where: { id: Number(req.params.id) }, data: req.body });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'update', module: 'master',
+      targetId: data.id, targetName: data.name,
+    }});
     sendSuccess(res, data, 'Sparepart berhasil diperbarui');
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
 
@@ -160,10 +186,16 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
       );
     }
 
+    const sp = await prisma.sparepart.findUnique({ where: { id }, select: { name: true } });
     await prisma.$transaction(async (tx) => {
       // Hapus log inventaris terkait
       await tx.inventarisLog.deleteMany({ where: { sparepartId: id } });
       await tx.sparepart.delete({ where: { id } });
+      await tx.activityLog.create({ data: {
+        userId: (req as any).user?.id ?? null,
+        action: 'delete', module: 'master',
+        targetId: id, targetName: sp?.name,
+      }});
     });
 
     sendSuccess(res, null, 'Sparepart berhasil dihapus');

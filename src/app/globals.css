@@ -75,6 +75,7 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
   }
 }
 
@@ -97,6 +98,71 @@
     @apply opacity-100;
   }
 }
+
+/* ═══════════════════════════════════
+   HERO BACKGROUND ANIMATIONS
+   ═══════════════════════════════════ */
+
+@keyframes hero-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(80px, -60px) scale(1.15); }
+  50% { transform: translate(-50px, -30px) scale(0.9); }
+  75% { transform: translate(30px, 50px) scale(1.08); }
+}
+
+@keyframes hero-float-reverse {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-70px, 40px) scale(0.92); }
+  50% { transform: translate(60px, 60px) scale(1.12); }
+  75% { transform: translate(-30px, -50px) scale(0.95); }
+}
+
+@keyframes hero-spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes hero-grid-drift {
+  0% { background-position: 0px 0px; }
+  100% { background-position: 40px 40px; }
+}
+
+@keyframes hero-particle {
+  0%, 100% { opacity: 0; transform: translateY(0) scale(0); }
+  15% { opacity: 1; transform: translateY(-30px) scale(1.2); }
+  85% { opacity: 0.4; transform: translateY(-200px) scale(0.6); }
+}
+
+@keyframes hero-glow-pulse {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.1); }
+}
+
+.hero-orb-1 {
+  animation: hero-float 12s ease-in-out infinite;
+}
+.hero-orb-2 {
+  animation: hero-float-reverse 14s ease-in-out infinite;
+}
+.hero-orb-3 {
+  animation: hero-float 18s ease-in-out infinite 2s;
+}
+.hero-ring {
+  animation: hero-spin-slow 25s linear infinite;
+}
+.hero-grid {
+  animation: hero-grid-drift 6s linear infinite;
+}
+.hero-glow {
+  animation: hero-glow-pulse 4s ease-in-out infinite;
+}
+.hero-particle-1 { animation: hero-particle 3s ease-in-out infinite 0s; }
+.hero-particle-2 { animation: hero-particle 4s ease-in-out infinite 1s; }
+.hero-particle-3 { animation: hero-particle 3.5s ease-in-out infinite 2s; }
+.hero-particle-4 { animation: hero-particle 4.5s ease-in-out infinite 0.5s; }
+.hero-particle-5 { animation: hero-particle 5s ease-in-out infinite 2.5s; }
+.hero-particle-6 { animation: hero-particle 3.2s ease-in-out infinite 1.5s; }
+.hero-particle-7 { animation: hero-particle 4.2s ease-in-out infinite 3s; }
 
 /* Mobile-responsive utilities */
 @layer utilities {

@@ -5,3 +5,7 @@ uploads/
 wa-sessions/
 logs/
 *.log
+
+# Baileys WhatsApp Cache
+.baileys/
+.baileys

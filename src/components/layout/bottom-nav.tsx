@@ -30,10 +30,10 @@ import {
 import { cn } from "@/lib/utils";
 
 const primaryTabs = [
-  { name: "Home", href: "/", icon: LayoutDashboard },
-  { name: "SPK", href: "/spk", icon: FileText },
-  { name: "Monitor", href: "/monitoring", icon: Wrench },
-  { name: "Bayar", href: "/pembayaran", icon: Wallet },
+  { name: "Home", href: "/app", icon: LayoutDashboard },
+  { name: "SPK", href: "/app/spk", icon: FileText },
+  { name: "Monitor", href: "/app/monitoring", icon: Wrench },
+  { name: "Bayar", href: "/app/pembayaran", icon: Wallet },
   { name: "Lainnya", href: "#more", icon: MoreHorizontal },
 ];
 
@@ -41,42 +41,43 @@ const moreMenuGroups = [
   {
     label: "Utama",
     items: [
-      { name: "Pelanggan", href: "/kendaraan", icon: CarFront },
-      { name: "Notifikasi", href: "/notifikasi", icon: Bell },
-      { name: "Laporan", href: "/laporan", icon: BarChart3 },
+      { name: "Pelanggan", href: "/app/kendaraan", icon: CarFront },
+      { name: "Booking", href: "/app/booking", icon: Calendar },
+      { name: "Notifikasi", href: "/app/notifikasi", icon: Bell },
+      { name: "Laporan", href: "/app/laporan", icon: BarChart3 },
     ],
   },
   {
     label: "Master Data",
     items: [
-      { name: "Sparepart", href: "/master/sparepart", icon: Package },
-      { name: "Jasa & Layanan", href: "/master/jasa", icon: Hammer },
-      { name: "Supplier", href: "/master/supplier", icon: Truck },
-      { name: "Inventaris", href: "/inventaris", icon: Boxes },
+      { name: "Sparepart", href: "/app/master/sparepart", icon: Package },
+      { name: "Jasa & Layanan", href: "/app/master/jasa", icon: Hammer },
+      { name: "Supplier", href: "/app/master/supplier", icon: Truck },
+      { name: "Inventaris", href: "/app/inventaris", icon: Boxes },
     ],
   },
   {
     label: "Tim & Jadwal",
     items: [
-      { name: "Mekanik", href: "/mekanik", icon: Users },
-      { name: "Jadwal", href: "/jadwal", icon: Calendar },
+      { name: "Mekanik", href: "/app/mekanik", icon: Users },
+      { name: "Jadwal", href: "/app/jadwal", icon: Calendar },
     ],
   },
   {
     label: "Operasional",
     items: [
-      { name: "Inspeksi", href: "/inspeksi", icon: ClipboardCheck },
-      { name: "Garansi", href: "/garansi", icon: Shield },
-      { name: "Pengeluaran", href: "/pengeluaran", icon: Receipt },
+      { name: "Inspeksi", href: "/app/inspeksi", icon: ClipboardCheck },
+      { name: "Garansi", href: "/app/garansi", icon: Shield },
+      { name: "Pengeluaran", href: "/app/pengeluaran", icon: Receipt },
     ],
   },
   {
     label: "Lainnya",
     items: [
-      { name: "Loyalty", href: "/loyalty", icon: Star },
-      { name: "Log Aktivitas", href: "/log-aktivitas", icon: ScrollText },
-      { name: "Bantuan", href: "/bantuan", icon: HelpCircle },
-      { name: "Pengaturan", href: "/settings", icon: Settings },
+      { name: "Loyalty", href: "/app/loyalty", icon: Star },
+      { name: "Log Aktivitas", href: "/app/log-aktivitas", icon: ScrollText },
+      { name: "Bantuan", href: "/app/bantuan", icon: HelpCircle },
+      { name: "Pengaturan", href: "/app/settings", icon: Settings },
     ],
   },
 ];
@@ -88,7 +89,7 @@ export function BottomNav() {
   // Check if current path matches any "more" menu item
   const isMoreActive = moreMenuGroups
     .flatMap((g) => g.items)
-    .some((item) => item.href === "/" ? pathname === "/" : pathname.startsWith(item.href));
+    .some((item) => item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href));
 
   return (
     <>
@@ -133,7 +134,7 @@ export function BottomNav() {
                 </p>
                 <div className="grid grid-cols-4 gap-1">
                   {group.items.map((item) => {
-                    const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                    const isActive = item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href);
                     return (
                       <Link
                         key={item.name}
@@ -166,16 +167,16 @@ export function BottomNav() {
       </div>
 
       {/* Bottom Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-[80] lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-[80] lg:hidden select-none">
         {/* Frosted glass background */}
-        <div className="bg-background/80 backdrop-blur-xl border-t border-surface-border pb-[env(safe-area-inset-bottom)]">
-          <div className="flex items-start justify-around px-2 pt-1.5 pb-1.5">
+        <div className="bg-background/80 backdrop-blur-xl border-t border-surface-border safe-bottom">
+          <div className="flex items-start justify-around px-2 pt-1.5 pb-2">
             {primaryTabs.map((tab) => {
               const isMore = tab.href === "#more";
               const isActive = isMore
                 ? (showMore || isMoreActive)
-                : tab.href === "/"
-                  ? pathname === "/"
+                : tab.href === "/app"
+                  ? pathname === "/app"
                   : pathname.startsWith(tab.href);
 
               return (

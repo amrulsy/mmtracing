@@ -1,8 +1,20 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import prisma from '../../config/database';
-import { authMiddleware } from '../../middleware/auth';
+import { authMiddleware, requireRole } from '../../middleware/auth';
+import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated, sendPaginated, parsePagination } from '../../shared/utils';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
+
+const claimSchema = z.object({
+  garansiId: z.number().int().positive(),
+  reason: z.string().min(3, 'Alasan klaim minimal 3 karakter'),
+});
+
+const claimUpdateSchema = z.object({
+  status: z.enum(['pending', 'approved', 'rejected', 'resolved']),
+  resolution: z.string().optional(),
+});
 
 const router = Router();
 router.use(authMiddleware);
@@ -37,7 +49,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /garansi/sync-status — Auto-update garansi statuses in DB
-router.post('/sync-status', async (_req: Request, res: Response, next: NextFunction) => {
+router.post('/sync-status', requireRole('Admin'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const now = new Date();
     const almostExpiredDate = new Date();
@@ -85,7 +97,7 @@ router.get('/claims', async (_req: Request, res: Response, next: NextFunction) =
 });
 
 // POST /garansi/claim
-router.post('/claim', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/claim', validate(claimSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { garansiId, reason } = req.body;
     
@@ -104,7 +116,7 @@ router.post('/claim', async (req: Request, res: Response, next: NextFunction) =>
 });
 
 // PUT /garansi/claim/:id — resolve claim
-router.put('/claim/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.put('/claim/:id', requireRole('Admin'), validate(claimUpdateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.garansiClaim.update({
       where: { id: Number(req.params.id) },

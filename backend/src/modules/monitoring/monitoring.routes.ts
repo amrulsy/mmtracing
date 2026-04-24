@@ -3,6 +3,9 @@ import prisma from '../../config/database';
 import { authMiddleware } from '../../middleware/auth';
 import { sendSuccess } from '../../shared/utils';
 import { upload } from '../../middleware/upload';
+import { spkService } from '../spk/spk.service';
+import { AuthRequest } from '../../middleware/auth';
+import { NotFoundError } from '../../shared/errors';
 
 const router = Router();
 router.use(authMiddleware);
@@ -43,20 +46,19 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
         photos: { orderBy: { createdAt: 'desc' } },
       },
     });
+    if (!data) throw new NotFoundError('SPK');
     sendSuccess(res, data);
   } catch (e) { next(e); }
 });
 
-// PUT /monitoring/:id/status — update status dari Kanban
-router.put('/:id/status', async (req: Request, res: Response, next: NextFunction) => {
+// PUT /monitoring/:id/status — update status dari Kanban (via spkService agar semua business logic berjalan)
+router.put('/:id/status', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { status, progress, catatan } = req.body;
-    const updateData: any = { status };
-    if (progress !== undefined) updateData.progress = progress;
-    if (catatan) updateData.catatan = catatan;
-    if (status === 'dikerjakan') updateData.startedAt = new Date();
-    if (status === 'selesai') { updateData.completedAt = new Date(); updateData.progress = 100; }
-    const data = await prisma.spk.update({ where: { id: Number(req.params.id) }, data: updateData });
+    const data = await spkService.updateStatus(
+      Number(req.params.id),
+      { status: req.body.status, catatan: req.body.catatan, progress: req.body.progress },
+      req.user?.id,
+    );
     sendSuccess(res, data, 'Status berhasil diperbarui');
   } catch (e) { next(e); }
 });

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../../config/database';
-import { authMiddleware } from '../../middleware/auth';
+import { authMiddleware, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated } from '../../shared/utils';
 
@@ -46,7 +46,7 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
 });
 
 // PUT /jadwal/:id
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requireRole('Admin', 'Mekanik'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.jadwal.update({ where: { id: Number(req.params.id) }, data: req.body });
     sendSuccess(res, data, 'Jadwal berhasil diperbarui');
@@ -54,7 +54,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // DELETE /jadwal/:id
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.jadwal.delete({ where: { id: Number(req.params.id) } });
     sendSuccess(res, null, 'Jadwal berhasil dihapus');

@@ -16,7 +16,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     if (userId) where.userId = Number(userId);
     if (search) {
       where.OR = [
-        { details: { contains: String(search) } },
+        { detail: { contains: String(search) } },
         { user: { name: { contains: String(search) } } },
         { action: { contains: String(search) } }
       ];

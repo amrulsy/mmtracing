@@ -114,14 +114,14 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
   } catch (e) { next(e); }
 });
 
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.pengeluaran.update({ where: { id: Number(req.params.id) }, data: req.body });
     sendSuccess(res, data, 'Pengeluaran berhasil diperbarui');
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.pengeluaran.delete({ where: { id: Number(req.params.id) } });
     sendSuccess(res, null, 'Pengeluaran berhasil dihapus');

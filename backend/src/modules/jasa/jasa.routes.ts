@@ -1,9 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../../config/database';
-import { authMiddleware } from '../../middleware/auth';
+import { authMiddleware, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
-import { sendSuccess, sendCreated } from '../../shared/utils';
+import { sendSuccess, sendCreated, sendPaginated, parsePagination } from '../../shared/utils';
 import { NotFoundError, BadRequestError } from '../../shared/errors';
 
 const router = Router();
@@ -15,7 +15,7 @@ const sparepartBundleSchema = z.object({
 });
 
 const createSchema = z.object({
-  kode: z.string().min(1),
+  kode: z.string().min(1).optional(),
   name: z.string().min(1),
   kategori: z.string().optional(),
   harga: z.number().min(0),
@@ -34,20 +34,29 @@ const updateSchema = z.object({
   sparepartBundles: z.array(sparepartBundleSchema).optional(),
 });
 
-// GET /jasa — list all
-router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
+// GET /jasa — list all with pagination
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await prisma.jasa.findMany({ 
-      orderBy: { name: 'asc' },
-      include: {
-        sparepartBundles: {
-          include: {
-            sparepart: true
-          }
-        }
-      }
-    });
-    sendSuccess(res, data);
+    const { page, limit, skip } = parsePagination(req.query);
+    const { search, kategori } = req.query;
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search as string } },
+        { kode: { contains: search as string } },
+      ];
+    }
+    if (kategori) where.kategori = kategori as string;
+    const [data, total] = await Promise.all([
+      prisma.jasa.findMany({
+        where, skip, take: limit, orderBy: { name: 'asc' },
+        include: {
+          sparepartBundles: { include: { sparepart: true } },
+        },
+      }),
+      prisma.jasa.count({ where }),
+    ]);
+    sendPaginated(res, data, total, page, limit);
   } catch (e) { next(e); }
 });
 
@@ -75,12 +84,14 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /jasa — create with optional sparepartBundles
-router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requireRole('Admin'), validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { sparepartBundles, ...jasaData } = req.body;
+    const { sparepartBundles, kode, ...jasaData } = req.body;
+    const finalKode = kode || `JS-${Date.now().toString(36).toUpperCase().slice(-5)}`;
     const data = await prisma.jasa.create({
       data: {
         ...jasaData,
+        kode: finalKode,
         sparepartBundles: sparepartBundles?.length ? {
           create: sparepartBundles.map((b: any) => ({
             sparepartId: b.sparepartId,
@@ -92,12 +103,17 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
         sparepartBundles: { include: { sparepart: true } },
       },
     });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'create', module: 'master',
+      targetId: data.id, targetName: data.name,
+    }});
     sendCreated(res, data, 'Jasa berhasil ditambahkan');
   } catch (e) { next(e); }
 });
 
 // PUT /jasa/:id — update with optional sparepartBundles sync
-router.put('/:id', validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requireRole('Admin'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     const { sparepartBundles, ...jasaData } = req.body;
@@ -128,12 +144,18 @@ router.put('/:id', validate(updateSchema), async (req: Request, res: Response, n
       });
     });
 
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'update', module: 'master',
+      targetId: data?.id ?? id, targetName: data?.name,
+    }});
+
     sendSuccess(res, data, 'Jasa berhasil diperbarui');
   } catch (e) { next(e); }
 });
 
 // DELETE /jasa/:id — with protection
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
 
@@ -145,9 +167,15 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
       );
     }
 
+    const jasa = await prisma.jasa.findUnique({ where: { id }, select: { name: true } });
     await prisma.$transaction(async (tx) => {
       await tx.jasaSparepart.deleteMany({ where: { jasaId: id } });
       await tx.jasa.delete({ where: { id } });
+      await tx.activityLog.create({ data: {
+        userId: (req as any).user?.id ?? null,
+        action: 'delete', module: 'master',
+        targetId: id, targetName: jasa?.name,
+      }});
     });
 
     sendSuccess(res, null, 'Jasa berhasil dihapus');

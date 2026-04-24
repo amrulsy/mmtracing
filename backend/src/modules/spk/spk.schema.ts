@@ -33,7 +33,14 @@ export const createSpkSchema = z.object({
       path: ['judulProyek'],
     });
   }
-  // Mode bubut tidak butuh kendaraan (bubut lepas)
+  // Mode bubut wajib isi keluhan/deskripsi pekerjaan
+  if (data.mode === 'bubut' && !data.keluhan?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Mode bubut membutuhkan deskripsi pekerjaan (keluhan)',
+      path: ['keluhan'],
+    });
+  }
   // items dan stages tidak bisa bersamaan
   if (data.items?.length && data.stages?.length) {
     ctx.addIssue({

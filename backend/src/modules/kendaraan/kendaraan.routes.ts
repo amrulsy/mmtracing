@@ -72,6 +72,11 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.kendaraan.create({ data: req.body });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'create', module: 'master',
+      targetId: data.id, targetName: `${data.name} (${data.plat})`,
+    }});
     sendCreated(res, data, 'Kendaraan berhasil ditambahkan');
   } catch (e) { next(e); }
 });
@@ -79,6 +84,11 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
 router.put('/:id', validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await prisma.kendaraan.update({ where: { id: Number(req.params.id) }, data: req.body });
+    await prisma.activityLog.create({ data: {
+      userId: (req as any).user?.id ?? null,
+      action: 'update', module: 'master',
+      targetId: data.id, targetName: `${data.name} (${data.plat})`,
+    }});
     sendSuccess(res, data, 'Kendaraan berhasil diperbarui');
   } catch (e) { next(e); }
 });
@@ -91,9 +101,15 @@ router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, 
       throw new BadRequestError(`Kendaraan ini masih terhubung dengan ${spkCount} SPK dan tidak dapat dihapus.`);
     }
     
+    const kendaraan = await prisma.kendaraan.findUnique({ where: { id }, select: { name: true, plat: true } });
     await prisma.$transaction(async (tx) => {
       await tx.inspeksi.deleteMany({ where: { kendaraanId: id } });
       await tx.kendaraan.delete({ where: { id } });
+      await tx.activityLog.create({ data: {
+        userId: (req as any).user?.id ?? null,
+        action: 'delete', module: 'master',
+        targetId: id, targetName: `${kendaraan?.name} (${kendaraan?.plat})`,
+      }});
     });
     
     sendSuccess(res, null, 'Kendaraan berhasil dihapus');

@@ -1,8 +1,19 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import prisma from '../../config/database';
 import { authMiddleware } from '../../middleware/auth';
+import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated } from '../../shared/utils';
-import { NotFoundError } from '../../shared/errors';
+import { NotFoundError, BadRequestError } from '../../shared/errors';
+
+const createInspeksiSchema = z.object({
+  kendaraanId: z.number().int().positive(),
+  tanggal: z.string().transform(v => new Date(v)).optional(),
+  odometer: z.number().int().min(0).optional(),
+  catatan: z.string().optional(),
+  kondisi: z.record(z.string(), z.any()).optional(),
+  foto: z.array(z.string()).optional(),
+});
 
 const router = Router();
 router.use(authMiddleware);
@@ -31,8 +42,15 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', validate(createInspeksiSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Validasi odometer tidak boleh lebih kecil dari nilai saat ini
+    if (req.body.odometer && req.body.kendaraanId) {
+      const kendaraan = await prisma.kendaraan.findUnique({ where: { id: req.body.kendaraanId }, select: { odometer: true } });
+      if (kendaraan && kendaraan.odometer !== null && req.body.odometer < kendaraan.odometer) {
+        throw new BadRequestError(`Odometer tidak boleh lebih kecil dari nilai terakhir (${kendaraan.odometer} km)`);
+      }
+    }
     const data = await prisma.inspeksi.create({ data: req.body });
     // Update kendaraan odometer
     if (req.body.odometer) {

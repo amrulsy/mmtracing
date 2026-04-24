@@ -38,22 +38,52 @@ router.get('/rewards', async (_req: Request, res: Response, next: NextFunction) 
 router.post('/redeem', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { pelangganId, rewardId } = req.body;
-    const reward = await prisma.loyaltyReward.findUnique({ where: { id: rewardId } });
-    if (!reward || reward.stock <= 0) return res.status(400).json({ success: false, message: 'Reward tidak tersedia' });
+    if (!pelangganId || !rewardId) {
+      return res.status(400).json({ success: false, message: 'pelangganId dan rewardId wajib diisi' });
+    }
 
-    // Check poin cukup
-    const totalEarned = await prisma.loyaltyPoint.aggregate({ where: { pelangganId, type: 'earn' }, _sum: { points: true } });
-    const totalRedeemed = await prisma.loyaltyPoint.aggregate({ where: { pelangganId, type: 'redeem' }, _sum: { points: true } });
-    const balance = (totalEarned._sum.points || 0) - Math.abs(totalRedeemed._sum.points || 0);
+    const result = await prisma.$transaction(async (tx) => {
+      // Lock reward row dengan update conditional untuk cegah stock negatif
+      const reward = await tx.loyaltyReward.findUnique({ where: { id: rewardId } });
+      if (!reward || !reward.isActive) {
+        throw new Error('Reward tidak tersedia');
+      }
+      if (reward.stock <= 0) {
+        throw new Error('Stok reward habis');
+      }
 
-    if (balance < reward.pointsCost) return res.status(400).json({ success: false, message: `Poin tidak cukup (saldo: ${balance})` });
+      // Hitung balance di dalam transaksi untuk atomicity
+      const [earned, redeemed] = await Promise.all([
+        tx.loyaltyPoint.aggregate({ where: { pelangganId, type: 'earn' }, _sum: { points: true } }),
+        tx.loyaltyPoint.aggregate({ where: { pelangganId, type: 'redeem' }, _sum: { points: true } }),
+      ]);
+      const balance = (earned._sum.points || 0) - Math.abs(redeemed._sum.points || 0);
+      if (balance < reward.pointsCost) {
+        throw new Error(`Poin tidak cukup (saldo: ${balance}, dibutuhkan: ${reward.pointsCost})`);
+      }
 
-    await prisma.loyaltyPoint.create({
-      data: { pelangganId, type: 'redeem', points: -reward.pointsCost, description: `Redeem: ${reward.name}`, refType: 'redeem', refId: rewardId },
+      await tx.loyaltyPoint.create({
+        data: { pelangganId, type: 'redeem', points: -reward.pointsCost, description: `Redeem: ${reward.name}`, refType: 'redeem', refId: rewardId },
+      });
+      // Guard stock tidak negatif
+      const updatedReward = await tx.loyaltyReward.updateMany({
+        where: { id: rewardId, stock: { gt: 0 } },
+        data: { stock: { decrement: 1 } },
+      });
+      if (updatedReward.count === 0) {
+        throw new Error('Stok reward habis saat proses simultan');
+      }
+
+      return balance - reward.pointsCost;
     });
-    await prisma.loyaltyReward.update({ where: { id: rewardId }, data: { stock: { decrement: 1 } } });
-    sendSuccess(res, { balance: balance - reward.pointsCost }, 'Poin berhasil ditukar');
-  } catch (e) { next(e); }
+
+    sendSuccess(res, { balance: result }, 'Poin berhasil ditukar');
+  } catch (e: any) {
+    if (e.message && !e.code) {
+      return res.status(400).json({ success: false, message: e.message });
+    }
+    next(e);
+  }
 });
 
 // GET /loyalty/history/:pelangganId

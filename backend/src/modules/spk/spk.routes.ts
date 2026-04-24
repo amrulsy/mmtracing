@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { spkController } from './spk.controller';
-import { authMiddleware } from '../../middleware/auth';
+import { authMiddleware, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { createSpkSchema, updateSpkStatusSchema, addSpkItemSchema, updateSpkItemSchema, updateSpkStageSchema, addSpkStageSchema } from './spk.schema';
 
@@ -14,7 +14,7 @@ router.get('/:id', spkController.findById);
 router.post('/', validate(createSpkSchema), spkController.create);
 router.put('/:id/status', validate(updateSpkStatusSchema), spkController.updateStatus);
 router.put('/:id/progress', spkController.updateProgress);
-router.delete('/:id', spkController.delete);
+router.delete('/:id', requireRole('Admin'), spkController.delete);
 
 // Item Management (bisa dijalankan di status manapun kecuali selesai/dibatalkan)
 router.post('/:id/items', validate(addSpkItemSchema), spkController.addItem);
