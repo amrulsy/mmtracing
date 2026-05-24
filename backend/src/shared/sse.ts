@@ -6,7 +6,9 @@ export type SSEEvent =
   | 'spk:selesai' 
   | 'spk:kendala' 
   | 'pembayaran:lunas' 
-  | 'pembayaran:bayar';
+  | 'pembayaran:bayar'
+  | 'inventaris:stok-update'
+  | 'notifikasi:new';
 
 interface SSEClient {
   id: number;

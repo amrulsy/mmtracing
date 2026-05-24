@@ -63,6 +63,7 @@ export interface Pelanggan {
   phone: string;
   email?: string | null;
   address?: string | null;
+  photoUrl?: string | null;
   type: 'kendaraan' | 'bubut' | 'both';
   loyaltyPoints?: LoyaltyPoint[];
   loyaltyBalance?: number;
@@ -70,6 +71,7 @@ export interface Pelanggan {
   kendaraan?: Kendaraan[];
   spk?: Spk[];
   _count?: { spk: number };
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -88,7 +90,12 @@ export interface Kendaraan {
   noRangka?: string | null;
   noMesin?: string | null;
   odometer?: number | null;
+  photoUrl?: string | null;
+  nextServiceDate?: string | null;
+  nextServiceKm?: number | null;
+  deletedAt?: string | null;
   pelanggan?: Pelanggan;
+  reminderStatus?: 'overdue' | 'due_soon' | 'upcoming';
   createdAt: string;
   updatedAt: string;
 }
@@ -228,6 +235,7 @@ export interface Jasa {
   name: string;
   kategori?: string | null;
   harga: number;
+  hargaModal?: number;
   estimasiWaktu?: string | null;
   garansiHari?: number | null;
   createdAt: string;
@@ -286,6 +294,7 @@ export interface InventarisSummary {
 
 export interface Pembayaran {
   id: number;
+  publicId: string;
   spkId: number;
   noInvoice: string;
   totalTagihan: number;

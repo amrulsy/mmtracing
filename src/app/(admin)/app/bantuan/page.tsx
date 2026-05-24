@@ -6,7 +6,7 @@ export default function BantuanPage() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">Pusat Bantuan</h1>
-        <p className="text-muted-foreground">FAQ, panduan, dan tips untuk menggunakan MM Tracing.</p>
+        <p className="text-muted-foreground">FAQ, panduan, dan tips untuk menggunakan MMT Racing.</p>
       </div>
 
       <div className="flex items-center gap-2 bg-surface border border-surface-border rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-primary/50 shadow-sm">

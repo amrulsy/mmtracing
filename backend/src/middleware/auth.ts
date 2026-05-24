@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { UnauthorizedError } from '../shared/errors';
-import prisma from '../config/database';
+import db from '../config/db';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -26,13 +26,26 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, env.jwt.secret) as { userId: number };
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      include: { role: true },
-    });
+    const user = await db.queryOne<{
+      id: number; name: string; username: string; email: string | null;
+      roleId: number; status: string; roleName: string; permissions: any;
+    }>(
+      `SELECT u.id, u.name, u.username, u.email, u.roleId, u.status,
+              r.name AS roleName, r.permissions
+       FROM users u
+       JOIN roles r ON r.id = u.roleId
+       WHERE u.id = ?`,
+      [decoded.userId],
+    );
 
     if (!user || user.status !== 'aktif') {
       throw new UnauthorizedError('User tidak aktif atau tidak ditemukan');
+    }
+
+    let perms: string[] = [];
+    if (user.permissions) {
+      const raw = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+      if (Array.isArray(raw)) perms = raw;
     }
 
     req.user = {
@@ -41,8 +54,8 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
       username: user.username,
       email: user.email,
       roleId: user.roleId,
-      roleName: user.role.name,
-      permissions: Array.isArray(user.role.permissions) ? user.role.permissions as string[] : [],
+      roleName: user.roleName,
+      permissions: perms,
     };
 
     next();

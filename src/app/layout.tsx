@@ -11,15 +11,61 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "MM Tracing | Manajemen Bengkel",
-  description: "Sistem Manajemen Bengkel Terpadu",
+  title: {
+    default: "MMT Racing | Bengkel Motor, Modifikasi & Jasa Bubut Custom Cilacap",
+    template: "%s | MMT Racing",
+  },
+  description: "MMT Racing adalah bengkel motor terpercaya di Widarapayung Wetan, Binangun, Cilacap. Spesialis servis rutin, modifikasi presisi tinggi, dan jasa bubut custom. Booking antrian online sekarang!",
+  keywords: [
+    "Bengkel Motor",
+    "Servis Motor",
+    "Modifikasi Motor",
+    "Jasa Bubut",
+    "Bubut Custom",
+    "Bubut Velg Motor",
+    "Bengkel Terpercaya",
+    "MMT Racing",
+    "Bengkel Motor Cilacap",
+    "Bengkel Motor Binangun",
+    "Servis Motor Cilacap",
+    "Modifikasi Motor Cilacap",
+    "Jasa Bubut Cilacap",
+    "Bengkel Widarapayung",
+    "Bengkel Binangun Cilacap",
+  ],
+  authors: [{ name: "MMT Racing" }],
+  creator: "MMT Racing",
+  openGraph: {
+    type: "website",
+    locale: "id_ID",
+    url: "https://mmtracing.com", // Ganti dengan URL asli jika sudah ada
+    title: "MMT Racing | Bengkel Motor, Modifikasi & Jasa Bubut Custom Cilacap",
+    description: "Spesialis servis rutin, modifikasi presisi tinggi, dan jasa bubut custom untuk motor. Cek antrian dan booking online di MMT Racing Cilacap.",
+    siteName: "MMT Racing",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MMT Racing | Bengkel Motor, Modifikasi & Jasa Bubut Cilacap",
+    description: "Spesialis servis rutin, modifikasi presisi tinggi, dan jasa bubut custom untuk motor di Widarapayung Wetan, Binangun, Cilacap.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   viewportFit: "cover",
 };
 

@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import prisma from '../../config/database';
+import db from '../../config/db';
 import { sendSuccess, generateInvoiceNo } from '../../shared/utils';
 import { NotFoundError } from '../../shared/errors';
 
@@ -10,18 +10,21 @@ const router = Router();
 router.get('/:token', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tokenStr = String(req.params.token);
-    const approvalToken = await prisma.approvalToken.findUnique({
-      where: { token: tokenStr },
-      include: {
-        spk: {
-          include: {
-            pelanggan: true, kendaraan: true, mekanik: true,
-            items: true, stages: { orderBy: { urutan: 'asc' } },
-          },
-        },
-      },
-    });
+    const approvalToken = await db.queryOne<any>('SELECT * FROM approval_tokens WHERE token = ?', [tokenStr]);
     if (!approvalToken) throw new NotFoundError('Token approval');
+    const spk = await db.queryOne<any>('SELECT * FROM spk WHERE id = ?', [approvalToken.spkId]);
+    if (spk) {
+      const [pelanggan, kendaraan, mekanik, items, stages] = await Promise.all([
+        db.queryOne('SELECT * FROM pelanggan WHERE id = ?', [spk.pelangganId]),
+        spk.kendaraanId ? db.queryOne('SELECT * FROM kendaraan WHERE id = ?', [spk.kendaraanId]) : null,
+        spk.mekanikId ? db.queryOne('SELECT * FROM mekanik WHERE id = ?', [spk.mekanikId]) : null,
+        db.query('SELECT * FROM spk_items WHERE spkId = ?', [spk.id]),
+        db.query('SELECT * FROM spk_stages WHERE spkId = ? ORDER BY urutan ASC', [spk.id]),
+      ]);
+      spk.pelanggan = pelanggan; spk.kendaraan = kendaraan; spk.mekanik = mekanik;
+      spk.items = items; spk.stages = stages;
+    }
+    approvalToken.spk = spk;
     if (new Date() > approvalToken.expiresAt) {
       res.status(410).json({ success: false, message: 'Token sudah expired' });
       return;
@@ -35,7 +38,7 @@ router.post('/:token', async (req: Request, res: Response, next: NextFunction) =
   try {
     const { action } = req.body; // 'approved' or 'rejected'
     const tokenStr = String(req.params.token);
-    const approvalToken = await prisma.approvalToken.findUnique({ where: { token: tokenStr } });
+    const approvalToken = await db.queryOne<any>('SELECT * FROM approval_tokens WHERE token = ?', [tokenStr]);
     if (!approvalToken) throw new NotFoundError('Token approval');
     if (approvalToken.status !== 'pending') {
       res.status(400).json({ success: false, message: 'Token sudah direspon' });
@@ -46,28 +49,23 @@ router.post('/:token', async (req: Request, res: Response, next: NextFunction) =
       return;
     }
 
-    await prisma.approvalToken.update({
-      where: { token: tokenStr },
-      data: { status: action, respondedAt: new Date() },
-    });
+    await db.update('approval_tokens', { status: action, respondedAt: new Date() }, 'token = ?', [tokenStr]);
 
     // If approved, buat pembayaran HANYA jika belum ada invoice untuk SPK ini
     if (action === 'approved') {
-      const spk = await prisma.spk.findUnique({ where: { id: approvalToken.spkId } });
+      const spk = await db.queryOne<any>('SELECT * FROM spk WHERE id = ?', [approvalToken.spkId]);
       if (spk) {
-        const existingPembayaran = await prisma.pembayaran.findFirst({ where: { spkId: spk.id } });
+        const existingPembayaran = await db.queryOne('SELECT id FROM pembayaran WHERE spkId = ? LIMIT 1', [spk.id]);
         if (!existingPembayaran) {
-          const totalTagihan = Math.max(0, spk.totalHarga.toNumber() - spk.diskon.toNumber());
+          const totalTagihan = Math.max(0, Number(spk.totalHarga) - Number(spk.diskon));
           const jatuhTempo = new Date();
           jatuhTempo.setDate(jatuhTempo.getDate() + 30);
-          await prisma.pembayaran.create({
-            data: {
-              noInvoice: generateInvoiceNo(),
-              spkId: spk.id,
-              totalTagihan,
-              sisaBayar: totalTagihan,
-              jatuhTempo,
-            },
+          await db.insert('pembayaran', {
+            noInvoice: generateInvoiceNo(),
+            spkId: spk.id,
+            totalTagihan,
+            sisaBayar: totalTagihan,
+            jatuhTempo,
           });
         }
       }

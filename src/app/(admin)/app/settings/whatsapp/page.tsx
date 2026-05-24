@@ -7,7 +7,7 @@ import { toast } from "@/lib/toast";
 
 const DEFAULT_TEMPLATES = [
   // 1. SPK Dibuat
-  { event: "SPK Dibuat", mode: "repair", template: "Halo Kak *{nama}*, terima kasih telah mempercayakan servis *{kendaraan}* di MM Tracing! 🔧\n\nSPK Anda (*{no_spk}*) telah diterbitkan. Mekanik kami akan melakukan perbaikan agar kendaraan Anda kembali prima. Estimasi selesai: *{estimasi}*.", active: true },
+  { event: "SPK Dibuat", mode: "repair", template: "Halo Kak *{nama}*, terima kasih telah mempercayakan servis *{kendaraan}* di MMT Racing! 🔧\n\nSPK Anda (*{no_spk}*) telah diterbitkan. Mekanik kami akan melakukan perbaikan agar kendaraan Anda kembali prima. Estimasi selesai: *{estimasi}*.", active: true },
   { event: "SPK Dibuat", mode: "modifikasi", template: "Welcome to the custom lab, Kak *{nama}*! 🏎️✨\n\nProyek *{judul_proyek}* untuk *{kendaraan}* (*{no_spk}*) telah resmi dimulai. \nSesuai kesepakatan, *Minimum DP* untuk proyek ini adalah *{minimum_dp}* dengan total estimasi tagihan *{total}*.\n\nTim kami sedang meracik rancangan terbaik. Estimasi selesai: *{estimasi}*.", active: true },
   { event: "SPK Dibuat", mode: "bubut", template: "Halo Kak *{nama}*, pesanan jasa Bubut/Milling (*{judul_proyek}*) Anda (*{no_spk}*) telah diterbitkan! 🔩📐\n\nSpesialis mesin kami akan memproses komponen/parts Anda dengan presisi tinggi sesuai spesifikasi yang diminta. Kami akan kabari jika sudah siap.\nEstimasi selesai: *{estimasi}*.", active: true },
   

@@ -1,4 +1,4 @@
-import prisma from '../config/database';
+import db from '../config/db';
 
 // In-memory cache map for application settings
 const settingsCache = new Map<string, string>();
@@ -11,9 +11,9 @@ export const getSetting = async (key: string): Promise<string | null> => {
     return settingsCache.get(key) || null;
   }
 
-  const setting = await prisma.setting.findUnique({
-    where: { key }
-  });
+  const setting = await db.queryOne<{ value: string }>(
+    'SELECT `value` FROM settings WHERE `key` = ?', [key]
+  );
 
   if (setting) {
     settingsCache.set(key, setting.value);

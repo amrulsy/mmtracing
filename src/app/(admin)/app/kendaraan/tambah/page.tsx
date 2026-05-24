@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Car, User } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { Pelanggan, Kendaraan } from "@/lib/types";
+import { isValidPlat, normalizePlat } from "@/lib/validators";
+import type { Pelanggan } from "@/lib/types";
 
 interface KendaraanInput {
   uid: string;
@@ -17,9 +18,14 @@ interface KendaraanInput {
   warna: string;
   noRangka: string;
   noMesin: string;
+  odometer: string;
 }
 
-const MERKS = ["Honda", "Yamaha", "Suzuki", "Kawasaki", "KTM", "TVS", "Royal Enfield", "Toyota", "Daihatsu", "Mitsubishi", "Suzuki", "Honda (Mobil)", "Lainnya"];
+// Merk hanya helper untuk auto-fill nama kendaraan (tidak disimpan terpisah di DB).
+const MERKS = [
+  "Honda", "Yamaha", "Suzuki", "Kawasaki", "KTM", "TVS", "Royal Enfield",
+  "Toyota", "Daihatsu", "Mitsubishi", "Nissan", "Hyundai", "Wuling", "Lainnya",
+];
 
 export default function TambahKendaraanPage() {
   const router = useRouter();
@@ -34,11 +40,11 @@ export default function TambahKendaraanPage() {
 
   // Kendaraan list
   const [kendaraanList, setKendaraanList] = useState<KendaraanInput[]>([
-    { uid: "1", plat: "", name: "", merk: "", tahun: "", warna: "", noRangka: "", noMesin: "" }
+    { uid: "1", plat: "", name: "", merk: "", tahun: "", warna: "", noRangka: "", noMesin: "", odometer: "" }
   ]);
 
   const addKendaraan = () => {
-    setKendaraanList(prev => [...prev, { uid: Math.random().toString(36).slice(2), plat: "", name: "", merk: "", tahun: "", warna: "", noRangka: "", noMesin: "" }]);
+    setKendaraanList(prev => [...prev, { uid: Math.random().toString(36).slice(2), plat: "", name: "", merk: "", tahun: "", warna: "", noRangka: "", noMesin: "", odometer: "" }]);
   };
 
   const removeKendaraan = (uid: string) => {
@@ -60,33 +66,36 @@ export default function TambahKendaraanPage() {
     e.preventDefault();
     if (!name.trim() || !phone.trim()) return toast.error("Wajib Diisi", "Nama dan nomor WhatsApp wajib diisi.");
 
+    let kendaraanPayload: Array<Record<string, unknown>> = [];
     if (type !== "bubut") {
       const hasInvalidKendaraan = kendaraanList.some(k => !k.plat.trim() || !k.name.trim());
       if (hasInvalidKendaraan) return toast.error("Data Kendaraan Tidak Lengkap", "Plat dan nama kendaraan wajib diisi.");
+
+      const invalidPlat = kendaraanList.find(k => !isValidPlat(k.plat));
+      if (invalidPlat) return toast.error("Format Plat Tidak Valid", `"${invalidPlat.plat}" bukan format plat yang valid. Contoh: B 1234 ABC`);
+
+      kendaraanPayload = kendaraanList.map(k => ({
+        plat: normalizePlat(k.plat),
+        name: k.name.trim(),
+        tahun: k.tahun || undefined,
+        warna: k.warna || undefined,
+        noRangka: k.noRangka || undefined,
+        noMesin: k.noMesin || undefined,
+        odometer: k.odometer ? Number(k.odometer) : undefined,
+      }));
     }
 
     setLoading(true);
     try {
-      // 1. Create Pelanggan
-      const pelRes = await api.post<Pelanggan>("/pelanggan", { name, phone, email: email || undefined, address: address || undefined, type });
-
-      // 2. Create Kendaraan (only if type has kendaraan)
-      if (type !== "bubut") {
-        await Promise.all(
-          kendaraanList.map(k =>
-            api.post<Kendaraan>("/kendaraan", {
-              pelangganId: pelRes.data.id,
-              plat: k.plat.toUpperCase(),
-              name: k.name,
-              merk: k.merk || undefined,
-              tahun: k.tahun || undefined,
-              warna: k.warna || undefined,
-              noRangka: k.noRangka || undefined,
-              noMesin: k.noMesin || undefined,
-            })
-          )
-        );
-      }
+      // Transactional: pelanggan + kendaraan dibuat atomik di backend
+      await api.post<Pelanggan>("/pelanggan/with-kendaraan", {
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email || undefined,
+        address: address || undefined,
+        type,
+        kendaraan: kendaraanPayload,
+      });
 
       toast.success("Berhasil Didaftarkan!", `Data ${name} berhasil disimpan.`);
       router.push("/app/kendaraan");
@@ -210,6 +219,10 @@ export default function TambahKendaraanPage() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground">No. Mesin</label>
                     <input type="text" value={k.noMesin} onChange={e => updateKendaraan(k.uid, "noMesin", e.target.value)} placeholder="Opsional" className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Odometer (km)</label>
+                    <input type="number" min="0" value={k.odometer} onChange={e => updateKendaraan(k.uid, "odometer", e.target.value)} placeholder="mis. 12500" className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                   </div>
                 </div>
               </div>

@@ -11,6 +11,7 @@ export const createSpkSchema = z.object({
   prioritas: z.enum(['rendah', 'normal', 'tinggi', 'urgent']).default('normal'),
   catatan: z.string().optional(),
   diskon: z.number().min(0).default(0),
+  odometerMasuk: z.number().int().min(0).optional(),
   items: z.array(z.object({
     type: z.enum(['jasa', 'sparepart']),
     sparepartId: z.number().int().positive().optional(),
@@ -33,6 +34,17 @@ export const createSpkSchema = z.object({
       path: ['judulProyek'],
     });
   }
+  // Mode modifikasi wajib punya minimal 1 stage dengan nama
+  if (data.mode === 'modifikasi') {
+    const validStages = data.stages?.filter(s => s.nama?.trim()) ?? [];
+    if (validStages.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Mode modifikasi membutuhkan minimal 1 tahapan pekerjaan',
+        path: ['stages'],
+      });
+    }
+  }
   // Mode bubut wajib isi keluhan/deskripsi pekerjaan
   if (data.mode === 'bubut' && !data.keluhan?.trim()) {
     ctx.addIssue({
@@ -41,12 +53,12 @@ export const createSpkSchema = z.object({
       path: ['keluhan'],
     });
   }
-  // items dan stages tidak bisa bersamaan
-  if (data.items?.length && data.stages?.length) {
+  // Mode rutin tidak boleh punya stages
+  if (data.mode === 'rutin' && data.stages?.length) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Tidak bisa menggunakan items dan stages bersamaan',
-      path: ['items'],
+      message: 'Mode rutin tidak menggunakan tahapan',
+      path: ['stages'],
     });
   }
 });
@@ -90,6 +102,22 @@ export const addSpkStageSchema = z.object({
 // Schema untuk update stage
 export const updateSpkStageSchema = z.object({
   status: z.enum(['pending', 'in_progress', 'done']).optional(),
+});
+
+// Schema untuk edit field non-finansial SPK (keluhan/judul/spesifikasi/prioritas/catatan/mekanik)
+export const updateSpkSchema = z.object({
+  keluhan: z.string().optional(),
+  judulProyek: z.string().max(200).optional(),
+  spesifikasi: z.string().optional(),
+  prioritas: z.enum(['rendah', 'normal', 'tinggi', 'urgent']).optional(),
+  catatan: z.string().optional(),
+  mekanikId: z.number().int().positive().nullable().optional(),
+  estimasiSelesai: z.string().datetime().nullable().optional(),
+});
+
+// Schema untuk assign/change mekanik
+export const assignMekanikSchema = z.object({
+  mekanikId: z.number().int().positive().nullable(),
 });
 
 export type CreateSpkInput = z.infer<typeof createSpkSchema>;

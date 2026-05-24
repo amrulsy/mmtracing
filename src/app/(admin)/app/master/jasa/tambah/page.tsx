@@ -38,6 +38,7 @@ function JasaFormContent() {
     name: "",
     kategori: "Servis Rutin",
     harga: 0,
+    hargaModal: 0,
     estimasiWaktu: "",
     garansiHari: 0,
   });
@@ -59,6 +60,7 @@ function JasaFormContent() {
             name: d.name || "",
             kategori: d.kategori || "Servis Rutin",
             harga: Number(d.harga) || 0,
+            hargaModal: Number((d as any).hargaModal) || 0,
             estimasiWaktu: d.estimasiWaktu || "",
             garansiHari: d.garansiHari || 0,
           });
@@ -79,7 +81,7 @@ function JasaFormContent() {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: name === "harga" || name === "garansiHari" ? Number(value) : value,
+      [name]: name === "harga" || name === "hargaModal" || name === "garansiHari" ? Number(value) : value,
     }));
   };
 
@@ -175,6 +177,11 @@ function JasaFormContent() {
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Tarif Jasa (Rp) <span className="text-red-500">*</span></label>
             <input type="number" min="0" name="harga" value={formData.harga} onChange={handleChange} className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary/50" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Harga Modal (Rp) <span className="text-[10px] font-normal">(komisi/sub-kontrak)</span></label>
+            <input type="number" min="0" name="hargaModal" value={formData.hargaModal} onChange={handleChange} className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary/50" />
+            <p className="text-[10px] text-muted-foreground">Opsional. Dipakai untuk menghitung HPP & margin laba.</p>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Estimasi Durasi (Opsional)</label>

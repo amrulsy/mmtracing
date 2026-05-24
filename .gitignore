@@ -43,3 +43,22 @@ next-env.d.ts
 # Baileys WhatsApp Cache
 .baileys/
 .baileys
+certificates
+
+# Deploy
+deploy/
+
+# Logs & backups
+*.log
+*.err
+backend/backups/
+*.sql
+
+# IDE & tools
+.windsurf/
+
+# Test/temp files
+backend/test_db*.ts
+backend/ts_errors*.txt
+certgen.*
+DEPLOY.md

@@ -55,12 +55,16 @@ export default function PembayaranDetailPage({ params }: { params: Promise<{ id:
       toast.warning("Gagal", "Nomor HP pelanggan tidak tersedia.");
       return;
     }
+    const pin = phone.slice(-4);
+    const pubUrl = `${window.location.origin}/pub/pembayaran/${data.publicId}/kwitansi`;
     
-    const kwitansiUrl = `${window.location.origin}/app/pembayaran/${id}/kwitansi`;
     const message = `Halo ${data.spk?.pelanggan?.name || 'Pelanggan'},
     
 Berikut adalah link E-Kwitansi / Invoice digital dari Moro Motor Tracing untuk SPK *${data.spk?.noSpk}*:
-${kwitansiUrl}
+${pubUrl}
+
+*🔐 PIN Akses:* ${pin}
+(Gunakan 4 digit terakhir nomor HP Anda)
 
 Total Transaksi: ${formatRupiah(data.totalTagihan)}
 Status: ${isLunas ? 'LUNAS ✅' : 'BELUM LUNAS ❌'}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -42,7 +42,7 @@ const moreMenuGroups = [
     label: "Utama",
     items: [
       { name: "Pelanggan", href: "/app/kendaraan", icon: CarFront },
-      { name: "Booking", href: "/app/booking", icon: Calendar },
+      { name: "Booking", href: "/app/booking", icon: Calendar, badgeKey: "booking" },
       { name: "Notifikasi", href: "/app/notifikasi", icon: Bell },
       { name: "Laporan", href: "/app/laporan", icon: BarChart3 },
     ],
@@ -85,6 +85,22 @@ const moreMenuGroups = [
 export function BottomNav() {
   const pathname = usePathname();
   const [showMore, setShowMore] = useState(false);
+  const [newBookingCount, setNewBookingCount] = useState(0);
+
+  // Poll for new booking count
+  useEffect(() => {
+    const fetchCount = () => {
+      fetch("/api/v1/booking/stats", {
+        headers: { Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("mm_token") || "" : ""}` },
+      })
+        .then(r => r.json())
+        .then(res => { if (res.success && res.data) setNewBookingCount(res.data.baru || 0); })
+        .catch(() => {});
+    };
+    fetchCount();
+    const iv = setInterval(fetchCount, 30000);
+    return () => clearInterval(iv);
+  }, []);
 
   // Check if current path matches any "more" menu item
   const isMoreActive = moreMenuGroups
@@ -135,6 +151,7 @@ export function BottomNav() {
                 <div className="grid grid-cols-4 gap-1">
                   {group.items.map((item) => {
                     const isActive = item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href);
+                    const badge = (item as any).badgeKey === "booking" ? newBookingCount : 0;
                     return (
                       <Link
                         key={item.name}
@@ -149,11 +166,16 @@ export function BottomNav() {
                       >
                         <div
                           className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors relative",
                             isActive ? "bg-primary text-white shadow-glossy-primary" : "bg-surface-hover"
                           )}
                         >
                           <item.icon size={20} />
+                          {badge > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-sm border-2 border-background animate-pulse">
+                              {badge > 9 ? "9+" : badge}
+                            </span>
+                          )}
                         </div>
                         <span className="text-[10px] font-medium leading-tight text-center">{item.name}</span>
                       </Link>
@@ -191,7 +213,7 @@ export function BottomNav() {
                     }
                   }}
                   className={cn(
-                    "flex flex-col items-center gap-0.5 min-w-[56px] py-1 rounded-xl transition-all duration-200 active:scale-90",
+                    "flex flex-col items-center gap-0.5 min-w-[56px] py-1 rounded-xl transition-all duration-200 active:scale-90 relative",
                     isActive && !isMore ? "text-primary" : isMore && showMore ? "text-primary" : "text-muted-foreground"
                   )}
                 >
@@ -204,6 +226,10 @@ export function BottomNav() {
                     <tab.icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
                     {isActive && !isMore && (
                       <div className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary" />
+                    )}
+                    {/* Badge for 'Lainnya' tab if there's a notification inside */}
+                    {isMore && newBookingCount > 0 && (
+                      <span className="absolute -top-1 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background animate-pulse" />
                     )}
                   </div>
                   <span

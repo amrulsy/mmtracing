@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware, requireRole } from '../../middleware/auth';
-import prisma from '../../config/database';
+import db from '../../config/db';
 
 const router = Router();
 
@@ -9,7 +9,7 @@ router.get('/:entity/export', authMiddleware, requireRole('Admin'), async (req: 
   try {
     const entityKey = String(req.params.entity);
     
-    // Map standard entity names to prisma models
+    // Map standard entity names to MySQL table names
     const entityMap: Record<string, string> = {
       'pelanggan': 'pelanggan',
       'kendaraan': 'kendaraan',
@@ -17,18 +17,18 @@ router.get('/:entity/export', authMiddleware, requireRole('Admin'), async (req: 
       'pembayaran': 'pembayaran',
       'sparepart': 'sparepart',
       'mekanik': 'mekanik',
-      'inventaris': 'inventarisLog',
-      'log-aktivitas': 'activityLog',
-      'users': 'user'
+      'inventaris': 'inventaris_log',
+      'log-aktivitas': 'activity_logs',
+      'users': 'users'
     };
 
-    const modelName = entityMap[entityKey];
-    if (!modelName || !(prisma as any)[modelName]) {
+    const tableName = entityMap[entityKey];
+    if (!tableName) {
       res.status(404).json({ success: false, message: 'Entity not found or export not supported' });
       return;
     }
 
-    const data = await (prisma as any)[modelName].findMany();
+    const data = await db.query(`SELECT * FROM \`${tableName}\``);
     
     if (data.length === 0) {
       res.setHeader('Content-Type', 'text/csv');

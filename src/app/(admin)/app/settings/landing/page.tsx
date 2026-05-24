@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
-import { Save, Loader2, Plus, Trash2, ExternalLink } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, ExternalLink, Upload, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 import Link from "next/link";
 
 interface LandingContent {
+  landing_header: { logoText: string; brandName: string; subtitle: string };
   landing_hero: { tagline: string; title: string; subtitle: string };
   landing_stats: { value: string; label: string }[];
   landing_services: { icon: string; title: string; desc: string; color: string; image?: string }[];
@@ -33,11 +34,58 @@ const COLOR_OPTIONS = [
 const inputClass = "w-full bg-background border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50";
 const labelClass = "text-xs font-medium text-muted-foreground mb-1 block";
 
+function GalleryImageUploader({ value, onChange }: { value?: string; onChange: (url: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) { toast.error("Error", "File harus berupa gambar"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error("Error", "Ukuran file maksimal 5MB"); return; }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await api.upload<{ url: string }>("/upload/image", formData);
+      onChange(res.data.url);
+    } catch {
+      toast.error("Gagal", "Upload gambar gagal");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
+      {value ? (
+        <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-surface-border group">
+          <img src={value} alt="Gallery" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <button type="button" onClick={() => inputRef.current?.click()} className="px-3 py-1.5 bg-white text-black rounded-lg text-xs font-bold flex items-center gap-1">
+              <Upload size={12} /> Ganti
+            </button>
+            <button type="button" onClick={() => onChange("")} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-bold flex items-center gap-1">
+              <X size={12} /> Hapus
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+          className="w-full aspect-video rounded-xl border-2 border-dashed border-surface-border hover:border-primary/50 hover:bg-primary/5 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground disabled:opacity-60">
+          {uploading ? <Loader2 size={24} className="animate-spin text-primary" /> : <Upload size={24} />}
+          <span className="text-xs font-medium">{uploading ? "Mengupload..." : "Klik untuk upload gambar"}</span>
+          <span className="text-[10px]">JPG, PNG, WebP · Maks 5MB</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function LandingSettingsPage() {
   const [data, setData] = useState<LandingContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeSection, setActiveSection] = useState("hero");
+  const [activeSection, setActiveSection] = useState("header");
 
   useEffect(() => {
     api.get<LandingContent>("/landing/content")
@@ -68,6 +116,7 @@ export default function LandingSettingsPage() {
   }
 
   const sections = [
+    { id: "header", label: "📛 Header" },
     { id: "hero", label: "🏠 Hero" },
     { id: "stats", label: "📊 Statistik" },
     { id: "services", label: "🔧 Layanan" },
@@ -107,6 +156,18 @@ export default function LandingSettingsPage() {
           </button>
         ))}
       </div>
+
+      {/* ========== HEADER ========== */}
+      {activeSection === "header" && (
+        <div className="glass-panel p-4 lg:p-6 space-y-4">
+          <h3 className="font-bold text-sm">Header Settings</h3>
+          <div className="space-y-3">
+            <div><label className={labelClass}>Logo Text (max 2 karakter)</label><input className={inputClass} maxLength={2} value={data.landing_header?.logoText || ""} onChange={e => setData({ ...data, landing_header: { ...data.landing_header, logoText: e.target.value } })} /></div>
+            <div><label className={labelClass}>Brand Name</label><input className={inputClass} value={data.landing_header?.brandName || ""} onChange={e => setData({ ...data, landing_header: { ...data.landing_header, brandName: e.target.value } })} /></div>
+            <div><label className={labelClass}>Subtitle</label><input className={inputClass} value={data.landing_header?.subtitle || ""} onChange={e => setData({ ...data, landing_header: { ...data.landing_header, subtitle: e.target.value } })} /></div>
+          </div>
+        </div>
+      )}
 
       {/* ========== HERO ========== */}
       {activeSection === "hero" && (
@@ -250,21 +311,27 @@ export default function LandingSettingsPage() {
             <h3 className="font-bold text-sm">Galeri</h3>
             <button onClick={() => setData({ ...data, landing_gallery: [...data.landing_gallery, { title: "", sub: "", image: "" }] })} className="flex items-center gap-1 text-xs text-primary font-medium"><Plus size={14} /> Tambah</button>
           </div>
-          <div className="space-y-2">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {data.landing_gallery.map((g, i) => (
               <div key={i} className="p-3 border border-surface-border rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-muted-foreground">Galeri #{i + 1}</span>
                   <button onClick={() => { const n = data.landing_gallery.filter((_, j) => j !== i); setData({ ...data, landing_gallery: n }); }} className="text-red-500 hover:text-red-400"><Trash2 size={14} /></button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div><label className={labelClass}>Judul</label><input className={inputClass} value={g.title} onChange={e => { const n = [...data.landing_gallery]; n[i] = { ...n[i], title: e.target.value }; setData({ ...data, landing_gallery: n }); }} /></div>
-                  <div><label className={labelClass}>Sub</label><input className={inputClass} value={g.sub} onChange={e => { const n = [...data.landing_gallery]; n[i] = { ...n[i], sub: e.target.value }; setData({ ...data, landing_gallery: n }); }} /></div>
-                </div>
-                <div><label className={labelClass}>Gambar URL</label><div className="flex gap-2 items-center"><input className={inputClass} value={g.image || ''} placeholder="https://example.com/gallery.jpg" onChange={e => { const n = [...data.landing_gallery]; n[i] = { ...n[i], image: e.target.value }; setData({ ...data, landing_gallery: n }); }} />{g.image && <img src={g.image} alt="" className="w-12 h-12 rounded-lg object-cover border border-surface-border shrink-0" />}</div></div>
+                <GalleryImageUploader
+                  value={g.image}
+                  onChange={url => { const n = [...data.landing_gallery]; n[i] = { ...n[i], image: url }; setData({ ...data, landing_gallery: n }); }}
+                />
+                <div><label className={labelClass}>Judul</label><input className={inputClass} value={g.title} onChange={e => { const n = [...data.landing_gallery]; n[i] = { ...n[i], title: e.target.value }; setData({ ...data, landing_gallery: n }); }} /></div>
+                <div><label className={labelClass}>Sub</label><input className={inputClass} value={g.sub} onChange={e => { const n = [...data.landing_gallery]; n[i] = { ...n[i], sub: e.target.value }; setData({ ...data, landing_gallery: n }); }} /></div>
               </div>
             ))}
           </div>
+          {data.landing_gallery.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              Belum ada item galeri. Klik <b>+ Tambah</b> untuk menambah foto.
+            </div>
+          )}
         </div>
       )}
 

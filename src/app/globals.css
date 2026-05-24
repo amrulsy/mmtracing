@@ -209,3 +209,25 @@
   /* Hide interactive elements */
   input, select, textarea { border: none !important; background: none !important; }
 }
+
+/* ═══════════════════════════════════
+   REDUCED MOTION — Accessibility
+   ═══════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .hero-orb-1, .hero-orb-2, .hero-orb-3,
+  .hero-ring, .hero-grid, .hero-glow,
+  .hero-particle-1, .hero-particle-2, .hero-particle-3,
+  .hero-particle-4, .hero-particle-5, .hero-particle-6,
+  .hero-particle-7 {
+    animation: none !important;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* cache buster 4 */
+

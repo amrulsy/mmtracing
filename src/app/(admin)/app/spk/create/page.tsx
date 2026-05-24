@@ -8,6 +8,8 @@ import { toast } from "@/lib/toast";
 import { api } from "@/lib/api";
 import type { Pelanggan, Kendaraan, Mekanik, Jasa, Sparepart } from "@/lib/types";
 import { Skeleton } from "@/components/ui/loading-skeleton";
+import { SparepartPicker, ImageUploader } from "./SpkExtras";
+import { StageTemplates } from "./StageTemplates";
 
 type Mode = "rutin" | "modifikasi" | "bubut";
 
@@ -66,6 +68,7 @@ export default function CreateSpkPage() {
   // Form state utama
   const [pelangganId, setPelangganId] = useState(searchParams.get("pelangganId") || "");
   const [kendaraanId, setKendaraanId] = useState(searchParams.get("kendaraanId") || "");
+  const [odometerMasuk, setOdometerMasuk] = useState("");
   const [mekanikId, setMekanikId] = useState("");
   const [prioritas, setPrioritas] = useState<"rendah" | "normal" | "tinggi" | "urgent">("normal");
   const [keluhan, setKeluhan] = useState("");
@@ -73,11 +76,24 @@ export default function CreateSpkPage() {
   // Modifikasi
   const [judulProyek, setJudulProyek] = useState("");
   const [spesifikasi, setSpesifikasi] = useState("");
-  const [stages, setStages] = useState<StageInput[]>([{ nama: "", estimasiBiaya: 0, durasiHari: 1 }]);
+  const [modifikasiStages, setModifikasiStages] = useState<StageInput[]>([{ nama: "", estimasiBiaya: 0, durasiHari: 1 }]);
 
   // Bubut
   const [bubutKeluhan, setBubutKeluhan] = useState("");
   const [namaBubut, setNamaBubut] = useState("");
+  const [bubutStages, setBubutStages] = useState<StageInput[]>([]);
+  const [materialFromCustomer, setMaterialFromCustomer] = useState(false);
+
+  // Upload gambar referensi (modifikasi)
+  const [referensiFiles, setReferensiFiles] = useState<File[]>([]);
+  const [referensiPreviews, setReferensiPreviews] = useState<string[]>([]);
+
+  // Stages aktif sesuai mode (computed)
+  const stages = mode === "modifikasi" ? modifikasiStages : mode === "bubut" ? bubutStages : [];
+  const setStages: React.Dispatch<React.SetStateAction<StageInput[]>> = (updater) => {
+    if (mode === "modifikasi") setModifikasiStages(updater);
+    else if (mode === "bubut") setBubutStages(updater);
+  };
 
   // Modals & Combobox
   const [showAddPelanggan, setShowAddPelanggan] = useState(false);
@@ -90,11 +106,31 @@ export default function CreateSpkPage() {
   const [newKendaraanPlat, setNewKendaraanPlat] = useState("");
   const [addingKendaraan, setAddingKendaraan] = useState(false);
 
+  // Modal review pre-submit
+  const [showReview, setShowReview] = useState(false);
+
   const [pelangganSearch, setPelangganSearch] = useState("");
   const [showPelDropdown, setShowPelDropdown] = useState(false);
 
   const [kendaraanSearch, setKendaraanSearch] = useState("");
   const [showKenDropdown, setShowKenDropdown] = useState(false);
+
+  // DP percentages dinamis dari settings (default 40%)
+  const [dpPersen, setDpPersen] = useState({ modifikasi: 40, bubut: 40 });
+  useEffect(() => {
+    api.get<{ general?: Record<string, string> }>("/settings/config")
+      .then(res => {
+        const g = res.data?.general || {};
+        const m = Number(g.dp_modifikasi_persen);
+        const b = Number(g.dp_bubut_persen);
+        setDpPersen({
+          modifikasi: !isNaN(m) && m >= 0 && m <= 100 ? m : 40,
+          bubut: !isNaN(b) && b >= 0 && b <= 100 ? b : 40,
+        });
+      })
+      .catch(() => { /* fallback 40% */ });
+  }, []);
+  const dpPctNow = mode === "modifikasi" ? dpPersen.modifikasi : mode === "bubut" ? dpPersen.bubut : 0;
 
   // Load mekanik sekali di awal
   useEffect(() => {
@@ -103,6 +139,97 @@ export default function CreateSpkPage() {
       .catch(() => toast.error("Gagal", "Gagal memuat data mekanik"))
       .finally(() => setLoadingOptions(false));
   }, []);
+
+  // Clone support: read template dari localStorage jika ?clone=1
+  useEffect(() => {
+    if (searchParams.get("clone") !== "1") return;
+    try {
+      const raw = localStorage.getItem("mm_spk_clone");
+      if (!raw) return;
+      const t = JSON.parse(raw);
+      if (t.pelangganId) setPelangganId(String(t.pelangganId));
+      if (t.kendaraanId) setKendaraanId(String(t.kendaraanId));
+      if (t.mekanikId) setMekanikId(String(t.mekanikId));
+      if (t.prioritas) setPrioritas(t.prioritas);
+      if (t.keluhan) setKeluhan(t.keluhan);
+      if (t.judulProyek) setJudulProyek(t.judulProyek);
+      if (t.spesifikasi) setSpesifikasi(t.spesifikasi);
+      if (Array.isArray(t.items)) {
+        const jasaItems: SelectedJasa[] = t.items.filter((i: { type: string }) => i.type === "jasa").map((i: { jasaId?: number; nama: string; qty: number; hargaSatuan: number }) => ({ jasaId: i.jasaId ?? 0, nama: i.nama, qty: i.qty, harga: i.hargaSatuan }));
+        const spItems: SelectedSparepart[] = t.items.filter((i: { type: string }) => i.type === "sparepart").map((i: { sparepartId?: number; nama: string; qty: number; hargaSatuan: number }) => ({ sparepartId: i.sparepartId ?? 0, nama: i.nama, qty: i.qty, harga: i.hargaSatuan }));
+        if (jasaItems.length) setSelectedJasaItems(jasaItems);
+        if (spItems.length) setSelectedSparepartItems(spItems);
+      }
+      if (Array.isArray(t.stages) && t.stages.length) {
+        setStages(t.stages);
+      }
+      localStorage.removeItem("mm_spk_clone");
+      toast.success("Data Disalin", "Form diisi dari SPK sebelumnya. Silakan ubah sesuai kebutuhan.");
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Autosave draft ke localStorage per mode (tidak saat clone)
+  const DRAFT_KEY = `mm_spk_draft_${mode}`;
+  useEffect(() => {
+    if (searchParams.get("clone") === "1") return;
+    const timer = setTimeout(() => {
+      try {
+        const draft = {
+          pelangganId, kendaraanId, odometerMasuk, mekanikId, prioritas, keluhan,
+          judulProyek, spesifikasi, stages, bubutKeluhan, namaBubut,
+          selectedJasaItems, selectedSparepartItems,
+          savedAt: new Date().toISOString(),
+        };
+        // Hanya simpan jika ada isi substansial
+        const hasContent = pelangganId || keluhan || judulProyek || selectedJasaItems.length || selectedSparepartItems.length;
+        if (hasContent) localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch { /* ignore */ }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [DRAFT_KEY, pelangganId, kendaraanId, odometerMasuk, mekanikId, prioritas, keluhan, judulProyek, spesifikasi, stages, bubutKeluhan, namaBubut, selectedJasaItems, selectedSparepartItems, searchParams]);
+
+  // Restore draft prompt
+  const [draftAvailable, setDraftAvailable] = useState<{ savedAt: string } | null>(null);
+  useEffect(() => {
+    if (searchParams.get("clone") === "1") return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d && d.savedAt) setDraftAvailable({ savedAt: d.savedAt });
+    } catch { /* ignore */ }
+  }, [DRAFT_KEY, searchParams]);
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.pelangganId) setPelangganId(d.pelangganId);
+      if (d.kendaraanId) setKendaraanId(d.kendaraanId);
+      if (d.odometerMasuk) setOdometerMasuk(d.odometerMasuk);
+      if (d.mekanikId) setMekanikId(d.mekanikId);
+      if (d.prioritas) setPrioritas(d.prioritas);
+      if (d.keluhan) setKeluhan(d.keluhan);
+      if (d.judulProyek) setJudulProyek(d.judulProyek);
+      if (d.spesifikasi) setSpesifikasi(d.spesifikasi);
+      if (Array.isArray(d.stages) && d.stages.length) setStages(d.stages);
+      if (d.bubutKeluhan) setBubutKeluhan(d.bubutKeluhan);
+      if (d.namaBubut) setNamaBubut(d.namaBubut);
+      if (Array.isArray(d.selectedJasaItems)) setSelectedJasaItems(d.selectedJasaItems);
+      if (Array.isArray(d.selectedSparepartItems)) setSelectedSparepartItems(d.selectedSparepartItems);
+      setDraftAvailable(null);
+      toast.success("Draft Dipulihkan");
+    } catch {
+      toast.error("Gagal memulihkan draft");
+    }
+  };
+
+  const dismissDraft = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    setDraftAvailable(null);
+  };
 
   // Load pelanggan dari API saat search berubah (server-side search)
   useEffect(() => {
@@ -127,9 +254,8 @@ export default function CreateSpkPage() {
     return () => clearTimeout(timer);
   }, [mode, jasaSearch]);
 
-  // Load sparepart saat mode rutin aktif atau search berubah
+  // Load sparepart saat mode rutin/modifikasi/bubut atau search berubah
   useEffect(() => {
-    if (mode !== "rutin") return;
     const timer = setTimeout(() => {
       setLoadingSparepart(true);
       api.getPaginated<Sparepart>("/sparepart", { limit: 50, search: sparepartSearch })
@@ -138,7 +264,7 @@ export default function CreateSpkPage() {
         .finally(() => setLoadingSparepart(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [mode, sparepartSearch]);
+  }, [sparepartSearch]);
 
   const initialKendaraanId = searchParams.get("kendaraanId");
 
@@ -244,7 +370,15 @@ export default function CreateSpkPage() {
   };
 
   const totalEstimasi = stages.reduce((sum, s) => sum + (Number(s.estimasiBiaya) || 0), 0);
+  const totalDurasi = stages.reduce((sum, s) => sum + (Number(s.durasiHari) || 0), 0);
   const formatRp = (n: number) => `Rp ${Number(n).toLocaleString("id-ID")}`;
+  const isLongDuration = totalDurasi > 30;
+  const isHighValue = totalEstimasi > 50000000;
+  const estimasiSelesai = totalDurasi > 0 ? (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + totalDurasi);
+    return d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  })() : null;
 
   // ── Quick Create API Handlers ──────────────────────────────
   const handleAddPelanggan = async (e: FormEvent) => {
@@ -289,8 +423,50 @@ export default function CreateSpkPage() {
   const filteredKendaraan = kendaraanList.filter(k => k.name.toLowerCase().includes(kendaraanSearch.toLowerCase()) || k.plat.toLowerCase().includes(kendaraanSearch.toLowerCase()));
 
   // ── Submit ─────────────────────────────────────────────────
+  // Validasi dan tampilkan modal review (untuk modifikasi/bubut dengan nilai > 0)
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError("");
+
+    // Validasi dasar dulu sebelum modal review
+    if (!pelangganId) {
+      setError("Pelanggan harus dipilih");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (mode === "rutin" && selectedJasaItems.length === 0 && selectedSparepartItems.length === 0) {
+      setError("Pilih minimal satu jasa/tipe servis atau sparepart");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (mode === "modifikasi" && !judulProyek.trim() && !keluhan.trim()) {
+      setError("Mode modifikasi membutuhkan judul proyek atau deskripsi pekerjaan");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (mode === "modifikasi" && stages.some(s => !s.nama.trim())) {
+      setError("Semua tahap harus memiliki nama");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (mode === "bubut" && !bubutKeluhan.trim()) {
+      setError("Deskripsi pekerjaan bubut wajib diisi");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // Tampilkan review untuk modifikasi/bubut yang punya nilai signifikan
+    const totalSubmit = mode === "rutin" ? (totalJasa + totalSparepart) : (totalEstimasi + totalSparepart);
+    if (mode !== "rutin" && totalSubmit > 0) {
+      setShowReview(true);
+      return;
+    }
+
+    await doSubmit();
+  }
+
+  async function doSubmit() {
+    setShowReview(false);
     setError("");
 
     if (!pelangganId) {
@@ -329,6 +505,7 @@ export default function CreateSpkPage() {
         keluhan,
       };
       if (kendaraanId) body.kendaraanId = Number(kendaraanId);
+      if (kendaraanId && odometerMasuk) body.odometerMasuk = Number(odometerMasuk);
       if (mekanikId) body.mekanikId = Number(mekanikId);
 
       if (mode === "rutin") {
@@ -357,9 +534,22 @@ export default function CreateSpkPage() {
           estimasiBiaya: Number(s.estimasiBiaya),
           durasiHari: Number(s.durasiHari),
         }));
+        // Sparepart/material opsional untuk modifikasi
+        if (selectedSparepartItems.length > 0) {
+          body.items = selectedSparepartItems.map(x => ({
+            type: "sparepart",
+            sparepartId: x.sparepartId,
+            nama: x.nama,
+            qty: x.qty,
+            hargaSatuan: Number(x.harga),
+          }));
+        }
       } else if (mode === "bubut") {
         body.keluhan = bubutKeluhan;
-        if (namaBubut) body.catatan = `Nama: ${namaBubut}`;
+        const catatanParts: string[] = [];
+        if (namaBubut) catatanParts.push(`Nama: ${namaBubut}`);
+        if (materialFromCustomer) catatanParts.push("Material disediakan customer");
+        if (catatanParts.length) body.catatan = catatanParts.join(" | ");
         // Hanya kirim stages jika ada dan terisi (bubut tidak wajib punya stages)
         const validStages = stages.filter(s => s.nama.trim());
         if (validStages.length > 0) {
@@ -369,10 +559,38 @@ export default function CreateSpkPage() {
             durasiHari: Number(s.durasiHari),
           }));
         }
+        // Material/sparepart opsional untuk bubut, kecuali jika customer bawa sendiri
+        if (!materialFromCustomer && selectedSparepartItems.length > 0) {
+          body.items = selectedSparepartItems.map(x => ({
+            type: "sparepart",
+            sparepartId: x.sparepartId,
+            nama: x.nama,
+            qty: x.qty,
+            hargaSatuan: Number(x.harga),
+          }));
+        }
       }
 
       const res = await api.post<{ id: number }>("/spk", body);
-      router.push(`/app/spk/${res.data.id}`);
+      const newSpkId = res.data.id;
+
+      // Upload gambar referensi (modifikasi) bila ada — pakai allSettled agar tahu file mana yang gagal
+      if (mode === "modifikasi" && referensiFiles.length > 0) {
+        const results = await Promise.allSettled(referensiFiles.map((file, idx) => {
+          const fd = new FormData();
+          fd.append("photo", file);
+          fd.append("type", "lampiran");
+          fd.append("caption", `Referensi ${idx + 1}`);
+          return api.upload(`/spk/${newSpkId}/photos`, fd);
+        }));
+        const failedCount = results.filter(r => r.status === "rejected").length;
+        if (failedCount > 0) {
+          toast.error(`${failedCount} dari ${referensiFiles.length} gambar gagal diupload — silakan retry dari halaman SPK.`);
+        }
+      }
+
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+      router.push(`/app/spk/${newSpkId}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Gagal membuat SPK";
       setError(msg);
@@ -383,7 +601,7 @@ export default function CreateSpkPage() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out max-w-4xl mx-auto">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out max-w-4xl mx-auto pb-24">
       <div className="flex items-center gap-4">
         <Link href="/app/spk" className="p-2 hover:bg-surface-hover rounded-xl border border-surface-border glass transition-colors">
           <ArrowLeft size={20} />
@@ -398,6 +616,18 @@ export default function CreateSpkPage() {
         <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-sm animate-in fade-in slide-in-from-top-2 duration-300">
           <AlertCircle size={16} className="shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {draftAvailable && (
+        <div className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-sm animate-in fade-in slide-in-from-top-2 duration-300">
+          <AlertCircle size={16} className="shrink-0 text-blue-600" />
+          <div className="flex-1">
+            <p className="font-semibold text-blue-700 dark:text-blue-400">Draft tersimpan</p>
+            <p className="text-xs text-muted-foreground">Disimpan otomatis pada {new Date(draftAvailable.savedAt).toLocaleString("id-ID")}</p>
+          </div>
+          <button type="button" onClick={restoreDraft} className="px-3 py-1.5 text-xs font-bold bg-blue-500 text-white rounded-lg hover:bg-blue-600">Pulihkan</button>
+          <button type="button" onClick={dismissDraft} className="px-3 py-1.5 text-xs font-medium border border-surface-border rounded-lg hover:bg-surface-hover">Abaikan</button>
         </div>
       )}
 
@@ -426,7 +656,7 @@ export default function CreateSpkPage() {
             {mode === "modifikasi" && (
               <div className="flex items-center gap-2 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-purple-600 text-xs mb-2">
                 <Info size={14} className="shrink-0" />
-                Mode modifikasi memerlukan minimum DP 40% dari total estimasi biaya tahapan.
+                Mode modifikasi memerlukan minimum DP {dpPersen.modifikasi}% dari total estimasi biaya tahapan.
               </div>
             )}
           </div>
@@ -537,6 +767,14 @@ export default function CreateSpkPage() {
                         <Car size={16} />
                       </button>
                     </div>
+                    {kendaraanId && (
+                      <div className="mt-3 space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">Odometer Saat Masuk (km) <span className="text-[10px] opacity-70">— opsional, otomatis update kendaraan</span></label>
+                        <input type="number" min="0" value={odometerMasuk} onChange={e => setOdometerMasuk(e.target.value)}
+                          placeholder="Contoh: 45000"
+                          className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono" />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-1.5">
@@ -800,6 +1038,11 @@ export default function CreateSpkPage() {
                       <label className="text-xs font-medium text-muted-foreground">Tahapan Pekerjaan</label>
                       {totalEstimasi > 0 && <span className="text-xs font-bold text-primary">Total: {formatRp(totalEstimasi)}</span>}
                     </div>
+                    <div className="flex items-start gap-2 p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[11px] text-blue-700 dark:text-blue-400">
+                      <Info size={12} className="shrink-0 mt-0.5" />
+                      <span>Stage hanya untuk biaya <b>jasa/labor</b>. Material/sparepart masuk ke section di bawah agar tidak terhitung dua kali.</span>
+                    </div>
+                    <StageTemplates mode="modifikasi" currentStages={modifikasiStages} onLoad={(s) => setModifikasiStages(s)} />
                     {stages.map((stage, i) => (
                       <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_80px_auto] gap-2 items-start p-3 sm:p-0 border border-surface-border sm:border-0 rounded-xl sm:rounded-none">
                         <input type="text" value={stage.nama} onChange={e => updateStage(i, "nama", e.target.value)}
@@ -829,10 +1072,44 @@ export default function CreateSpkPage() {
                     </button>
                     {totalEstimasi > 0 && (
                       <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-600">
-                        Minimum DP (40%): <span className="font-bold">{formatRp(Math.ceil(totalEstimasi * 0.4))}</span>
+                        Minimum DP ({dpPersen.modifikasi}%): <span className="font-bold">{formatRp(Math.ceil((totalEstimasi * dpPersen.modifikasi) / 100))}</span>
+                      </div>
+                    )}
+                    {(isLongDuration || isHighValue) && (
+                      <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-xs text-orange-700 dark:text-orange-400 flex items-start gap-2">
+                        <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-semibold">Proyek Skala Besar</p>
+                          <p className="text-[11px] mt-0.5">
+                            {isLongDuration && <>Total durasi <b>{totalDurasi} hari</b> melebihi 30 hari. </>}
+                            {isHighValue && <>Estimasi <b>{formatRp(totalEstimasi)}</b> melebihi Rp 50jt. </>}
+                            Pastikan estimasi sudah dikonfirmasi dengan pelanggan.
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
+
+                  <SparepartPicker
+                    label="Kebutuhan Sparepart / Material (Opsional)"
+                    sparepartList={sparepartList}
+                    sparepartSearch={sparepartSearch}
+                    setSparepartSearch={setSparepartSearch}
+                    loadingSparepart={loadingSparepart}
+                    selectedSparepartItems={selectedSparepartItems}
+                    addSparepart={addSparepart}
+                    removeSparepart={removeSparepart}
+                    updateSparepartQty={updateSparepartQty}
+                    totalSparepart={totalSparepart}
+                    formatRp={formatRp}
+                  />
+
+                  <ImageUploader
+                    files={referensiFiles}
+                    setFiles={setReferensiFiles}
+                    previews={referensiPreviews}
+                    setPreviews={setReferensiPreviews}
+                  />
                 </div>
               )}
 
@@ -845,14 +1122,24 @@ export default function CreateSpkPage() {
                       className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                       placeholder="Deskripsikan pekerjaan bubut: dimensi, material, spesifikasi..." />
                   </div>
+
+                  <label className="flex items-center gap-2 p-3 bg-surface-hover/40 border border-surface-border rounded-xl cursor-pointer hover:bg-surface-hover transition-colors">
+                    <input type="checkbox" checked={materialFromCustomer} onChange={e => setMaterialFromCustomer(e.target.checked)}
+                      className="w-4 h-4 accent-primary" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Material disediakan customer</p>
+                      <p className="text-[11px] text-muted-foreground">Bengkel hanya kerjakan jasa bubut, material dibawa pelanggan.</p>
+                    </div>
+                  </label>
                   
-                  {/* Tahapan Bubut */}
+                  {/* Tahapan Bubut (Opsional) */}
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-medium text-muted-foreground">Tahapan Pekerjaan</label>
+                      <label className="text-xs font-medium text-muted-foreground">Tahapan Pekerjaan (Opsional)</label>
                       {totalEstimasi > 0 && <span className="text-xs font-bold text-primary">Total: {formatRp(totalEstimasi)}</span>}
                     </div>
-                    {stages.map((stage, i) => (
+                    <StageTemplates mode="bubut" currentStages={bubutStages} onLoad={(s) => setBubutStages(s)} />
+                    {stages.length > 0 && stages.map((stage, i) => (
                       <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_80px_auto] gap-2 items-start p-3 sm:p-0 border border-surface-border sm:border-0 rounded-xl sm:rounded-none">
                         <input type="text" value={stage.nama} onChange={e => updateStage(i, "nama", e.target.value)}
                           placeholder={`Tahap ${i + 1}: Nama pekerjaan...`}
@@ -867,24 +1154,40 @@ export default function CreateSpkPage() {
                           <input type="number" min={1} value={stage.durasiHari} onChange={e => updateStage(i, "durasiHari", Number(e.target.value))}
                             placeholder="Hari"
                             className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
-                          <button type="button" onClick={() => removeStage(i)} disabled={stages.length === 1}
-                            className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl disabled:opacity-30 transition-colors">
+                          <button type="button" onClick={() => removeStage(i)}
+                            className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-colors">
                             <Trash2 size={16} />
                           </button>
                         </div>
                       </div>
                     ))}
-                    <div className="text-xs text-muted-foreground hidden sm:block">Nama · Estimasi Biaya · Durasi (hari)</div>
+                    {stages.length > 0 && (
+                      <div className="text-xs text-muted-foreground hidden sm:block">Nama · Estimasi Biaya · Durasi (hari)</div>
+                    )}
                     <button type="button" onClick={addStage}
                       className="w-full flex items-center justify-center gap-2 py-2 text-sm border border-dashed border-primary/30 text-primary rounded-xl hover:bg-primary/5 transition-colors">
                       <Plus size={16} /> Tambah Tahap
                     </button>
                     {totalEstimasi > 0 && (
                       <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-600">
-                        Minimum DP Opsional: <span className="font-bold">{formatRp(Math.ceil(totalEstimasi * 0.4))}</span>
+                        Minimum DP ({dpPersen.bubut}%): <span className="font-bold">{formatRp(Math.ceil((totalEstimasi * dpPersen.bubut) / 100))}</span>
                       </div>
                     )}
                   </div>
+
+                  {!materialFromCustomer && <SparepartPicker
+                    label="Kebutuhan Material / Sparepart (Opsional)"
+                    sparepartList={sparepartList}
+                    sparepartSearch={sparepartSearch}
+                    setSparepartSearch={setSparepartSearch}
+                    loadingSparepart={loadingSparepart}
+                    selectedSparepartItems={selectedSparepartItems}
+                    addSparepart={addSparepart}
+                    removeSparepart={removeSparepart}
+                    updateSparepartQty={updateSparepartQty}
+                    totalSparepart={totalSparepart}
+                    formatRp={formatRp}
+                  />}
                 </div>
               )}
             </section>
@@ -944,6 +1247,36 @@ export default function CreateSpkPage() {
         </div>
       </form>
 
+      {/* ── Sticky Total Summary (E5) ── */}
+      {(() => {
+        const stickyTotal = mode === "rutin" ? (totalJasa + totalSparepart) : (totalEstimasi + totalSparepart);
+        const itemCount = mode === "rutin" ? (selectedJasaItems.length + selectedSparepartItems.length) : (stages.filter(s => s.nama).length + selectedSparepartItems.length);
+        if (stickyTotal <= 0 && itemCount === 0) return null;
+        return (
+          <div className="fixed bottom-0 left-0 right-0 z-30 bg-surface/95 backdrop-blur-md border-t border-surface-border shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{mode === "rutin" ? "Subtotal" : "Estimasi Total"}</p>
+                <p className="text-lg font-bold text-primary truncate">{formatRp(stickyTotal)}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {mode === "rutin"
+                    ? `${selectedJasaItems.length} jasa • ${selectedSparepartItems.length} sparepart`
+                    : `${stages.filter(s => s.nama).length} tahapan${selectedSparepartItems.length > 0 ? ` • ${selectedSparepartItems.length} sparepart` : ""}${estimasiSelesai ? ` • ETA: ${estimasiSelesai}` : ""}${stickyTotal > 0 && dpPctNow > 0 ? ` • DP min: ${formatRp(Math.ceil((stickyTotal * dpPctNow) / 100))}` : ""}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { const f = document.querySelector("form") as HTMLFormElement | null; f?.requestSubmit(); }}
+                disabled={submitting}
+                className="shrink-0 px-5 py-3 text-sm font-bold bg-primary text-primary-foreground rounded-xl shadow-glossy-primary btn-glossy disabled:opacity-70 flex items-center gap-2"
+              >
+                {submitting ? <><Loader2 size={16} className="animate-spin" /> Memproses</> : <><Save size={16} /> Buat SPK</>}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* QUICK CREATE MODALS */}
       {showAddPelanggan && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -965,6 +1298,133 @@ export default function CreateSpkPage() {
                 {addingPelanggan ? <Loader2 size={16} className="animate-spin" /> : "Simpan Pelanggan"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL REVIEW PRE-SUBMIT */}
+      {showReview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-background border border-surface-border rounded-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b border-surface-border flex justify-between items-center bg-surface-hover/30">
+              <h3 className="font-bold flex items-center gap-2"><CheckCircle2 size={16} className="text-primary"/> Review SPK</h3>
+              <button onClick={() => setShowReview(false)} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4 overflow-y-auto text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Mode</p>
+                  <p className="font-bold capitalize">{mode === "modifikasi" ? "Modifikasi" : "Bubut Lepas"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Prioritas</p>
+                  <p className="font-bold capitalize">{prioritas}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Pelanggan</p>
+                <p className="font-medium">{pelangganSearch || "—"}</p>
+              </div>
+
+              {mode === "modifikasi" && (
+                <>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Judul Proyek</p>
+                    <p className="font-medium">{judulProyek || "—"}</p>
+                  </div>
+                  {kendaraanSearch && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Kendaraan</p>
+                      <p className="font-medium">{kendaraanSearch}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {mode === "bubut" && (
+                <>
+                  {namaBubut && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Nama Walk-in</p>
+                      <p className="font-medium">{namaBubut}</p>
+                    </div>
+                  )}
+                  {materialFromCustomer && (
+                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg text-[11px] text-blue-700 dark:text-blue-400">
+                      ✓ Material disediakan customer
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="border-t border-surface-border pt-3 space-y-1.5">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Tahapan ({stages.filter(s => s.nama.trim()).length})</p>
+                {stages.filter(s => s.nama.trim()).map((s, i) => (
+                  <div key={i} className="flex justify-between text-xs">
+                    <span className="truncate flex-1">{i + 1}. {s.nama}</span>
+                    <span className="text-muted-foreground ml-2">{formatRp(Number(s.estimasiBiaya))} · {s.durasiHari}h</span>
+                  </div>
+                ))}
+                {stages.filter(s => s.nama.trim()).length === 0 && <p className="text-xs text-muted-foreground italic">Tidak ada tahapan</p>}
+              </div>
+
+              {selectedSparepartItems.length > 0 && !materialFromCustomer && (
+                <div className="border-t border-surface-border pt-3 space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Sparepart/Material ({selectedSparepartItems.length})</p>
+                  {selectedSparepartItems.map(it => (
+                    <div key={it.sparepartId} className="flex justify-between text-xs">
+                      <span className="truncate flex-1">{it.nama}</span>
+                      <span className="text-muted-foreground ml-2">{it.qty}× {formatRp(it.harga)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {mode === "modifikasi" && referensiFiles.length > 0 && (
+                <div className="border-t border-surface-border pt-3">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Gambar Referensi</p>
+                  <p className="text-xs">{referensiFiles.length} file akan diupload</p>
+                </div>
+              )}
+
+              <div className="border-t border-surface-border pt-3 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Subtotal Tahapan</span>
+                  <span className="font-medium">{formatRp(totalEstimasi)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Subtotal Sparepart</span>
+                  <span className="font-medium">{formatRp(totalSparepart)}</span>
+                </div>
+                <div className="flex justify-between text-base font-bold pt-1 border-t border-surface-border">
+                  <span>Total Estimasi</span>
+                  <span className="text-primary">{formatRp(totalEstimasi + totalSparepart)}</span>
+                </div>
+                {estimasiSelesai && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Estimasi Selesai</span>
+                    <span className="font-medium">{estimasiSelesai}</span>
+                  </div>
+                )}
+                {dpPctNow > 0 && (
+                  <div className="flex justify-between text-xs pt-1">
+                    <span className="text-amber-600">Min. DP ({dpPctNow}%)</span>
+                    <span className="font-bold text-amber-600">{formatRp(Math.ceil(((totalEstimasi + totalSparepart) * dpPctNow) / 100))}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-4 border-t border-surface-border bg-surface-hover/30 flex gap-2">
+              <button type="button" onClick={() => setShowReview(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium border border-surface-border rounded-xl hover:bg-surface transition-colors">
+                Edit Lagi
+              </button>
+              <button type="button" onClick={() => doSubmit()} disabled={submitting}
+                className="flex-1 px-4 py-2 text-sm font-bold bg-primary text-primary-foreground rounded-xl shadow-glossy-primary btn-glossy disabled:opacity-70 flex items-center justify-center gap-2">
+                {submitting ? <><Loader2 size={16} className="animate-spin" /> Memproses</> : <><Save size={16} /> Konfirmasi</>}
+              </button>
+            </div>
           </div>
         </div>
       )}

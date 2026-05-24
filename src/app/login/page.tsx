@@ -52,7 +52,7 @@ export default function LoginPage() {
           <div className="w-16 h-16 mx-auto rounded-2xl bg-primary flex items-center justify-center text-white font-bold text-3xl shadow-glossy-primary mb-4 transform hover:rotate-12 transition-transform duration-300">
             M
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">MM Tracing</h1>
+          <h1 className="text-2xl font-bold tracking-tight">MMT Racing</h1>
           <p className="text-muted-foreground text-sm mt-2">Sistem Manajemen Bengkel Terpadu</p>
         </div>
 
@@ -113,7 +113,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-8 text-center text-xs text-muted-foreground border-t border-surface-border/50 pt-4">
-          &copy; 2026 Bengkel MM Tracing. All rights reserved.
+          &copy; 2026 Bengkel MMT Racing. All rights reserved.
         </div>
       </div>
     </div>

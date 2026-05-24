@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Package, AlertTriangle, XCircle, TrendingUp, ArrowDownToLine, ClipboardList } from "lucide-react";
+import { Package, AlertTriangle, XCircle, TrendingUp, ArrowDownToLine, ClipboardList, History, ShoppingCart } from "lucide-react";
 import { api } from "@/lib/api";
 import type { InventarisSummary, InventarisLog, Sparepart } from "@/lib/types";
 import { CardSkeleton, ListSkeleton, Skeleton } from "@/components/ui/loading-skeleton";
@@ -20,13 +20,15 @@ export default function InventarisPage() {
       api.get<InventarisSummary>("/inventaris/summary"),
       api.getPaginated<InventarisLog>("/inventaris", { limit: 5, type: "masuk" }),
       api.getPaginated<InventarisLog>("/inventaris", { limit: 5, type: "keluar" }),
-      api.getPaginated<Sparepart>("/sparepart", { limit: 100 }),
+      api.get<Sparepart[]>("/sparepart/low-stock"),
     ])
-      .then(([summaryRes, masukRes, keluarRes, sparepartRes]) => {
+      .then(([summaryRes, masukRes, keluarRes, lowStockRes]) => {
         setSummary(summaryRes.data);
         setLogsMasuk(masukRes.data);
         setLogsKeluar(keluarRes.data);
-        const menipis = sparepartRes.data.filter(s => s.stok > 0 && s.stok <= s.stokMinimum);
+        const all = Array.isArray(lowStockRes.data) ? lowStockRes.data : [];
+        // pisahkan: tampilkan hanya yang masih ada stok tipis (bukan habis; habis sudah di KPI)
+        const menipis = all.filter((s: any) => Number(s.stok) > 0);
         setStokMenipis(menipis);
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Gagal memuat data setelan inventaris"))
@@ -71,12 +73,15 @@ export default function InventarisPage() {
           <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Inventaris & Stok</h1>
           <p className="text-muted-foreground text-sm">Pantau stok real-time, barang masuk/keluar, dan opname.</p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/app/inventaris/masuk" className="flex items-center gap-2 text-sm bg-surface border border-surface-border px-3 py-2 rounded-xl hover:bg-surface-hover font-medium">
+        <div className="flex flex-wrap gap-2">
+          <Link href="/app/inventaris/masuk" className="flex items-center gap-2 text-sm bg-primary text-primary-foreground px-3 py-2 rounded-xl hover:opacity-90 font-medium shadow-glossy-primary">
             <ArrowDownToLine size={16} /> Stok Masuk
           </Link>
+          <Link href="/app/inventaris/mutasi" className="flex items-center gap-2 text-sm bg-surface border border-surface-border px-3 py-2 rounded-xl hover:bg-surface-hover font-medium">
+            <History size={16} /> Mutasi
+          </Link>
           <Link href="/app/inventaris/opname" className="flex items-center gap-2 text-sm bg-surface border border-surface-border px-3 py-2 rounded-xl hover:bg-surface-hover font-medium">
-            <ClipboardList size={16} /> Stok Opname
+            <ClipboardList size={16} /> Opname
           </Link>
         </div>
       </div>
@@ -117,7 +122,13 @@ export default function InventarisPage() {
                   <p className="text-sm font-semibold truncate">{item.name}</p>
                   <p className="text-[10px] text-muted-foreground">Sisa: <span className="text-amber-600 font-bold">{item.stok}</span> / Min: {item.stokMinimum}</p>
                 </div>
-                <span className="text-xs font-mono font-medium text-muted-foreground">{formatRp(Number(item.hargaJual))}</span>
+                <Link
+                  href={`/app/inventaris/masuk?sparepartId=${item.id}`}
+                  className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-500/30 transition-colors shrink-0"
+                  title="Restock sekarang"
+                >
+                  <ShoppingCart size={12} /> Restock
+                </Link>
               </div>
             ))}
           </div>
@@ -127,7 +138,10 @@ export default function InventarisPage() {
       {/* Recent Activity */}
       <div className="grid md:grid-cols-2 gap-6">
         <div className="glass-panel p-3 sm:p-4 lg:p-6">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3 lg:mb-4">📥 Stok Masuk Terakhir</h3>
+          <div className="flex items-center justify-between mb-3 lg:mb-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">📥 Stok Masuk Terakhir</h3>
+            <Link href="/app/inventaris/mutasi?type=masuk" className="text-xs text-primary hover:underline">Lihat Semua</Link>
+          </div>
           <div className="space-y-2">
             {logsMasuk.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Belum ada data stok masuk</p>
@@ -146,7 +160,10 @@ export default function InventarisPage() {
         </div>
 
         <div className="glass-panel p-3 sm:p-4 lg:p-6">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3 lg:mb-4">📤 Stok Keluar Terakhir</h3>
+          <div className="flex items-center justify-between mb-3 lg:mb-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">📤 Stok Keluar Terakhir</h3>
+            <Link href="/app/inventaris/mutasi?type=keluar" className="text-xs text-primary hover:underline">Lihat Semua</Link>
+          </div>
           <div className="space-y-2">
             {logsKeluar.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Belum ada data stok keluar</p>

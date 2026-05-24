@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import prisma from '../config/database';
+import db from '../config/db';
 import logger from '../config/logger';
 
 // Daily at 08:00 — Check expiring warranties
@@ -10,24 +10,16 @@ async function checkGaransi() {
     sevenDays.setDate(sevenDays.getDate() + 7);
 
     // Mark nearly expired
-    const hampir = await prisma.garansi.updateMany({
-      where: { status: 'aktif', endDate: { lte: sevenDays, gte: now } },
-      data: { status: 'hampir' },
-    });
+    const hampir = await db.execute("UPDATE garansi SET status = 'hampir' WHERE status = 'aktif' AND endDate <= ? AND endDate >= ?", [sevenDays, now]);
 
     // Mark expired
-    const expired = await prisma.garansi.updateMany({
-      where: { status: { in: ['aktif', 'hampir'] }, endDate: { lt: now } },
-      data: { status: 'expired' },
-    });
+    const expired = await db.execute("UPDATE garansi SET status = 'expired' WHERE status IN ('aktif','hampir') AND endDate < ?", [now]);
 
-    if (hampir.count > 0 || expired.count > 0) {
-      logger.info(`[CRON] Garansi: ${hampir.count} hampir expired, ${expired.count} expired`);
+    if (hampir.affectedRows > 0 || expired.affectedRows > 0) {
+      logger.info(`[CRON] Garansi: ${hampir.affectedRows} hampir expired, ${expired.affectedRows} expired`);
 
-      if (hampir.count > 0) {
-        await prisma.notifikasi.create({
-          data: { type: 'sistem', title: 'Garansi Hampir Expired', message: `${hampir.count} garansi akan expired dalam 7 hari`, link: '/garansi' },
-        });
+      if (hampir.affectedRows > 0) {
+        await db.insert('notifikasi', { type: 'sistem', title: 'Garansi Hampir Expired', message: `${hampir.affectedRows} garansi akan expired dalam 7 hari`, link: '/garansi' });
       }
     }
   } catch (err) {
@@ -39,19 +31,14 @@ async function checkGaransi() {
 async function checkPaymentReminder() {
   try {
     const now = new Date();
-    const overdue = await prisma.pembayaran.findMany({
-      where: { status: { not: 'lunas' }, jatuhTempo: { lt: now } },
-      include: { spk: { include: { pelanggan: true } } },
-    });
+    const overdue = await db.query("SELECT sisaBayar FROM pembayaran WHERE status != 'lunas' AND jatuhTempo < ?", [now]);
 
     if (overdue.length > 0) {
-      const totalSisa = overdue.reduce((s, p) => s + Number(p.sisaBayar), 0);
-      await prisma.notifikasi.create({
-        data: {
-          type: 'pembayaran', title: 'Invoice Jatuh Tempo',
-          message: `${overdue.length} invoice jatuh tempo — total Rp ${totalSisa.toLocaleString('id-ID')}`,
-          link: '/pembayaran',
-        },
+      const totalSisa = overdue.reduce((s: number, p: any) => s + Number(p.sisaBayar), 0);
+      await db.insert('notifikasi', {
+        type: 'pembayaran', title: 'Invoice Jatuh Tempo',
+        message: `${overdue.length} invoice jatuh tempo — total Rp ${totalSisa.toLocaleString('id-ID')}`,
+        link: '/pembayaran',
       });
       logger.info(`[CRON] Payment: ${overdue.length} overdue invoices`);
     }
@@ -63,17 +50,15 @@ async function checkPaymentReminder() {
 // Daily at 07:00 — Check low stock
 async function checkStockAlert() {
   try {
-    const lowStock = await prisma.$queryRaw<any[]>`SELECT id, name, stok, stokMinimum FROM sparepart WHERE stok <= stokMinimum AND stok > 0`;
-    const outOfStock = await prisma.sparepart.count({ where: { stok: 0 } });
+    const lowStock = await db.query('SELECT id, name, stok, stokMinimum FROM sparepart WHERE stok <= stokMinimum AND stok > 0');
+    const outOfStock = await db.queryVal<number>('SELECT COUNT(*) FROM sparepart WHERE stok = 0');
 
-    if (lowStock.length > 0 || outOfStock > 0) {
+    if (lowStock.length > 0 || (outOfStock ?? 0) > 0) {
       const items = lowStock.slice(0, 5).map((s: any) => s.name).join(', ');
-      await prisma.notifikasi.create({
-        data: {
-          type: 'stok', title: 'Stok Menipis',
-          message: `${lowStock.length} item menipis (${items}), ${outOfStock} item habis`,
-          link: '/inventaris',
-        },
+      await db.insert('notifikasi', {
+        type: 'stok', title: 'Stok Menipis',
+        message: `${lowStock.length} item menipis (${items}), ${outOfStock} item habis`,
+        link: '/inventaris',
       });
       logger.info(`[CRON] Stock: ${lowStock.length} low, ${outOfStock} out`);
     }

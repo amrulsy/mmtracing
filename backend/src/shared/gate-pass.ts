@@ -7,23 +7,27 @@
  * 2. pembayaran.routes.ts — when invoice is marked 'lunas' and SPK is already 'selesai'
  */
 
-export async function releaseGatePass(tx: any, spkId: number): Promise<void> {
-  const spk = await tx.spk.findUnique({
-    where: { id: spkId },
-    include: {
-      items: { include: { jasa: true } },
-      stages: true,
-      pembayaran: { select: { totalTagihan: true } },
-    },
-  });
+import type { Queryable } from '../config/db';
+
+export async function releaseGatePass(tx: Queryable, spkId: number): Promise<void> {
+  const spk = await tx.queryOne<any>('SELECT * FROM spk WHERE id = ?', [spkId]);
   if (!spk) return;
 
   // ── Guard: jangan terbitkan garansi/poin duplikat ─────────────
-  const existingGaransi = await tx.garansi.count({ where: { spkId } });
+  const existingGaransi = await tx.queryVal<number>('SELECT COUNT(*) FROM garansi WHERE spkId = ?', [spkId]);
   if (existingGaransi > 0) return; // Already issued
 
+  // Fetch items with jasa data, and stages
+  const [items, stages] = await Promise.all([
+    tx.query(
+      `SELECT si.*, j.garansiHari AS jasaGaransiHari
+       FROM spk_items si LEFT JOIN jasa j ON j.id = si.jasaId
+       WHERE si.spkId = ?`, [spkId]),
+    tx.query('SELECT * FROM spk_stages WHERE spkId = ?', [spkId]),
+  ]);
+
   // ── 1. Terbitkan Garansi ──────────────────────────────────────
-  const warrantySources = spk.items.length > 0 ? spk.items : spk.stages;
+  const warrantySources = items.length > 0 ? items : stages;
   for (const item of warrantySources) {
     let daysGaransi = 30; // default jasa
     let typeGaransi = 'jasa';
@@ -31,9 +35,8 @@ export async function releaseGatePass(tx: any, spkId: number): Promise<void> {
     if ('type' in item && item.type === 'sparepart') {
       daysGaransi = 180;
       typeGaransi = 'part';
-    } else if ('type' in item && item.type === 'jasa' && item.jasa?.garansiHari) {
-      // Gunakan garansiHari dari master data Jasa jika tersedia
-      daysGaransi = item.jasa.garansiHari;
+    } else if ('type' in item && item.type === 'jasa' && item.jasaGaransiHari) {
+      daysGaransi = item.jasaGaransiHari;
       typeGaransi = 'jasa';
     }
     if (spk.mode === 'modifikasi') {
@@ -45,35 +48,29 @@ export async function releaseGatePass(tx: any, spkId: number): Promise<void> {
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + daysGaransi);
 
-    await tx.garansi.create({
-      data: {
-        spkId,
-        itemName: item.nama,
-        type: typeGaransi,
-        startDate,
-        endDate,
-      },
+    await tx.insert('garansi', {
+      spkId,
+      itemName: item.nama,
+      type: typeGaransi,
+      startDate,
+      endDate,
     });
   }
 
   // ── 2. Terbitkan Loyalty Points (1 poin per Rp 10.000) ───────
-  // Gunakan totalTagihan (setelah diskon) dari invoice, fallback ke totalHarga
-  const pembayaran = spk.pembayaran?.[0];
-  const totalNum = pembayaran
-    ? Number(pembayaran.totalTagihan)
-    : spk.totalHarga.toNumber();
+  const pembayaran = await tx.queryOne<{ totalTagihan: number }>(
+    'SELECT totalTagihan FROM pembayaran WHERE spkId = ? LIMIT 1', [spkId]);
+  const totalNum = pembayaran ? Number(pembayaran.totalTagihan) : Number(spk.totalHarga);
   if (totalNum > 0) {
     const points = Math.floor(totalNum / 10000);
     if (points > 0) {
-      await tx.loyaltyPoint.create({
-        data: {
-          pelangganId: spk.pelangganId,
-          type: 'earn',
-          points,
-          description: `Poin dari ${spk.noSpk}`,
-          refType: 'transaksi',
-          refId: spk.id,
-        },
+      await tx.insert('loyalty_points', {
+        pelangganId: spk.pelangganId,
+        type: 'earn',
+        points,
+        description: `Poin dari ${spk.noSpk}`,
+        refType: 'transaksi',
+        refId: spk.id,
       });
     }
   }

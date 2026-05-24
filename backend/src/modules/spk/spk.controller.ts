@@ -44,6 +44,13 @@ export class SpkController {
     } catch (e) { next(e); }
   }
 
+  async restore(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await spkService.restore(Number(req.params.id), req.user?.id);
+      sendSuccess(res, null, result.message);
+    } catch (e) { next(e); }
+  }
+
   async delete(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const result = await spkService.delete(Number(req.params.id), req.user?.id);
@@ -98,6 +105,68 @@ export class SpkController {
     try {
       const data = await spkService.addStage(Number(req.params.id), req.body, req.user?.id);
       sendSuccess(res, data, 'Tahapan berhasil ditambahkan');
+    } catch (e) { next(e); }
+  }
+
+  // ── Edit SPK ──────────────────────────────────────────────────
+  async update(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await spkService.update(Number(req.params.id), req.body, req.user?.id);
+      sendSuccess(res, data, 'SPK berhasil diperbarui');
+    } catch (e) { next(e); }
+  }
+
+  async assignMekanik(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const data = await spkService.assignMekanik(Number(req.params.id), req.body.mekanikId ?? null, req.user?.id);
+      sendSuccess(res, data, data.mekanikId ? 'Mekanik berhasil diassign' : 'Mekanik berhasil di-unassign');
+    } catch (e) { next(e); }
+  }
+
+  // ── Stats dashboard ───────────────────────────────────────────
+  async stats(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await spkService.stats();
+      sendSuccess(res, data);
+    } catch (e) { next(e); }
+  }
+
+  // ── Analytics breakdown per mode + top sparepart + performa mekanik ──
+  async analytics(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { dateFrom, dateTo } = req.query as { dateFrom?: string; dateTo?: string };
+      const data = await spkService.analytics({ dateFrom, dateTo });
+      sendSuccess(res, data);
+    } catch (e) { next(e); }
+  }
+
+  // ── Upload foto/gambar referensi ──────────────────────────────
+  async uploadPhoto(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const file = (req as any).file as Express.Multer.File | undefined;
+      if (!file) {
+        res.status(400).json({ success: false, message: 'File foto wajib diupload dengan field "photo"' });
+        return;
+      }
+      const id = Number(req.params.id);
+      const type = String(req.body?.type || 'lampiran');
+      const caption = req.body?.caption ? String(req.body.caption) : undefined;
+      const data = await spkService.addPhoto(id, { url: `/uploads/${file.filename}`, caption, type });
+      sendCreated(res, data, 'Foto berhasil diupload');
+    } catch (e) { next(e); }
+  }
+
+  // ── Kirim ulang notifikasi WhatsApp invoice (SPK dibuat) ──────
+  async sendWhatsapp(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const kind = String(req.body?.kind || 'created'); // created | selesai | reminder-pembayaran
+      const id = Number(req.params.id);
+      const mod = await import('../whatsapp/whatsapp.notification');
+      if (kind === 'created') await mod.notifySpkCreated(id);
+      else if (kind === 'selesai') await mod.notifySpkSelesai(id);
+      else if (kind === 'progress') await mod.notifyProgressUpdate(id);
+      else throw new Error('Tipe notifikasi tidak dikenal');
+      sendSuccess(res, null, `Notifikasi "${kind}" dikirim ulang`);
     } catch (e) { next(e); }
   }
 }

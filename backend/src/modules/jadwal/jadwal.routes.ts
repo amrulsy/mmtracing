@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import prisma from '../../config/database';
+import db from '../../config/db';
 import { authMiddleware, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated } from '../../shared/utils';
@@ -24,23 +24,37 @@ const createSchema = z.object({
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { startDate, endDate, mekanikId } = req.query;
-    const where: any = {};
+    const conds: string[] = [];
+    const params: any[] = [];
     if (startDate && endDate) {
-      where.tanggal = { gte: new Date(startDate as string), lte: new Date(endDate as string) };
+      conds.push('j.tanggal >= ? AND j.tanggal <= ?');
+      params.push(new Date(startDate as string), new Date(endDate as string));
     }
-    if (mekanikId) where.mekanikId = Number(mekanikId);
-    const data = await prisma.jadwal.findMany({
-      where, orderBy: { tanggal: 'asc' },
-      include: { spk: { select: { noSpk: true, status: true } }, mekanik: { select: { name: true, initial: true } } },
-    });
-    sendSuccess(res, data);
+    if (mekanikId) { conds.push('j.mekanikId = ?'); params.push(Number(mekanikId)); }
+    const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+    const data = await db.query(
+      `SELECT j.*, s.noSpk, s.status AS spkStatus,
+              m.name AS mekanikName, m.initial AS mekanikInitial
+       FROM jadwal j
+       LEFT JOIN spk s ON s.id = j.spkId
+       LEFT JOIN mekanik m ON m.id = j.mekanikId
+       ${where} ORDER BY j.tanggal ASC`,
+      params,
+    );
+    const result = data.map((r: any) => ({
+      ...r,
+      spk: r.noSpk ? { noSpk: r.noSpk, status: r.spkStatus } : null,
+      mekanik: r.mekanikName ? { name: r.mekanikName, initial: r.mekanikInitial } : null,
+    }));
+    sendSuccess(res, result);
   } catch (e) { next(e); }
 });
 
 // POST /jadwal
 router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await prisma.jadwal.create({ data: req.body });
+    const id = await db.insert('jadwal', req.body);
+    const data = await db.queryOne('SELECT * FROM jadwal WHERE id = ?', [id]);
     sendCreated(res, data, 'Jadwal berhasil ditambahkan');
   } catch (e) { next(e); }
 });
@@ -48,7 +62,9 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
 // PUT /jadwal/:id
 router.put('/:id', requireRole('Admin', 'Mekanik'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await prisma.jadwal.update({ where: { id: Number(req.params.id) }, data: req.body });
+    const id = Number(req.params.id);
+    await db.update('jadwal', { ...req.body, updatedAt: new Date() }, 'id = ?', [id]);
+    const data = await db.queryOne('SELECT * FROM jadwal WHERE id = ?', [id]);
     sendSuccess(res, data, 'Jadwal berhasil diperbarui');
   } catch (e) { next(e); }
 });
@@ -56,7 +72,7 @@ router.put('/:id', requireRole('Admin', 'Mekanik'), async (req: Request, res: Re
 // DELETE /jadwal/:id
 router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await prisma.jadwal.delete({ where: { id: Number(req.params.id) } });
+    await db.execute('DELETE FROM jadwal WHERE id = ?', [Number(req.params.id)]);
     sendSuccess(res, null, 'Jadwal berhasil dihapus');
   } catch (e) { next(e); }
 });

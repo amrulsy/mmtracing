@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, CreditCard, Banknote, QrCode, Wallet, Printer, CheckCircle, Search, Loader2, User, Car, Phone, Tag, X } from "lucide-react";
+import { ArrowLeft, CreditCard, Banknote, QrCode, Wallet, Printer, CheckCircle, Search, Loader2, User, Car, Phone, Tag, X, Receipt, FileText } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useSSE } from "@/hooks/useSSE";
@@ -446,14 +446,24 @@ export default function KasirPage() {
                       {processing ? <Loader2 className="animate-spin" /> : <><CheckCircle size={22} /> Proses Pembayaran</>}
                     </button>
 
-                    {/* Shortcut ke Kwitansi jika sisa Rp 0 */}
+                    {/* Shortcut ke print jika sisa Rp 0 */}
                     {sisa <= 0 && (
-                      <Link
-                        href={`/app/pembayaran/${selected.id}/kwitansi`}
-                        className="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl border border-primary/30 text-primary font-bold hover:bg-primary/5 transition-all text-sm"
-                      >
-                        <Printer size={18} /> Cetak Kwitansi
-                      </Link>
+                      <div className="grid grid-cols-2 gap-2 mt-4">
+                        <Link
+                          href={`/app/pembayaran/${selected.id}/kwitansi`}
+                          onClick={() => localStorage.setItem('mm_print_format', 'thermal-80')}
+                          className="flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-amber-500/30 text-amber-600 bg-amber-50 font-bold hover:bg-amber-100 transition-all text-xs"
+                        >
+                          <Receipt size={16} /> Struk Thermal
+                        </Link>
+                        <Link
+                          href={`/app/pembayaran/${selected.id}/kwitansi`}
+                          onClick={() => localStorage.setItem('mm_print_format', 'a4')}
+                          className="flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-primary/30 text-primary bg-primary/5 font-bold hover:bg-primary/10 transition-all text-xs"
+                        >
+                          <FileText size={16} /> Kwitansi A4
+                        </Link>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -500,11 +510,32 @@ export default function KasirPage() {
 
             <div className="flex flex-col gap-2">
               {showSuccessModal.isLunas && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link
+                      href={`/app/pembayaran/${showSuccessModal.invoiceId}/kwitansi`}
+                      onClick={() => localStorage.setItem('mm_print_format', 'thermal-80')}
+                      className="flex items-center justify-center gap-1.5 py-3 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 transition-colors text-sm"
+                    >
+                      <Receipt size={16} /> Struk Thermal
+                    </Link>
+                    <Link
+                      href={`/app/pembayaran/${showSuccessModal.invoiceId}/kwitansi`}
+                      onClick={() => localStorage.setItem('mm_print_format', 'a4')}
+                      className="flex items-center justify-center gap-1.5 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-colors text-sm"
+                    >
+                      <FileText size={16} /> Kwitansi A4
+                    </Link>
+                  </div>
+                </>
+              )}
+              {!showSuccessModal.isLunas && (
                 <Link
                   href={`/app/pembayaran/${showSuccessModal.invoiceId}/kwitansi`}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-colors"
+                  onClick={() => localStorage.setItem('mm_print_format', 'thermal-80')}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 transition-colors text-sm"
                 >
-                  <Printer size={18} /> Cetak Kwitansi
+                  <Receipt size={16} /> Cetak Struk Pembayaran
                 </Link>
               )}
               <button

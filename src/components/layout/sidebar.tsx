@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import { 
   LayoutDashboard, 
   CarFront, 
@@ -35,7 +36,7 @@ const navGroups = [
       { name: "SPK", href: "/app/spk", icon: FileText },
       { name: "Monitoring", href: "/app/monitoring", icon: Wrench },
       { name: "Pembayaran", href: "/app/pembayaran", icon: Wallet },
-      { name: "Booking", href: "/app/booking", icon: CalendarCheck },
+      { name: "Booking", href: "/app/booking", icon: CalendarCheck, badgeKey: "booking" },
     ],
   },
   {
@@ -74,6 +75,22 @@ const navGroups = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [newBookingCount, setNewBookingCount] = useState(0);
+
+  // Poll for new booking count
+  useEffect(() => {
+    const fetchCount = () => {
+      fetch("/api/v1/booking/stats", {
+        headers: { Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("mm_token") || "" : ""}` },
+      })
+        .then(r => r.json())
+        .then(res => { if (res.success && res.data) setNewBookingCount(res.data.baru || 0); })
+        .catch(() => {});
+    };
+    fetchCount();
+    const iv = setInterval(fetchCount, 30000);
+    return () => clearInterval(iv);
+  }, []);
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-surface-border glass hidden lg:flex flex-col">
@@ -82,7 +99,7 @@ export function Sidebar() {
           <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-white font-bold group-hover:scale-105 transition-transform shadow-glossy-primary">
             M
           </div>
-          <span className="font-bold text-xl tracking-tight">MM Tracing</span>
+          <span className="font-bold text-xl tracking-tight">MMT Racing</span>
         </Link>
       </div>
 
@@ -95,6 +112,7 @@ export function Sidebar() {
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const isActive = item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href);
+                const badge = (item as any).badgeKey === "booking" ? newBookingCount : 0;
                 return (
                   <Link
                     key={item.name}
@@ -107,7 +125,15 @@ export function Sidebar() {
                     )}
                   >
                     <item.icon size={18} />
-                    <span>{item.name}</span>
+                    <span className="flex-1">{item.name}</span>
+                    {badge > 0 && (
+                      <span className={cn(
+                        "min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center",
+                        isActive ? "bg-white/20 text-white" : "bg-primary text-white animate-pulse"
+                      )}>
+                        {badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -141,3 +167,4 @@ export function Sidebar() {
     </aside>
   );
 }
+

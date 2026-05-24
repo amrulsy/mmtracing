@@ -31,7 +31,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
         <div className="h-16 flex items-center justify-between px-6 border-b border-surface-border">
           <Link href="/app" className="flex items-center gap-2" onClick={onClose}>
             <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-white font-bold shadow-glossy-primary">M</div>
-            <span className="font-bold text-xl tracking-tight">MM Tracing</span>
+            <span className="font-bold text-xl tracking-tight">MMT Racing</span>
           </Link>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-foreground">
             <X size={20} />

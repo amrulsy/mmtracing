@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import prisma from '../../config/database';
+import db from '../../config/db';
 import { authMiddleware } from '../../middleware/auth';
 import { sendSuccess } from '../../shared/utils';
 
@@ -16,58 +16,28 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       return sendSuccess(res, { pelanggan: [], kendaraan: [], spk: [] });
     }
 
-    const [pelanggan, kendaraan, spk] = await Promise.all([
-      // Pelanggan: name atau phone mengandung keyword
-      prisma.pelanggan.findMany({
-        where: {
-          OR: [
-            { name: { contains: q } },
-            { phone: { contains: q } },
-          ],
-        },
-        select: { id: true, name: true, phone: true },
-        take: 5,
-        orderBy: { updatedAt: 'desc' },
-      }),
-
-      // Kendaraan: name atau plat mengandung keyword, include pelanggan.name
-      prisma.kendaraan.findMany({
-        where: {
-          OR: [
-            { name: { contains: q } },
-            { plat: { contains: q } },
-          ],
-        },
-        select: {
-          id: true,
-          name: true,
-          plat: true,
-          pelanggan: { select: { name: true } },
-        },
-        take: 5,
-        orderBy: { updatedAt: 'desc' },
-      }),
-
-      // SPK: noSpk mengandung keyword, atau relasi pelanggan.name / kendaraan.plat
-      prisma.spk.findMany({
-        where: {
-          OR: [
-            { noSpk: { contains: q } },
-            { pelanggan: { name: { contains: q } } },
-            { kendaraan: { plat: { contains: q } } },
-          ],
-        },
-        select: {
-          id: true,
-          noSpk: true,
-          status: true,
-          pelanggan: { select: { name: true } },
-          kendaraan: { select: { plat: true } },
-        },
-        take: 5,
-        orderBy: { updatedAt: 'desc' },
-      }),
+    const like = `%${q}%`;
+    const [pelanggan, kendaraanRows, spkRows] = await Promise.all([
+      db.query(
+        'SELECT id, name, phone FROM pelanggan WHERE (name LIKE ? OR phone LIKE ?) AND deletedAt IS NULL ORDER BY updatedAt DESC LIMIT 5',
+        [like, like]),
+      db.query(
+        `SELECT k.id, k.name, k.plat, p.name AS pelangganName
+         FROM kendaraan k LEFT JOIN pelanggan p ON p.id = k.pelangganId
+         WHERE (k.name LIKE ? OR k.plat LIKE ?) AND k.deletedAt IS NULL ORDER BY k.updatedAt DESC LIMIT 5`,
+        [like, like]),
+      db.query(
+        `SELECT s.id, s.noSpk, s.status, p.name AS pelangganName, k.plat AS kendaraanPlat
+         FROM spk s
+         LEFT JOIN pelanggan p ON p.id = s.pelangganId
+         LEFT JOIN kendaraan k ON k.id = s.kendaraanId
+         WHERE (s.noSpk LIKE ? OR p.name LIKE ? OR k.plat LIKE ?)
+         ORDER BY s.updatedAt DESC LIMIT 5`,
+        [like, like, like]),
     ]);
+
+    const kendaraan = kendaraanRows.map((r: any) => ({ id: r.id, name: r.name, plat: r.plat, pelanggan: { name: r.pelangganName } }));
+    const spk = spkRows.map((r: any) => ({ id: r.id, noSpk: r.noSpk, status: r.status, pelanggan: { name: r.pelangganName }, kendaraan: r.kendaraanPlat ? { plat: r.kendaraanPlat } : null }));
 
     sendSuccess(res, { pelanggan, kendaraan, spk });
   } catch (e) {

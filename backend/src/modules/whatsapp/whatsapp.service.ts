@@ -1,27 +1,51 @@
-import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } from '@whiskeysockets/baileys';
 import path from 'path';
 import fs from 'fs';
-import pino from 'pino';
+
+// Baileys is ESM-only, load it dynamically with error handling
+let baileysModule: any = null;
+let baileysLoadError: Error | null = null;
+
+async function loadBaileys() {
+  if (baileysModule) return baileysModule;
+  if (baileysLoadError) throw baileysLoadError;
+  
+  try {
+    // Use Function constructor to avoid TypeScript module resolution issues
+    const dynamicImport = new Function('modulePath', 'return import(modulePath)');
+    baileysModule = await dynamicImport('@whiskeysockets/baileys');
+    return baileysModule;
+  } catch (err) {
+    baileysLoadError = err as Error;
+    console.error('[WhatsApp] Failed to load Baileys (ESM module):', (err as Error).message);
+    throw baileysLoadError;
+  }
+}
 
 export class WhatsappService {
   private sock: any = null;
   public qrCode: string | null = null;
   public status: 'disconnected' | 'qr' | 'connecting' | 'connected' = 'disconnected';
+  private initialized = false;
 
   constructor() {
-    this.init();
+    // Don't auto-init - wait for first API call
   }
 
   async init() {
+    if (this.initialized) return;
+    this.initialized = true;
+    
     this.status = 'connecting';
     const authDir = path.resolve(process.cwd(), '.baileys');
 
-    // Make sure we don't spam restarts
     try {
-      const { state, saveCreds } = await useMultiFileAuthState(authDir);
-      const { version } = await fetchLatestBaileysVersion();
+      const baileys = await loadBaileys();
+      const pino = (await import('pino')).default;
+      
+      const { state, saveCreds } = await baileys.useMultiFileAuthState(authDir);
+      const { version } = await baileys.fetchLatestBaileysVersion();
 
-      this.sock = makeWASocket({
+      this.sock = baileys.default({
         version,
         logger: pino({ level: 'silent' }) as any,
         printQRInTerminal: false,
@@ -29,7 +53,7 @@ export class WhatsappService {
         syncFullHistory: false,
         markOnlineOnConnect: true,
         generateHighQualityLinkPreview: false,
-        browser: ['MM Tracing Gateway', 'Chrome', '10.0.0']
+        browser: ['MMT Racing Gateway', 'Chrome', '10.0.0']
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -48,7 +72,7 @@ export class WhatsappService {
           
           const errorOutput = (lastDisconnect?.error as any)?.output;
           const statusCode = errorOutput?.statusCode;
-          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+          const shouldReconnect = statusCode !== baileys.DisconnectReason.loggedOut;
           
           // Logged out
           if (!shouldReconnect) {
@@ -64,7 +88,7 @@ export class WhatsappService {
         }
       });
     } catch (error) {
-      console.error('Failed to init WhatsApp', error);
+      console.error('[WhatsApp] Init failed:', (error as Error).message);
       this.status = 'disconnected';
     }
   }

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Save, Plus, Edit, Trash2, Loader2, X, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Users, Save, Plus, Edit, Trash2, Loader2, X, Eye, EyeOff, AlertTriangle, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Skeleton } from "@/components/ui/loading-skeleton";
+import { PhotoUploader } from "@/components/ui/photo-uploader";
 
 
 
@@ -20,6 +21,7 @@ interface User {
 
 interface BengkelProfile {
   NAMA_BENGKEL: string;
+  BENGKEL_LOGO?: string;
   NO_TELEPON: string;
   ALAMAT: string;
   NO_WHATSAPP: string;
@@ -40,6 +42,16 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<BengkelProfile>({
     NAMA_BENGKEL: "", NO_TELEPON: "", ALAMAT: "", NO_WHATSAPP: "", EMAIL_BENGKEL: "", NAMA_PEMILIK: ""
   });
+  // Operasional & keuangan (group: general)
+  const [general, setGeneral] = useState({
+    dp_modifikasi_persen: "40",
+    dp_bubut_persen: "40",
+    garansi_jasa_hari: "30",
+    garansi_part_hari: "180",
+    garansi_modif_hari: "90",
+    loyalty_poin_per_10rb: "1",
+  });
+  const [savingGeneral, setSavingGeneral] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -57,20 +69,30 @@ export default function SettingsPage() {
     try {
       const [uRes, pRes, rRes] = await Promise.all([
         api.get<User[]>("/settings/users"),
-        api.get<{ bengkel: Record<string, string> }>("/settings/config"),
+        api.get<{ bengkel?: Record<string, string>; general?: Record<string, string> }>("/settings/config"),
         api.get<Role[]>("/settings/roles"),
       ]);
       setUsers(uRes.data || []);
       setRoles(rRes.data || []);
       const cfg = pRes.data?.bengkel || {};
       setProfile({
-        NAMA_BENGKEL: cfg.NAMA_BENGKEL || "MM Tracing",
+        NAMA_BENGKEL: cfg.NAMA_BENGKEL || "MMT Racing",
+        BENGKEL_LOGO: cfg.BENGKEL_LOGO || "",
         NO_TELEPON: cfg.NO_TELEPON || "",
         ALAMAT: cfg.ALAMAT || "",
         NO_WHATSAPP: cfg.NO_WHATSAPP || "",
         EMAIL_BENGKEL: cfg.EMAIL_BENGKEL || "",
         NAMA_PEMILIK: cfg.NAMA_PEMILIK || "",
       });
+      const gen = pRes.data?.general || {};
+      setGeneral(g => ({
+        dp_modifikasi_persen: gen.dp_modifikasi_persen ?? g.dp_modifikasi_persen,
+        dp_bubut_persen: gen.dp_bubut_persen ?? g.dp_bubut_persen,
+        garansi_jasa_hari: gen.garansi_jasa_hari ?? g.garansi_jasa_hari,
+        garansi_part_hari: gen.garansi_part_hari ?? g.garansi_part_hari,
+        garansi_modif_hari: gen.garansi_modif_hari ?? g.garansi_modif_hari,
+        loyalty_poin_per_10rb: gen.loyalty_poin_per_10rb ?? g.loyalty_poin_per_10rb,
+      }));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Gagal memuat data");
     } finally {
@@ -79,6 +101,23 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const saveGeneral = async () => {
+    // Validasi % DP
+    const dpMod = Number(general.dp_modifikasi_persen);
+    const dpBubut = Number(general.dp_bubut_persen);
+    if (isNaN(dpMod) || dpMod < 0 || dpMod > 100) return toast.error("Validasi", "DP Modifikasi harus 0–100%");
+    if (isNaN(dpBubut) || dpBubut < 0 || dpBubut > 100) return toast.error("Validasi", "DP Bubut harus 0–100%");
+    setSavingGeneral(true);
+    try {
+      await api.put("/settings/config", general);
+      toast.success("Disimpan", "Pengaturan operasional berhasil disimpan");
+    } catch (e: unknown) {
+      toast.error("Gagal", e instanceof Error ? e.message : "Terjadi kesalahan");
+    } finally {
+      setSavingGeneral(false);
+    }
+  };
 
   const saveProfile = async () => {
     setSaving(true);
@@ -228,6 +267,84 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Operasional & Keuangan */}
+          <div className="glass-panel p-4 lg:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base lg:text-lg font-bold flex items-center gap-2"><Wallet size={18} className="text-primary" /> Operasional & Keuangan</h2>
+                <p className="text-[10px] lg:text-xs text-muted-foreground mt-0.5">Atur persentase DP dinamis, garansi, dan loyalty.</p>
+              </div>
+            </div>
+            {loading ? (
+              <div className="grid sm:grid-cols-2 gap-3"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+            ) : (
+              <div className="space-y-5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">DP Minimum (%)</p>
+                  <p className="text-[11px] text-muted-foreground mb-3">Persentase DP wajib sebelum SPK <strong>Modifikasi</strong>/<strong>Bubut</strong> dapat dimulai. Berlaku otomatis untuk SPK baru maupun saat total harga berubah.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { key: "dp_modifikasi_persen" as const, label: "DP Modifikasi (%)", hint: "Default 40%" },
+                      { key: "dp_bubut_persen" as const, label: "DP Bubut (%)", hint: "Default 40%" },
+                    ].map(f => (
+                      <div key={f.key} className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">{f.label}</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={0} max={100} step={1}
+                            value={general[f.key]}
+                            onChange={e => setGeneral(g => ({ ...g, [f.key]: e.target.value }))}
+                            className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">{f.hint}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Garansi (hari)</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      { key: "garansi_jasa_hari" as const, label: "Garansi Jasa" },
+                      { key: "garansi_part_hari" as const, label: "Garansi Sparepart" },
+                      { key: "garansi_modif_hari" as const, label: "Garansi Modifikasi" },
+                    ].map(f => (
+                      <div key={f.key} className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">{f.label}</label>
+                        <input
+                          type="number" min={0} step={1}
+                          value={general[f.key]}
+                          onChange={e => setGeneral(g => ({ ...g, [f.key]: e.target.value }))}
+                          className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="max-w-xs">
+                  <label className="text-xs font-medium text-muted-foreground">Loyalty Poin per Rp 10.000</label>
+                  <input
+                    type="number" min={0} step={1}
+                    value={general.loyalty_poin_per_10rb}
+                    onChange={e => setGeneral(g => ({ ...g, loyalty_poin_per_10rb: e.target.value }))}
+                    className="mt-1.5 w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+              </div>
+            )}
+            <div className="mt-4 flex justify-end">
+              <button onClick={saveGeneral} disabled={savingGeneral || loading} className="flex items-center gap-1.5 btn-glossy bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium shadow-glossy-primary hover:shadow-glossy-primary-dark disabled:opacity-50">
+                {savingGeneral ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                {savingGeneral ? "Menyimpan..." : "Simpan Pengaturan"}
+              </button>
+            </div>
+          </div>
+
           {/* Profil Bengkel */}
           <div className="glass-panel p-4 lg:p-6">
             <h2 className="text-base lg:text-lg font-bold mb-4">Profil Bengkel</h2>
@@ -235,6 +352,19 @@ export default function SettingsPage() {
               <div className="grid sm:grid-cols-2 gap-3"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10 sm:col-span-2" /></div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
+                <div className="sm:col-span-2 flex justify-center mb-2">
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Logo Bengkel</label>
+                    <PhotoUploader
+                      value={profile.BENGKEL_LOGO}
+                      onChange={(url) => setProfile(p => ({ ...p, BENGKEL_LOGO: url || "" }))}
+                      size={120}
+                      shape="rounded"
+                      label="Upload Logo Bengkel"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Logo akan digunakan pada Landing Page dan Struk Cetak Thermal.</p>
+                  </div>
+                </div>
                 {([
                   { key: "NAMA_BENGKEL" as const, label: "Nama Bengkel" },
                   { key: "NAMA_PEMILIK" as const, label: "Nama Pemilik" },

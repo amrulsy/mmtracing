@@ -36,6 +36,7 @@ import eventsRoutes from './modules/events/events.routes';
 import searchRoutes from './modules/search/search.routes';
 import landingRoutes from './modules/landing/landing.routes';
 import bookingRoutes from './modules/booking/booking.routes';
+import uploadRoutes from './modules/upload/upload.routes';
 import { initializeEventListeners } from './modules/events/event.listener';
 import { initBackgroundJobs } from './jobs/cron';
 import { startCronJobs } from './jobs/index';
@@ -53,7 +54,29 @@ startCronJobs();
 // MIDDLEWARE
 // ==========================================
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: env.frontendUrl, credentials: true }));
+app.use(cors({ 
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, Postman, server-side)
+    if (!origin) return callback(null, true);
+    // Allow production domains
+    const allowedOrigins = [
+      env.frontendUrl,
+      'https://mmtracing.com',
+      'https://www.mmtracing.com',
+    ];
+    // Allow all localhost and local network IPs in dev mode
+    if (
+      env.nodeEnv === 'development' && 
+      (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+       /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin))
+    ) {
+      return callback(null, true);
+    }
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true 
+}));
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -68,7 +91,7 @@ app.use('/uploads', express.static(path.resolve(env.upload.dir)));
 const API = '/api/v1';
 
 app.get(`${API}/health`, (_req, res) => {
-  res.json({ success: true, message: 'MM Tracing API is running', timestamp: new Date().toISOString() });
+  res.json({ success: true, message: 'MMT Racing API is running [V2-RESTARTED]', timestamp: new Date().toISOString() });
 });
 
 app.use(`${API}`, exportRoutes);
@@ -99,6 +122,7 @@ app.use(`${API}/events`, eventsRoutes);
 app.use(`${API}/search`, searchRoutes);
 app.use(`${API}/landing`, landingRoutes);
 app.use(`${API}/booking`, bookingRoutes);
+app.use(`${API}/upload`, uploadRoutes);
 
 // ==========================================
 // ERROR HANDLING

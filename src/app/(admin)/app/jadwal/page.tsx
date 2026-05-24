@@ -1,20 +1,27 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus, Wrench, Calendar as Cal, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Wrench, Calendar as Cal, Loader2, X, Save } from "lucide-react";
 import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 interface Jadwal {
   id: number;
-  tanggal: string; // ISO string
-  jamMulai: string; // HH:mm
-  jamSelesai: string; // HH:mm
+  tanggal: string;
+  jamMulai: string;
+  jamSelesai: string;
   namaBooking: string;
   pekerjaan: string;
   kategori: string;
   warna?: string;
   mekanik?: { name: string; initial: string };
   spk?: { noSpk: string; status: string };
+}
+
+interface Mekanik {
+  id: number;
+  name: string;
+  initial?: string;
 }
 
 export default function JadwalPage() {
@@ -24,14 +31,23 @@ export default function JadwalPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [mekanikList, setMekanikList] = useState<Mekanik[]>([]);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [form, setForm] = useState({
+    namaBooking: "", pekerjaan: "", kategori: "servis",
+    tanggal: new Date().toISOString().split("T")[0],
+    jamMulai: "09:00", jamSelesai: "10:00", mekanikId: "",
+  });
+
   const days = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
   const hours = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"];
 
-  // Helper to get start and end of week
   const getWeekRange = (date: Date) => {
     const d = new Date(date);
     const day = d.getDay();
-    const diff = d.getDate() - day; // Adjust if you want Monday as first day
+    const diff = d.getDate() - day;
     const start = new Date(d.setDate(diff));
     start.setHours(0, 0, 0, 0);
     const end = new Date(start);
@@ -58,9 +74,7 @@ export default function JadwalPage() {
     }
   }, [currentWeek]);
 
-  useEffect(() => {
-    fetchJadwal();
-  }, [fetchJadwal]);
+  useEffect(() => { fetchJadwal(); }, [fetchJadwal]);
 
   const navWeek = (dir: "prev" | "next") => {
     const next = new Date(currentWeek);
@@ -68,7 +82,6 @@ export default function JadwalPage() {
     setCurrentWeek(next);
   };
 
-  // Build grid days
   const gridDays = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
@@ -85,6 +98,38 @@ export default function JadwalPage() {
     }
   };
 
+  const openModal = () => {
+    setShowModal(true);
+    // Load mekanik list
+    api.get<any>("/mekanik", { limit: "100" })
+      .then(res => setMekanikList(Array.isArray(res.data) ? res.data : res.data?.data || []))
+      .catch(() => {});
+  };
+
+  const handleCreateJadwal = async () => {
+    if (!form.namaBooking.trim() || !form.tanggal) {
+      toast.error("Nama dan tanggal wajib diisi");
+      return;
+    }
+    setModalLoading(true);
+    try {
+      await api.post("/jadwal", {
+        ...form,
+        mekanikId: form.mekanikId ? Number(form.mekanikId) : undefined,
+      });
+      toast.success("Jadwal berhasil ditambahkan");
+      setShowModal(false);
+      setForm({ namaBooking: "", pekerjaan: "", kategori: "servis", tanggal: new Date().toISOString().split("T")[0], jamMulai: "09:00", jamSelesai: "10:00", mekanikId: "" });
+      fetchJadwal();
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal membuat jadwal");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const inputCls = "w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50";
+
   return (
     <div className="space-y-4 lg:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -92,8 +137,8 @@ export default function JadwalPage() {
           <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Jadwal & Booking</h1>
           <p className="text-muted-foreground text-sm">Kalender penjadwalan mekanik dan booking pelanggan.</p>
         </div>
-        <button className="flex items-center justify-center gap-1.5 btn-glossy bg-primary text-primary-foreground px-3 py-2 rounded-xl text-sm font-medium shadow-glossy-primary hover:shadow-glossy-primary-dark">
-          <Plus size={16} /> Tambah Booking
+        <button onClick={openModal} className="flex items-center justify-center gap-1.5 btn-glossy bg-primary text-primary-foreground px-3 py-2 rounded-xl text-sm font-medium shadow-glossy-primary hover:shadow-glossy-primary-dark">
+          <Plus size={16} /> Tambah Jadwal
         </button>
       </div>
 
@@ -172,7 +217,7 @@ export default function JadwalPage() {
             </div>
           )}
 
-          {/* Desktop / Mobile Grid View — hidden on mobile if list mode */}
+          {/* Desktop / Mobile Grid View */}
           <div className={view === "week" ? "" : "hidden lg:block"}>
             <div className="glass-panel overflow-hidden">
               <div className="overflow-x-auto">
@@ -201,7 +246,6 @@ export default function JadwalPage() {
                             const normalizedJam = b.jamMulai.length < 5 ? b.jamMulai.padStart(5, "0") : b.jamMulai;
                             return bDateStr === todayStr && normalizedJam.startsWith(hourPrefix);
                           });
-
                           return (
                             <div key={di} className={`border-l border-surface-border/50 relative p-1 space-y-1`}>
                               {cellBookings.map(booking => {
@@ -222,6 +266,73 @@ export default function JadwalPage() {
                   })}
                 </div>
               </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ===== Tambah Jadwal Modal ===== */}
+      {showModal && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowModal(false)} />
+          <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[65] max-w-lg mx-auto bg-background border border-surface-border rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-between p-5 border-b border-surface-border">
+              <h3 className="font-bold text-lg">Tambah Jadwal Baru</h3>
+              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-surface-hover text-muted-foreground"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Nama Booking / Pelanggan *</label>
+                <input type="text" value={form.namaBooking} onChange={e => setForm({ ...form, namaBooking: e.target.value })} placeholder="Budi Santoso" className={inputCls} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Pekerjaan</label>
+                <input type="text" value={form.pekerjaan} onChange={e => setForm({ ...form, pekerjaan: e.target.value })} placeholder="Servis Rutin, Ganti Oli..." className={inputCls} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Kategori</label>
+                  <select value={form.kategori} onChange={e => setForm({ ...form, kategori: e.target.value })} className={inputCls}>
+                    <option value="servis">Servis</option>
+                    <option value="modifikasi">Modifikasi</option>
+                    <option value="bubut">Bubut</option>
+                    <option value="booking">Booking</option>
+                    <option value="fleet">Fleet</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Mekanik</label>
+                  <select value={form.mekanikId} onChange={e => setForm({ ...form, mekanikId: e.target.value })} className={inputCls}>
+                    <option value="">Belum ditugaskan</option>
+                    {mekanikList.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Tanggal *</label>
+                  <input type="date" value={form.tanggal} onChange={e => setForm({ ...form, tanggal: e.target.value })} className={inputCls} />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Jam Mulai</label>
+                  <select value={form.jamMulai} onChange={e => setForm({ ...form, jamMulai: e.target.value })} className={inputCls}>
+                    {["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00"].map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Jam Selesai</label>
+                  <select value={form.jamSelesai} onChange={e => setForm({ ...form, jamSelesai: e.target.value })} className={inputCls}>
+                    {["09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"].map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t border-surface-border flex gap-2">
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm border border-surface-border rounded-xl hover:bg-surface-hover transition-colors">Batal</button>
+              <button onClick={handleCreateJadwal} disabled={modalLoading}
+                className="flex-1 btn-glossy bg-primary text-white py-2 rounded-xl font-bold text-sm shadow-glossy-primary hover:shadow-glossy-primary-dark flex items-center justify-center gap-1.5 disabled:opacity-60">
+                {modalLoading ? <><Loader2 size={14} className="animate-spin" /> Menyimpan...</> : <><Save size={14} /> Simpan Jadwal</>}
+              </button>
             </div>
           </div>
         </>

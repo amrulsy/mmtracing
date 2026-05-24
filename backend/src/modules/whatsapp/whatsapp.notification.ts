@@ -1,4 +1,4 @@
-import prisma from '../../config/database';
+import db from '../../config/db';
 import { whatsappService } from './whatsapp.service';
 
 /**
@@ -17,7 +17,7 @@ interface TemplateItem {
 /** Load templates from DB Setting table */
 async function getTemplates(): Promise<TemplateItem[]> {
   try {
-    const setting = await prisma.setting.findUnique({ where: { key: 'templates' } });
+    const setting = await db.queryOne<any>("SELECT value FROM setting WHERE `key` = 'templates'");
     if (!setting) return [];
     return JSON.parse(setting.value);
   } catch {
@@ -72,18 +72,15 @@ async function trySend(phone: string | null | undefined, eventName: string, mode
 /** 1. SPK Dibuat — called after SPK creation */
 export async function notifySpkCreated(spkId: number) {
   try {
-    const spk = await prisma.spk.findUnique({
-      where: { id: spkId },
-      include: { pelanggan: true, kendaraan: true },
-    });
+    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
     if (!spk) return;
-    await trySend(spk.pelanggan.phone, 'SPK Dibuat', spk.mode, {
-      nama: spk.pelanggan.name,
-      kendaraan: spk.kendaraan ? `${spk.kendaraan.name} (${spk.kendaraan.plat})` : '-',
+    await trySend(spk.pelangganPhone, 'SPK Dibuat', spk.mode, {
+      nama: spk.pelangganName,
+      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
       no_spk: spk.noSpk,
       estimasi: spk.estimasiSelesai ? new Date(spk.estimasiSelesai).toLocaleDateString('id-ID') : 'Segera',
-      minimum_dp: `Rp ${spk.minimumDp.toNumber().toLocaleString('id-ID')}`,
-      total: `Rp ${spk.totalHarga.toNumber().toLocaleString('id-ID')}`,
+      minimum_dp: `Rp ${Number(spk.minimumDp || 0).toLocaleString('id-ID')}`,
+      total: `Rp ${Number(spk.totalHarga || 0).toLocaleString('id-ID')}`,
     });
   } catch (e: any) {
     console.error('[WA] notifySpkCreated error:', e.message);
@@ -93,16 +90,13 @@ export async function notifySpkCreated(spkId: number) {
 /** 2. Progress Update — called after progress change */
 export async function notifyProgressUpdate(spkId: number) {
   try {
-    const spk = await prisma.spk.findUnique({
-      where: { id: spkId },
-      include: { pelanggan: true, kendaraan: true, stages: { orderBy: { urutan: 'asc' } } },
-    });
+    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
     if (!spk) return;
-    
-    const currentStage = spk.stages.find((s: any) => s.status === 'in_progress') || spk.stages.find((s: any) => s.status === 'done');
-    await trySend(spk.pelanggan.phone, 'Progress Update', spk.mode, {
-      nama: spk.pelanggan.name,
-      kendaraan: spk.kendaraan ? `${spk.kendaraan.name} (${spk.kendaraan.plat})` : '-',
+    const stages = await db.query('SELECT nama, status FROM spk_stages WHERE spkId = ? ORDER BY urutan ASC', [spkId]);
+    const currentStage = stages.find((s: any) => s.status === 'in_progress') || stages.find((s: any) => s.status === 'done');
+    await trySend(spk.pelangganPhone, 'Progress Update', spk.mode, {
+      nama: spk.pelangganName,
+      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
       judul_proyek: spk.judulProyek || '-',
       progress: String(spk.progress),
       stage: currentStage?.nama || 'Pengerjaan Umum',
@@ -116,22 +110,16 @@ export async function notifyProgressUpdate(spkId: number) {
 /** 3. Selesai & Siap Ambil — called when SPK status becomes 'selesai' */
 export async function notifySpkSelesai(spkId: number) {
   try {
-    const spk = await prisma.spk.findUnique({
-      where: { id: spkId },
-      include: { pelanggan: true, kendaraan: true, pembayaran: { select: { totalTagihan: true, sisaBayar: true } } },
-    });
+    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
     if (!spk) return;
-    // Gunakan totalTagihan dari invoice (sudah dipotong diskon), fallback ke totalHarga
-    const pembayaran = spk.pembayaran?.[0];
-    const totalDisplay = pembayaran
-      ? pembayaran.totalTagihan.toNumber()
-      : spk.totalHarga.toNumber();
-    await trySend(spk.pelanggan.phone, 'Selesai & Siap Ambil', spk.mode, {
-      nama: spk.pelanggan.name,
-      kendaraan: spk.kendaraan ? `${spk.kendaraan.name} (${spk.kendaraan.plat})` : '-',
+    const pembayaran = await db.queryOne<any>('SELECT totalTagihan, sisaBayar FROM pembayaran WHERE spkId = ? LIMIT 1', [spkId]);
+    const totalDisplay = pembayaran ? Number(pembayaran.totalTagihan) : Number(spk.totalHarga);
+    await trySend(spk.pelangganPhone, 'Selesai & Siap Ambil', spk.mode, {
+      nama: spk.pelangganName,
+      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
       judul_proyek: spk.judulProyek || '-',
       total: `Rp ${totalDisplay.toLocaleString('id-ID')}`,
-      sisa: pembayaran ? `Rp ${pembayaran.sisaBayar.toNumber().toLocaleString('id-ID')}` : '-',
+      sisa: pembayaran ? `Rp ${Number(pembayaran.sisaBayar).toLocaleString('id-ID')}` : '-',
       no_spk: spk.noSpk,
     });
   } catch (e: any) {
@@ -142,18 +130,16 @@ export async function notifySpkSelesai(spkId: number) {
 /** 4. Reminder Pembayaran — called when payment is partially paid */
 export async function notifyReminderPembayaran(pembayaranId: number) {
   try {
-    const p = await prisma.pembayaran.findUnique({
-      where: { id: pembayaranId },
-      include: { spk: { include: { pelanggan: true, kendaraan: true } } },
-    });
+    const p = await db.queryOne<any>('SELECT pb.*, s.mode, s.noSpk, s.judulProyek, pl.name AS pelangganName, pl.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM pembayaran pb JOIN spk s ON s.id = pb.spkId LEFT JOIN pelanggan pl ON pl.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE pb.id = ?', [pembayaranId]);
     if (!p) return;
-    await trySend(p.spk.pelanggan.phone, 'Reminder Pembayaran', p.spk.mode, {
-      nama: p.spk.pelanggan.name,
-      kendaraan: p.spk.kendaraan ? `${p.spk.kendaraan.name} (${p.spk.kendaraan.plat})` : '-',
-      judul_proyek: p.spk.judulProyek || '-',
-      sisa: `Rp ${p.sisaBayar.toNumber().toLocaleString('id-ID')}`,
+    await trySend(p.pelangganPhone, 'Reminder Pembayaran', p.mode, {
+      nama: p.pelangganName,
+      kendaraan: p.kendaraanName ? `${p.kendaraanName} (${p.kendaraanPlat})` : '-',
+      judul_proyek: p.judulProyek || '-',
+      sisa: `Rp ${Number(p.sisaBayar).toLocaleString('id-ID')}`,
       invoice: p.noInvoice,
-      no_spk: p.spk.noSpk,
+      no_spk: p.noSpk,
+      public_id: p.publicId,
     });
   } catch (e: any) {
     console.error('[WA] notifyReminderPembayaran error:', e.message);
@@ -163,14 +149,11 @@ export async function notifyReminderPembayaran(pembayaranId: number) {
 /** 5. SPK Kendala — called when SPK is pending due to technical issues */
 export async function notifySpkKendala(spkId: number, approvalLink?: string) {
   try {
-    const spk = await prisma.spk.findUnique({
-      where: { id: spkId },
-      include: { pelanggan: true, kendaraan: true },
-    });
+    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
     if (!spk) return;
-    await trySend(spk.pelanggan.phone, 'SPK Kendala', spk.mode, {
-      nama: spk.pelanggan.name,
-      kendaraan: spk.kendaraan ? `${spk.kendaraan.name} (${spk.kendaraan.plat})` : '-',
+    await trySend(spk.pelangganPhone, 'SPK Kendala', spk.mode, {
+      nama: spk.pelangganName,
+      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
       no_spk: spk.noSpk,
       link_approval: approvalLink || '-',
     });
@@ -182,32 +165,26 @@ export async function notifySpkKendala(spkId: number, approvalLink?: string) {
 /** 6. Gate Pass & Garansi & Point — called when invoice LUNAS & SPK Selesai */
 export async function notifyGatePassReleased(spkId: number, invoiceNo: string) {
   try {
-    const spk = await prisma.spk.findUnique({
-      where: { id: spkId },
-      include: { 
-        pelanggan: true, 
-        kendaraan: true, 
-        garansi: { orderBy: { endDate: 'desc' }, take: 1 }
-      },
-    });
+    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
     if (!spk) return;
 
-    const pointsAgg = await prisma.loyaltyPoint.aggregate({
-      where: { refType: 'transaksi', refId: spkId, type: 'earn' },
-      _sum: { points: true }
-    });
-    const points = pointsAgg._sum.points || 0;
-    
-    const endDate = spk.garansi.length > 0 ? new Date(spk.garansi[0].endDate).toLocaleDateString('id-ID') : '-';
+    const [pembayaran, garansi, pointsRow] = await Promise.all([
+      db.queryOne<any>('SELECT publicId FROM pembayaran WHERE spkId = ? LIMIT 1', [spkId]),
+      db.queryOne<any>('SELECT endDate FROM garansi WHERE spkId = ? ORDER BY endDate DESC LIMIT 1', [spkId]),
+      db.queryVal<number>("SELECT COALESCE(SUM(points),0) FROM loyalty_points WHERE refType = 'transaksi' AND refId = ? AND type = 'earn'", [spkId]),
+    ]);
+    const points = pointsRow || 0;
+    const endDate = garansi ? new Date(garansi.endDate).toLocaleDateString('id-ID') : '-';
 
-    await trySend(spk.pelanggan.phone, 'Lunas & Gate Pass', spk.mode, {
-      nama: spk.pelanggan.name,
-      kendaraan: spk.kendaraan ? `${spk.kendaraan.name} (${spk.kendaraan.plat})` : '-',
+    await trySend(spk.pelangganPhone, 'Lunas & Gate Pass', spk.mode, {
+      nama: spk.pelangganName,
+      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
       judul_proyek: spk.judulProyek || '-',
       poin: String(points),
       batas_garansi: endDate,
       invoice: invoiceNo,
       no_spk: spk.noSpk,
+      public_id: pembayaran?.publicId || '',
     });
   } catch (e: any) {
     console.error('[WA] notifyGatePassReleased error:', e.message);
@@ -217,14 +194,11 @@ export async function notifyGatePassReleased(spkId: number, invoiceNo: string) {
 /** 7. SPK Dibatalkan — called when SPK cancelled */
 export async function notifySpkBatal(spkId: number) {
   try {
-    const spk = await prisma.spk.findUnique({
-      where: { id: spkId },
-      include: { pelanggan: true, kendaraan: true },
-    });
+    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
     if (!spk) return;
-    await trySend(spk.pelanggan.phone, 'SPK Dibatalkan', spk.mode, {
-      nama: spk.pelanggan.name,
-      kendaraan: spk.kendaraan ? `${spk.kendaraan.name} (${spk.kendaraan.plat})` : '-',
+    await trySend(spk.pelangganPhone, 'SPK Dibatalkan', spk.mode, {
+      nama: spk.pelangganName,
+      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
       no_spk: spk.noSpk,
     });
   } catch (e: any) {

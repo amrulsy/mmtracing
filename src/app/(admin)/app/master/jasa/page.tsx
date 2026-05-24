@@ -130,7 +130,12 @@ export default function JasaPage() {
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-medium">{formatRp(s.harga)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-medium">
+                          <div>{formatRp(s.harga)}</div>
+                          {s.hargaModal && s.hargaModal > 0 ? (
+                            <div className="text-[10px] text-muted-foreground font-normal">Modal: {formatRp(s.hargaModal)}</div>
+                          ) : null}
+                        </td>
                         <td className="px-4 py-3 text-center text-xs text-muted-foreground">
                           {s.estimasiWaktu ? <><Clock size={12} className="inline mr-1" />{s.estimasiWaktu}</> : "—"}
                         </td>
@@ -178,6 +183,9 @@ export default function JasaPage() {
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <p className="text-sm font-bold text-primary font-mono">{formatRp(s.harga)}</p>
+                    {s.hargaModal && s.hargaModal > 0 ? (
+                      <span className="text-[9px] text-muted-foreground">/ modal {formatRp(s.hargaModal)}</span>
+                    ) : null}
                     {(s.sparepartBundles?.length ?? 0) > 0 && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{s.sparepartBundles!.length} bundle</span>
                     )}

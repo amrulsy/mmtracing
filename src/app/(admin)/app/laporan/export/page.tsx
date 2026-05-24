@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Download, FileSpreadsheet, FileText, Calendar, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -36,10 +37,13 @@ function triggerDownload(content: string, filename: string) {
 }
 
 export default function ExportLaporanPage() {
+  const searchParams = useSearchParams();
+  const qStart = searchParams?.get("start") || "";
+  const qEnd = searchParams?.get("end") || "";
   const [startDate, setStartDate] = useState(
-    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0]
+    () => qStart || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0]
   );
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState(() => qEnd || new Date().toISOString().split("T")[0]);
   const [format, setFormat] = useState<"pdf" | "excel">("pdf");
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(REPORT_TYPES.filter(r => r.available && r.defaultOn).map(r => r.id))
@@ -86,7 +90,7 @@ export default function ExportLaporanPage() {
 
       if (format === "excel") {
         const lines: string[] = [
-          `"MM Tracing — Export Laporan"`,
+          `"MMT Racing — Export Laporan"`,
           `"Periode: ${periodeLabel}"`,
           `"Dibuat: ${new Date().toLocaleString("id-ID")}"`,
           "",
@@ -163,7 +167,7 @@ export default function ExportLaporanPage() {
 
         printWin.document.write(`<!DOCTYPE html><html><head>
           <meta charset="UTF-8">
-          <title>Laporan MM Tracing — ${periodeLabel}</title>
+          <title>Laporan MMT Racing — ${periodeLabel}</title>
           <style>
             *{box-sizing:border-box} body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a;padding:24px}
             .hdr{border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:4px}
@@ -176,7 +180,7 @@ export default function ExportLaporanPage() {
             @media print{body{padding:0}}
           </style>
         </head><body>
-          <div class="hdr"><h1>Laporan Operasional — MM Tracing</h1>
+          <div class="hdr"><h1>Laporan Operasional — MMT Racing</h1>
           <p>Periode: ${periodeLabel} &nbsp;|&nbsp; Dibuat: ${new Date().toLocaleString("id-ID")}</p></div>
           ${sections}
         </body></html>`);

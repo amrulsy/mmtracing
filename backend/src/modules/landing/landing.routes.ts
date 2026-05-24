@@ -1,12 +1,25 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import prisma from '../../config/database';
+import db from '../../config/db';
 import { authMiddleware, requireRole } from '../../middleware/auth';
 import { sendSuccess } from '../../shared/utils';
+import { createRateLimiter } from '../../middleware/rateLimit';
+
+// Rate limiter: max 5 booking requests per IP per 10 minutes
+const bookingLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  message: 'Terlalu banyak permintaan booking. Silakan coba lagi dalam beberapa menit.',
+});
 
 const router = Router();
 
 // Default landing content (used as fallback)
 const LANDING_DEFAULTS: Record<string, string> = {
+  landing_header: JSON.stringify({
+    logoText: "M",
+    brandName: "MMT Racing",
+    subtitle: "Workshop & Custom Fabrication"
+  }),
   landing_hero: JSON.stringify({
     tagline: "Bengkel Terpercaya Sejak 2016",
     title: "Servis Berkualitas, Modifikasi Presisi Tinggi",
@@ -95,9 +108,9 @@ const LANDING_DEFAULTS: Record<string, string> = {
 // GET /landing/content — PUBLIC (no auth)
 router.get('/content', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const settings = await prisma.setting.findMany({
-      where: { group: 'landing' },
-    });
+    const settings = await db.query(
+      "SELECT * FROM settings WHERE `group` IN ('landing', 'bengkel')"
+    );
 
     // Build result from DB, with defaults as fallback
     const data: Record<string, any> = {};
@@ -110,6 +123,11 @@ router.get('/content', async (_req: Request, res: Response, next: NextFunction) 
       } catch {
         data[key] = LANDING_DEFAULTS[key];
       }
+    }
+
+    const bengkelLogo = settings.find(s => s.key === 'BENGKEL_LOGO');
+    if (bengkelLogo) {
+      data.BENGKEL_LOGO = bengkelLogo.value;
     }
 
     sendSuccess(res, data);
@@ -135,11 +153,7 @@ router.put('/content', authMiddleware, requireRole('Admin'), async (req: Request
     // Upsert each setting
     await Promise.all(
       updates.map(u =>
-        prisma.setting.upsert({
-          where: { key: u.key },
-          update: { value: u.value },
-          create: { key: u.key, value: u.value, group: u.group },
-        })
+        db.upsert('settings', { key: u.key, value: u.value, group: u.group }, ['value'])
       )
     );
 
@@ -157,45 +171,38 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction) =>
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const activeSpk = await prisma.spk.findMany({
-      where: {
-        status: { in: ['antri', 'dikerjakan'] },
-      },
-      select: {
-        id: true,
-        noSpk: true,
-        status: true,
-        mode: true,
-        progress: true,
-        prioritas: true,
-        createdAt: true,
-        pelanggan: { select: { name: true } },
-        kendaraan: { select: { name: true, plat: true } },
-        mekanik: { select: { name: true } },
-      },
-      orderBy: [{ prioritas: 'desc' }, { createdAt: 'asc' }],
-      take: 20,
-    });
+    const activeSpk = await db.query(
+      `SELECT s.id, s.noSpk, s.status, s.mode, s.progress, s.prioritas, s.createdAt,
+              p.name AS pelangganName,
+              k.name AS kendaraanName, k.plat AS kendaraanPlat,
+              m.name AS mekanikName
+       FROM spk s
+       LEFT JOIN pelanggan p ON p.id = s.pelangganId
+       LEFT JOIN kendaraan k ON k.id = s.kendaraanId
+       LEFT JOIN mekanik m ON m.id = s.mekanikId
+       WHERE s.status IN ('antri', 'dikerjakan')
+       ORDER BY s.prioritas DESC, s.createdAt ASC LIMIT 20`
+    );
 
     // Anonymize names: "Budi Santoso" → "B***o"
-    const queue = activeSpk.map(spk => ({
+    const queue = activeSpk.map((spk: any) => ({
       noSpk: spk.noSpk,
       status: spk.status,
       mode: spk.mode,
       progress: spk.progress,
       prioritas: spk.prioritas,
-      pelanggan: spk.pelanggan.name.length > 2
-        ? spk.pelanggan.name[0] + '***' + spk.pelanggan.name.slice(-1)
+      pelanggan: spk.pelangganName && spk.pelangganName.length > 2
+        ? spk.pelangganName[0] + '***' + spk.pelangganName.slice(-1)
         : '***',
-      kendaraan: spk.kendaraan ? spk.kendaraan.name : null,
-      plat: spk.kendaraan
-        ? spk.kendaraan.plat.split(' ').map((p, i) => i === 0 ? p : '***').join(' ')
+      kendaraan: spk.kendaraanName || null,
+      plat: spk.kendaraanPlat
+        ? spk.kendaraanPlat.split(' ').map((p: string, i: number) => i === 0 ? p : '***').join(' ')
         : null,
-      mekanik: spk.mekanik?.name || null,
+      mekanik: spk.mekanikName || null,
     }));
 
-    const antri = activeSpk.filter(s => s.status === 'antri').length;
-    const dikerjakan = activeSpk.filter(s => s.status === 'dikerjakan').length;
+    const antri = activeSpk.filter((s: any) => s.status === 'antri').length;
+    const dikerjakan = activeSpk.filter((s: any) => s.status === 'dikerjakan').length;
 
     sendSuccess(res, { antri, dikerjakan, total: queue.length, queue });
   } catch (e) {
@@ -204,11 +211,18 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction) =>
 });
 
 // POST /landing/booking — PUBLIC (submit booking from landing page)
-router.post('/booking', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/booking', bookingLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { nama, whatsapp, jenisKendaraan, merkTipe, layanan, tanggal, keluhan } = req.body;
+    const { nama, whatsapp, jenisKendaraan, merkTipe, platNomor, layanan, tanggal, jamPreferensi, keluhan, _hp } = req.body;
 
-    // Validation
+    // Honeypot check — if _hp field is filled, it's a bot
+    if (_hp) {
+      // Return fake success to confuse bots
+      res.status(200).json({ success: true, data: { id: 0 }, message: 'Booking berhasil dikirim' });
+      return;
+    }
+
+    // Basic validation
     if (!nama || !whatsapp || !jenisKendaraan || !layanan) {
       res.status(400).json({
         success: false,
@@ -217,21 +231,64 @@ router.post('/booking', async (req: Request, res: Response, next: NextFunction) 
       return;
     }
 
-    const booking = await prisma.booking.create({
-      data: {
-        nama,
-        whatsapp,
-        jenisKendaraan,
-        merkTipe: merkTipe || null,
-        layanan,
-        tanggal: tanggal ? new Date(tanggal) : null,
-        keluhan: keluhan || null,
-      },
+    // WhatsApp format validation
+    const waClean = String(whatsapp).replace(/[^0-9]/g, '');
+    const waRegex = /^(08|628)[0-9]{8,12}$/;
+    if (!waRegex.test(waClean)) {
+      res.status(400).json({
+        success: false,
+        message: 'Format nomor WhatsApp tidak valid. Gunakan format 08xx atau 628xx.',
+      });
+      return;
+    }
+
+    // Date validation — must not be in the past
+    if (tanggal) {
+      const bookingDate = new Date(tanggal);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (bookingDate < today) {
+        res.status(400).json({
+          success: false,
+          message: 'Tanggal booking tidak boleh di masa lalu.',
+        });
+        return;
+      }
+    }
+
+    // Sanitize text inputs — strip HTML tags
+    const sanitize = (s: string | undefined | null) => s ? String(s).replace(/<[^>]*>/g, '').trim() : null;
+
+    // Duplicate check — same WA + same tanggal within last 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const duplicate = await db.queryOne<{ id: number }>(
+      "SELECT id FROM bookings WHERE whatsapp IN (?, ?, ?) AND createdAt >= ? AND status = 'baru' LIMIT 1",
+      [waClean, waClean.replace(/^62/, '0'), '0' + waClean.slice(2), twentyFourHoursAgo]
+    );
+    if (duplicate) {
+      res.status(409).json({
+        success: false,
+        message: `Anda sudah memiliki booking aktif #${duplicate.id}. Silakan tunggu konfirmasi kami.`,
+      });
+      return;
+    }
+
+    const bookingId = await db.insert('bookings', {
+      nama: sanitize(nama)!,
+      whatsapp: waClean,
+      jenisKendaraan: sanitize(jenisKendaraan)!,
+      merkTipe: sanitize(merkTipe),
+      platNomor: sanitize(platNomor),
+      layanan: sanitize(layanan)!,
+      tanggal: tanggal ? new Date(tanggal) : null,
+      jamPreferensi: jamPreferensi || null,
+      keluhan: sanitize(keluhan),
+      sumber: 'landing',
     });
 
     sendSuccess(res, {
-      id: booking.id,
-      message: `Booking berhasil! Nomor booking: #${booking.id}`,
+      id: bookingId,
+      message: `Booking berhasil! Nomor booking: #${bookingId}`,
     }, 'Booking berhasil dikirim');
   } catch (e) {
     next(e);

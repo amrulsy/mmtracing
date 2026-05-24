@@ -1,6 +1,6 @@
 import multer from 'multer';
 import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { env } from '../config/env';
 import fs from 'fs';
 
@@ -16,7 +16,7 @@ const storage = multer.diskStorage({
   },
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname);
-    const name = `${Date.now()}-${uuidv4().slice(0, 8)}${ext}`;
+    const name = `${Date.now()}-${randomUUID().slice(0, 8)}${ext}`;
     cb(null, name);
   },
 });

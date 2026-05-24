@@ -15,7 +15,7 @@ export function Topbar() {
             <div className="w-7 h-7 rounded bg-primary flex items-center justify-center text-white text-sm font-bold shadow-glossy-primary">
               M
             </div>
-            <span className="font-bold text-lg tracking-tight">MM Tracing</span>
+            <span className="font-bold text-lg tracking-tight">MMT Racing</span>
           </Link>
 
           {/* Desktop search */}

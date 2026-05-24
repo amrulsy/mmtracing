@@ -1,6 +1,6 @@
 import { appEventEmitter } from '../../shared/eventEmitter';
 import { sseManager } from '../../shared/sse';
-import prisma from '../../config/database';
+import db from '../../config/db';
 import crypto from 'crypto';
 import { 
   notifySpkCreated, 
@@ -14,7 +14,6 @@ import {
 export function initializeEventListeners() {
   // SPK Created
   appEventEmitter.on('spk:created', (payload: { spkId: number, noSpk: string }) => {
-    // Notify whatsapp
     notifySpkCreated(payload.spkId);
   });
 
@@ -32,17 +31,14 @@ export function initializeEventListeners() {
   appEventEmitter.on('spk:kendala', async (payload: { spkId: number, noSpk: string, status: string }) => {
     sseManager.broadcast('spk:kendala', payload);
     
-    // Generate approval token
     const token = crypto.randomBytes(16).toString('hex');
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    await prisma.approvalToken.create({
-      data: {
-        token,
-        spkId: payload.spkId,
-        expiresAt
-      }
+    await db.insert('approval_tokens', {
+      token,
+      spkId: payload.spkId,
+      expiresAt,
     });
 
     const approvalLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/approval/${token}`;
@@ -63,6 +59,16 @@ export function initializeEventListeners() {
   // SPK Generic Update (dikerjakan)
   appEventEmitter.on('spk:updated', (payload: { spkId: number, noSpk: string, status: string }) => {
     sseManager.broadcast('spk:updated', payload);
+  });
+
+  // Inventaris: stok berubah (masuk/keluar/opname)
+  appEventEmitter.on('inventaris:stok-update', (payload: { sparepartId: number, sparepartName: string, stokLama: number, stokBaru: number, type: string }) => {
+    sseManager.broadcast('inventaris:stok-update', payload);
+  });
+
+  // New notification created
+  appEventEmitter.on('notifikasi:new', (payload: { type: string, title: string, message: string }) => {
+    sseManager.broadcast('notifikasi:new', payload);
   });
   
   console.log('[Event Listener] Initialized successfully');

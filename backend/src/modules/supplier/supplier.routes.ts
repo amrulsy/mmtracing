@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import prisma from '../../config/database';
+import db from '../../config/db';
 import { authMiddleware } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated } from '../../shared/utils';
@@ -27,17 +27,21 @@ const updateSchema = z.object({
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { search } = req.query;
-    const where: any = search ? {
-      OR: [
-        { name: { contains: String(search) } },
-        { phone: { contains: String(search) } },
-      ],
-    } : {};
-    const data = await prisma.supplier.findMany({
-      where,
-      orderBy: { name: 'asc' },
-      include: { _count: { select: { sparepart: true, inventarisLog: true } } },
-    });
+    const conds: string[] = [];
+    const params: any[] = [];
+    if (search) {
+      conds.push('(s.name LIKE ? OR s.phone LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+    const data = await db.query(
+      `SELECT s.*,
+              (SELECT COUNT(*) FROM sparepart sp WHERE sp.supplierId = s.id) AS _countSparepart,
+              (SELECT COUNT(*) FROM inventaris_log il WHERE il.supplierId = s.id) AS _countInventarisLog
+       FROM supplier s ${where}
+       ORDER BY s.name ASC`,
+      params,
+    );
     sendSuccess(res, data);
   } catch (e) { next(e); }
 });
@@ -45,21 +49,38 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 // GET /supplier/:id — detail with spareparts + purchase history
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await prisma.supplier.findUnique({
-      where: { id: Number(req.params.id) },
-      include: {
-        sparepart: {
-          orderBy: { name: 'asc' },
-          include: { kategori: true },
-        },
-        inventarisLog: {
-          orderBy: { createdAt: 'desc' },
-          take: 30,
-          include: { sparepart: { select: { id: true, kode: true, name: true } } },
-        },
-      },
-    });
+    const id = Number(req.params.id);
+    const data = await db.queryOne('SELECT * FROM supplier WHERE id = ?', [id]);
     if (!data) throw new NotFoundError('Supplier');
+
+    const [spareparts, logs] = await Promise.all([
+      db.query(
+        `SELECT sp.*, ks.id AS kategoriId, ks.name AS kategoriName
+         FROM sparepart sp
+         LEFT JOIN kategori_sparepart ks ON ks.id = sp.kategoriId
+         WHERE sp.supplierId = ?
+         ORDER BY sp.name ASC`,
+        [id],
+      ),
+      db.query(
+        `SELECT il.*, sp.id AS sparepartId, sp.kode AS sparepartKode, sp.name AS sparepartName
+         FROM inventaris_log il
+         LEFT JOIN sparepart sp ON sp.id = il.sparepartId
+         WHERE il.supplierId = ?
+         ORDER BY il.createdAt DESC LIMIT 30`,
+        [id],
+      ),
+    ]);
+
+    (data as any).sparepart = spareparts.map((sp: any) => ({
+      ...sp,
+      kategori: sp.kategoriId ? { id: sp.kategoriId, name: sp.kategoriName } : null,
+    }));
+    (data as any).inventarisLog = logs.map((l: any) => ({
+      ...l,
+      sparepart: { id: l.sparepartId, kode: l.sparepartKode, name: l.sparepartName },
+    }));
+
     sendSuccess(res, data);
   } catch (e) { next(e); }
 });
@@ -67,12 +88,13 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // POST /supplier
 router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await prisma.supplier.create({ data: req.body });
-    await prisma.activityLog.create({ data: {
+    const id = await db.insert('supplier', req.body);
+    const data = await db.queryOne('SELECT * FROM supplier WHERE id = ?', [id]);
+    await db.insert('activity_logs', {
       userId: (req as any).user?.id ?? null,
       action: 'create', module: 'master',
-      targetId: data.id, targetName: data.name,
-    }});
+      targetId: id, targetName: req.body.name,
+    });
     sendCreated(res, data, 'Supplier berhasil ditambahkan');
   } catch (e) { next(e); }
 });
@@ -80,12 +102,14 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
 // PUT /supplier/:id
 router.put('/:id', validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await prisma.supplier.update({ where: { id: Number(req.params.id) }, data: req.body });
-    await prisma.activityLog.create({ data: {
+    const id = Number(req.params.id);
+    await db.update('supplier', { ...req.body, updatedAt: new Date() }, 'id = ?', [id]);
+    const data = await db.queryOne('SELECT * FROM supplier WHERE id = ?', [id]);
+    await db.insert('activity_logs', {
       userId: (req as any).user?.id ?? null,
       action: 'update', module: 'master',
-      targetId: data.id, targetName: data.name,
-    }});
+      targetId: id, targetName: data?.name,
+    });
     sendSuccess(res, data, 'Supplier berhasil diperbarui');
   } catch (e) { next(e); }
 });
@@ -93,12 +117,14 @@ router.put('/:id', validate(updateSchema), async (req: Request, res: Response, n
 // PATCH /supplier/:id
 router.patch('/:id', validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await prisma.supplier.update({ where: { id: Number(req.params.id) }, data: req.body });
-    await prisma.activityLog.create({ data: {
+    const id = Number(req.params.id);
+    await db.update('supplier', { ...req.body, updatedAt: new Date() }, 'id = ?', [id]);
+    const data = await db.queryOne('SELECT * FROM supplier WHERE id = ?', [id]);
+    await db.insert('activity_logs', {
       userId: (req as any).user?.id ?? null,
       action: 'update', module: 'master',
-      targetId: data.id, targetName: data.name,
-    }});
+      targetId: id, targetName: data?.name,
+    });
     sendSuccess(res, data, 'Supplier berhasil diperbarui');
   } catch (e) { next(e); }
 });
@@ -109,7 +135,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     const id = Number(req.params.id);
 
     // Cek apakah supplier masih punya sparepart
-    const sparepartCount = await prisma.sparepart.count({ where: { supplierId: id } });
+    const sparepartCount = await db.queryVal<number>('SELECT COUNT(*) FROM sparepart WHERE supplierId = ?', [id]);
     if (sparepartCount > 0) {
       throw new BadRequestError(
         `Supplier ini masih terhubung dengan ${sparepartCount} sparepart dan tidak dapat dihapus. Pindahkan sparepart ke supplier lain terlebih dahulu.`
@@ -117,20 +143,20 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     // Cek apakah supplier masih punya log inventaris
-    const logCount = await prisma.inventarisLog.count({ where: { supplierId: id } });
+    const logCount = await db.queryVal<number>('SELECT COUNT(*) FROM inventaris_log WHERE supplierId = ?', [id]);
     if (logCount > 0) {
       throw new BadRequestError(
         `Supplier ini memiliki ${logCount} riwayat transaksi inventaris dan tidak dapat dihapus untuk menjaga integritas data historis.`
       );
     }
 
-    const supplier = await prisma.supplier.findUnique({ where: { id }, select: { name: true } });
-    await prisma.supplier.delete({ where: { id } });
-    await prisma.activityLog.create({ data: {
+    const supplier = await db.queryOne<{ name: string }>('SELECT name FROM supplier WHERE id = ?', [id]);
+    await db.execute('DELETE FROM supplier WHERE id = ?', [id]);
+    await db.insert('activity_logs', {
       userId: (req as any).user?.id ?? null,
       action: 'delete', module: 'master',
       targetId: id, targetName: supplier?.name,
-    }});
+    });
     sendSuccess(res, null, 'Supplier berhasil dihapus');
   } catch (e) { next(e); }
 });
