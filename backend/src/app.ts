@@ -9,6 +9,7 @@ import { errorHandler } from './middleware/errorHandler';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
+import pelangganAuthRoutes from './modules/pelanggan/pelanggan-auth.routes';
 import spkRoutes from './modules/spk/spk.routes';
 import pelangganRoutes from './modules/pelanggan/pelanggan.routes';
 import kendaraanRoutes from './modules/kendaraan/kendaraan.routes';
@@ -96,6 +97,7 @@ app.get(`${API}/health`, (_req, res) => {
 
 app.use(`${API}`, exportRoutes);
 app.use(`${API}/auth`, authRoutes);
+app.use(`${API}/customer-auth`, pelangganAuthRoutes);
 app.use(`${API}/dashboard`, dashboardRoutes);
 app.use(`${API}/spk`, spkRoutes);
 app.use(`${API}/pelanggan`, pelangganRoutes);

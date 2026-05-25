@@ -284,6 +284,8 @@ router.post('/booking', bookingLimiter, async (req: Request, res: Response, next
       jamPreferensi: jamPreferensi || null,
       keluhan: sanitize(keluhan),
       sumber: 'landing',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
     sendSuccess(res, {

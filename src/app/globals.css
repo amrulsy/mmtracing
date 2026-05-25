@@ -140,29 +140,32 @@
 
 .hero-orb-1 {
   animation: hero-float 12s ease-in-out infinite;
+  will-change: transform;
 }
 .hero-orb-2 {
   animation: hero-float-reverse 14s ease-in-out infinite;
+  will-change: transform;
 }
 .hero-orb-3 {
   animation: hero-float 18s ease-in-out infinite 2s;
+  will-change: transform;
 }
 .hero-ring {
   animation: hero-spin-slow 25s linear infinite;
+  will-change: transform;
 }
 .hero-grid {
   animation: hero-grid-drift 6s linear infinite;
 }
 .hero-glow {
   animation: hero-glow-pulse 4s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 .hero-particle-1 { animation: hero-particle 3s ease-in-out infinite 0s; }
 .hero-particle-2 { animation: hero-particle 4s ease-in-out infinite 1s; }
 .hero-particle-3 { animation: hero-particle 3.5s ease-in-out infinite 2s; }
 .hero-particle-4 { animation: hero-particle 4.5s ease-in-out infinite 0.5s; }
 .hero-particle-5 { animation: hero-particle 5s ease-in-out infinite 2.5s; }
-.hero-particle-6 { animation: hero-particle 3.2s ease-in-out infinite 1.5s; }
-.hero-particle-7 { animation: hero-particle 4.2s ease-in-out infinite 3s; }
 
 /* Mobile-responsive utilities */
 @layer utilities {
@@ -217,8 +220,7 @@
   .hero-orb-1, .hero-orb-2, .hero-orb-3,
   .hero-ring, .hero-grid, .hero-glow,
   .hero-particle-1, .hero-particle-2, .hero-particle-3,
-  .hero-particle-4, .hero-particle-5, .hero-particle-6,
-  .hero-particle-7 {
+  .hero-particle-4, .hero-particle-5 {
     animation: none !important;
   }
   *, *::before, *::after {
@@ -227,6 +229,17 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ═══════════════════════════════════
+   SCROLLBAR HIDE — Testimonial carousel
+   ═══════════════════════════════════ */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* cache buster 4 */
