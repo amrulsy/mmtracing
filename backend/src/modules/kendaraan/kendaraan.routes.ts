@@ -115,7 +115,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
 router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const body = { ...req.body, plat: normalizePlat(req.body.plat) };
+    const body = { ...req.body, plat: normalizePlat(req.body.plat), updatedAt: new Date() };
     const newId = await db.insert('kendaraan', body);
     const data = await db.queryOne('SELECT * FROM kendaraan WHERE id = ?', [newId]);
     await db.insert('activity_logs', {

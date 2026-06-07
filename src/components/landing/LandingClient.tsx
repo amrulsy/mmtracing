@@ -51,7 +51,7 @@ function Navbar({
             <span className="hidden sm:block text-[9px] text-muted-foreground -mt-1">{header.subtitle}</span>
           </div>
         </Link>
-        <div className="hidden lg:flex items-center gap-6">
+        <div className="hidden lg:flex items-center gap-5">
           {["Layanan", "Harga", "Antrian", "Galeri", "Testimoni", "FAQ", "Kontak"].map((item) => {
             const isActive = activeSection === item.toLowerCase();
             return (
@@ -64,7 +64,7 @@ function Navbar({
           <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-muted-foreground" aria-label="Toggle tema gelap/terang">
             {mounted ? (theme === "dark" ? <Sun size={16} /> : <Moon size={16} />) : <Moon size={16} />}
           </button>
-          <a href="#booking" className="btn-glossy bg-primary text-white px-5 py-2 rounded-xl text-sm font-bold shadow-glossy-primary hover:shadow-glossy-primary-dark">Booking Online</a>
+          <a href="#booking" className="btn-glossy bg-primary text-white px-6 py-3 rounded-2xl text-sm font-black shadow-glossy-primary hover:shadow-glossy-primary-dark ring-2 ring-primary/20 hover:ring-primary/40 transition-all">Booking Online</a>
         </div>
         {/* Mobile */}
         <div className="lg:hidden flex items-center gap-2">
@@ -198,8 +198,9 @@ export default function LandingClient({ initialData, initialQueue }: LandingClie
   // Resolved data with defaults
   const header = data?.landing_header || { logoText: "M", brandName: "MMT Racing", subtitle: "Workshop & Custom Fabrication" };
   const contact: ContactData = data?.landing_contact || { address: "", addressDetail: "", hours: "", hoursClosed: "", phone: "", email: "", whatsapp: "62274123456", mapsEmbed: "" };
-  const hero = data?.landing_hero || { tagline: "Bengkel Terpercaya Sejak 2016", title: "Servis Berkualitas, Modifikasi Presisi Tinggi", subtitle: "Spesialis servis rutin, modifikasi, dan jasa bubut custom untuk motor & mobil." };
+  const hero = data?.landing_hero || { tagline: "Bengkel Terpercaya Sejak 2016", title: "Servis Berkualitas, Modifikasi Presisi Tinggi", subtitle: "Spesialis servis rutin, modifikasi, dan jasa bubut custom untuk motor." };
   const footer = data?.landing_footer || { description: "", hourWeekday: "", hourSaturday: "", hourSunday: "" };
+  const gallery = data?.landing_gallery || [];
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -226,10 +227,12 @@ export default function LandingClient({ initialData, initialQueue }: LandingClie
 
       {/* Wave → Pricing */}
       <WaveDivider flip color="fill-[var(--surface-hover)]" className="bg-background -mb-px" />
-      <PricingSection pricingMotor={data?.landing_pricing_motor || []} pricingMobil={data?.landing_pricing_mobil || []} pricingBubut={data?.landing_pricing_bubut || []} />
+      <PricingSection pricingMotor={data?.landing_pricing_motor || []} pricingBubut={data?.landing_pricing_bubut || []} />
 
-      {/* Gallery with lightbox */}
-      <GallerySection gallery={data?.landing_gallery || []} />
+      {/* Gallery with lightbox — hidden when empty */}
+      {gallery.length > 0 && (
+        <GallerySection gallery={gallery} />
+      )}
 
       {/* Testimonials carousel */}
       <WaveDivider color="fill-[var(--surface-hover)]" className="bg-background -mb-px" />
@@ -240,7 +243,7 @@ export default function LandingClient({ initialData, initialQueue }: LandingClie
       <BookingSection contact={contact} />
 
       {/* FAQ accordion — NEW */}
-      <FAQSection />
+      <FAQSection faqs={data?.landing_faq} />
 
       {/* Contact & Map */}
       <WaveDivider color="fill-[var(--surface-hover)]" className="bg-background -mb-px" />

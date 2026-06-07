@@ -327,9 +327,9 @@ export default function LaporanPage() {
                 </div>
               </div>
               <div>
-                <p className="text-xl sm:text-2xl font-bold font-mono">
+                <div className="text-xl sm:text-2xl font-bold font-mono">
                   {loading ? <Skeleton className="h-8 w-24" /> : formatRp(labaRugi?.pendapatan || 0)}
-                </p>
+                </div>
                 {kpi && <div className="mt-1 flex items-center gap-1"><DeltaBadge pct={kpi.change.pendapatan} /> <span className="text-[10px] text-muted-foreground">vs periode lalu</span></div>}
               </div>
             </div>
@@ -345,9 +345,9 @@ export default function LaporanPage() {
                 </div>
               </div>
               <div>
-                <p className="text-xl sm:text-2xl font-bold font-mono">
+                <div className="text-xl sm:text-2xl font-bold font-mono">
                   {loading ? <Skeleton className="h-8 w-24" /> : formatRp(labaRugi?.hpp || 0)}
-                </p>
+                </div>
                 {labaRugi && <p className="text-[10px] text-muted-foreground mt-1">Part {formatRp(labaRugi.hppSparepart)} · Jasa {formatRp(labaRugi.hppJasa)}</p>}
               </div>
             </div>
@@ -360,9 +360,9 @@ export default function LaporanPage() {
                 </div>
               </div>
               <div>
-                <p className="text-xl sm:text-2xl font-bold font-mono">
+                <div className="text-xl sm:text-2xl font-bold font-mono">
                   {loading ? <Skeleton className="h-8 w-24" /> : formatRp(labaRugi?.labaKotor || 0)}
-                </p>
+                </div>
                 {labaRugi && <p className="text-[10px] text-muted-foreground mt-1">Margin: <b className={labaRugi.marginKotor >= 0 ? "text-emerald-600" : "text-red-500"}>{labaRugi.marginKotor.toFixed(1)}%</b></p>}
               </div>
             </div>
@@ -375,9 +375,9 @@ export default function LaporanPage() {
                 </div>
               </div>
               <div>
-                <p className="text-xl sm:text-2xl font-bold font-mono">
+                <div className="text-xl sm:text-2xl font-bold font-mono">
                   {loading ? <Skeleton className="h-8 w-24" /> : formatRp(labaRugi?.pengeluaran || 0)}
-                </p>
+                </div>
                 {kpi && <div className="mt-1 flex items-center gap-1"><DeltaBadge pct={kpi.change.pengeluaran} invert /> <span className="text-[10px] text-muted-foreground">vs lalu</span></div>}
               </div>
             </div>
@@ -390,9 +390,9 @@ export default function LaporanPage() {
                 </div>
               </div>
               <div>
-                <p className="text-2xl sm:text-3xl font-black font-mono text-indigo-300 drop-shadow-sm">
+                <div className="text-2xl sm:text-3xl font-black font-mono text-indigo-300 drop-shadow-sm">
                   {loading ? <Skeleton className="h-8 w-full" /> : formatRp(labaRugi?.labaBersih || 0)}
-                </p>
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                   {kpi && <DeltaBadge pct={kpi.change.labaBersih} />}
                   {labaRugi && <span className="text-[10px] text-indigo-400/80">Margin {labaRugi.marginBersih.toFixed(1)}%</span>}
@@ -408,7 +408,7 @@ export default function LaporanPage() {
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SPK Selesai</span>
                 <Receipt size={14} className="text-blue-500" />
               </div>
-              <p className="text-xl font-bold font-mono">{loading ? <Skeleton className="h-6 w-12" /> : (kpi?.current.spkSelesai ?? 0)}</p>
+              <div className="text-xl font-bold font-mono">{loading ? <Skeleton className="h-6 w-12" /> : (kpi?.current.spkSelesai ?? 0)}</div>
               {kpi && <DeltaBadge pct={kpi.change.spkSelesai} />}
             </div>
             <div className="glass-panel p-4 flex flex-col gap-1">
@@ -416,7 +416,7 @@ export default function LaporanPage() {
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Avg Ticket</span>
                 <Scissors size={14} className="text-purple-500" />
               </div>
-              <p className="text-xl font-bold font-mono">{loading ? <Skeleton className="h-6 w-20" /> : formatRp(kpi?.current.avgTicket ?? 0)}</p>
+              <div className="text-xl font-bold font-mono">{loading ? <Skeleton className="h-6 w-20" /> : formatRp(kpi?.current.avgTicket ?? 0)}</div>
               {kpi && <DeltaBadge pct={kpi.change.avgTicket} />}
             </div>
             <div className="glass-panel p-4 flex flex-col gap-1">
@@ -424,7 +424,7 @@ export default function LaporanPage() {
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Repeat Rate</span>
                 <Repeat size={14} className="text-emerald-500" />
               </div>
-              <p className="text-xl font-bold font-mono">{loading ? <Skeleton className="h-6 w-16" /> : `${(pelanggan?.repeatRate ?? 0).toFixed(0)}%`}</p>
+              <div className="text-xl font-bold font-mono">{loading ? <Skeleton className="h-6 w-16" /> : `${(pelanggan?.repeatRate ?? 0).toFixed(0)}%`}</div>
               {pelanggan && <p className="text-[10px] text-muted-foreground">{pelanggan.repeatPelanggan}/{pelanggan.uniquePelangganWithSpk} pelanggan</p>}
             </div>
             <div className="glass-panel p-4 flex flex-col gap-1">
@@ -432,7 +432,7 @@ export default function LaporanPage() {
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Mekanik Aktif</span>
                 <Wrench size={14} className="text-amber-500" />
               </div>
-              <p className="text-xl font-bold font-mono">{loading ? <Skeleton className="h-6 w-10" /> : (kpi?.current.mekanikAktif ?? 0)}</p>
+              <div className="text-xl font-bold font-mono">{loading ? <Skeleton className="h-6 w-10" /> : (kpi?.current.mekanikAktif ?? 0)}</div>
               <p className="text-[10px] text-muted-foreground">available + busy</p>
             </div>
           </div>
@@ -673,16 +673,16 @@ export default function LaporanPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {loading ? (
                   <div className="space-y-3"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
-                ) : pelanggan?.topSpenders.length === 0 ? (
+                ) : !pelanggan?.topSpenders?.length ? (
                   <div className="text-center text-sm text-muted-foreground">Data belum tersedia</div>
-                ) : pelanggan?.topSpenders.slice(0, 6).map((c, i) => (
+                ) : pelanggan.topSpenders.slice(0, 6).map((c, i) => (
                   <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-hover/30 border border-surface-border transition-colors">
                     <span className="text-lg w-6 text-center">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{c.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{c._count.spk} kunjungan</p>
+                      <p className="text-[10px] text-muted-foreground">{c._count?.spk || 0} kunjungan</p>
                     </div>
-                    <span className="text-sm font-bold font-mono text-primary text-right">{formatRp(Number(c.totalTrx))}</span>
+                    <span className="text-sm font-bold font-mono text-primary text-right">{formatRp(Number(c.totalTrx || 0))}</span>
                   </div>
                 ))}
               </div>

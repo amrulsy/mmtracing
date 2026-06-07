@@ -9,6 +9,8 @@ import { api } from "@/lib/api";
 import type { Pelanggan, Kendaraan, Mekanik, Jasa, Sparepart } from "@/lib/types";
 import { Skeleton } from "@/components/ui/loading-skeleton";
 import { SparepartPicker, ImageUploader } from "./SpkExtras";
+import { ServiceBundlePicker } from "./ServiceBundles";
+import { CustomerVehicleForm } from "./CustomerVehicleForm";
 import { StageTemplates } from "./StageTemplates";
 
 type Mode = "rutin" | "modifikasi" | "bubut";
@@ -47,6 +49,9 @@ export default function CreateSpkPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [loadingOptions, setLoadingOptions] = useState(true);
+
+  // Mobile Wizard State
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
   // Options dari API
   const [pelangganList, setPelangganList] = useState<Pelanggan[]>([]);
@@ -231,15 +236,7 @@ export default function CreateSpkPage() {
     setDraftAvailable(null);
   };
 
-  // Load pelanggan dari API saat search berubah (server-side search)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      api.getPaginated<Pelanggan>("/pelanggan", { limit: 30, search: pelangganSearch && pelangganSearch.length >= 1 ? pelangganSearch : "" })
-        .then(res => setPelangganList(res.data))
-        .catch(() => {});
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [pelangganSearch]);
+
 
   // Load jasa saat mode rutin aktif atau search berubah
   useEffect(() => {
@@ -268,40 +265,7 @@ export default function CreateSpkPage() {
 
   const initialKendaraanId = searchParams.get("kendaraanId");
 
-  // Load kendaraan ketika pelanggan berubah
-  useEffect(() => {
-    if (!pelangganId || mode === "bubut") {
-      setKendaraanList([]);
-      if (!initialKendaraanId) setKendaraanId("");
-      return;
-    }
-    api.get<Pelanggan>(`/pelanggan/${pelangganId}`)
-      .then(res => setKendaraanList(res.data.kendaraan || []))
-      .catch(() => toast.error("Gagal", "Gagal memuat data kendaraan"));
-  }, [pelangganId, mode, initialKendaraanId]);
 
-  // Sync display name untuk pelangganId dari URL params
-  useEffect(() => {
-    if (pelangganId && !pelangganSearch) {
-      const p = pelangganList.find(x => x.id.toString() === pelangganId);
-      if (p) {
-        setPelangganSearch(p.name);
-      } else {
-        // Fetch langsung jika belum ada di list
-        api.get<Pelanggan>(`/pelanggan/${pelangganId}`)
-          .then(res => setPelangganSearch(res.data.name))
-          .catch(() => {});
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pelangganId]);
-  
-  useEffect(() => {
-    if (kendaraanList.length > 0 && kendaraanId && !kendaraanSearch) {
-       const k = kendaraanList.find(x => x.id.toString() === kendaraanId);
-       if (k) setKendaraanSearch(`${k.name} - ${k.plat}`);
-    }
-  }, [kendaraanList, kendaraanId]);
 
   // ── Helpers item jasa ──────────────────────────────────────
   const addJasa = (j: Jasa) => {
@@ -361,6 +325,27 @@ export default function CreateSpkPage() {
   };
 
   const totalSparepart = selectedSparepartItems.reduce((s, x) => s + x.harga * x.qty, 0);
+
+  // ── Helpers Service Bundle ──────────────────────────────────
+  const handleSelectBundle = (items: Array<{ type: 'jasa' | 'sparepart'; id: number; nama: string; harga: number; qty: number }>) => {
+    // Add jasa
+    items.filter(i => i.type === 'jasa').forEach(j => {
+      setSelectedJasaItems(prev => {
+        const exists = prev.find(x => x.jasaId === j.id);
+        if (exists) return prev.map(x => x.jasaId === j.id ? { ...x, qty: x.qty + j.qty } : x);
+        return [...prev, { jasaId: j.id, nama: j.nama, harga: j.harga, qty: j.qty }];
+      });
+    });
+
+    // Add sparepart
+    items.filter(i => i.type === 'sparepart').forEach(sp => {
+      setSelectedSparepartItems(prev => {
+        const exists = prev.find(x => x.sparepartId === sp.id);
+        if (exists) return prev.map(x => x.sparepartId === sp.id ? { ...x, qty: x.qty + sp.qty } : x);
+        return [...prev, { sparepartId: sp.id, nama: sp.nama, harga: sp.harga, qty: sp.qty }];
+      });
+    });
+  };
 
   // ── Helpers stages ─────────────────────────────────────────
   const addStage = () => setStages(prev => [...prev, { nama: "", estimasiBiaya: 0, durasiHari: 1 }]);
@@ -663,120 +648,45 @@ export default function CreateSpkPage() {
 
           {/* #14: Mobile Step Indicator */}
           <div className="flex items-center justify-center gap-2 py-3 px-6 border-b border-surface-border sm:hidden">
-            {["Data Pelanggan", "Pekerjaan", "Prioritas"].map((label, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${i === 0 ? "bg-primary text-white border-primary" : "border-surface-border text-muted-foreground"}`}>
-                  {i + 1}
+            {["Data Pelanggan", "Pekerjaan", "Prioritas"].map((label, i) => {
+              const stepNum = i + 1;
+              const isActive = currentStep === stepNum;
+              const isPast = currentStep > stepNum;
+              return (
+                <div key={i} className="flex items-center gap-1.5" onClick={() => isPast && setCurrentStep(stepNum as 1|2|3)}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-colors ${isActive ? "bg-primary text-white border-primary" : isPast ? "bg-primary/20 text-primary border-primary cursor-pointer" : "border-surface-border text-muted-foreground"}`}>
+                    {isPast ? <Check size={12} /> : stepNum}
+                  </div>
+                  <span className={`text-[10px] whitespace-nowrap ${isActive ? "font-bold text-primary" : "text-muted-foreground"}`}>{label}</span>
+                  {i < 2 && <div className={`w-3 sm:w-4 h-0.5 ${isPast ? "bg-primary" : "bg-surface-border"}`} />}
                 </div>
-                <span className={`text-[10px] ${i === 0 ? "font-bold text-primary" : "text-muted-foreground"}`}>{label}</span>
-                {i < 2 && <div className="w-4 h-0.5 bg-surface-border" />}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="p-6 space-y-8">
 
             {/* ── Section 1: Pelanggan & Kendaraan ── */}
-            <section>
-              <h3 className="text-sm font-semibold mb-4 text-primary uppercase tracking-wider">
+            <section className={`sm:block ${currentStep === 1 ? 'block animate-in fade-in slide-in-from-right-4' : 'hidden'}`}>
+              <h3 className="text-sm font-semibold mb-4 text-primary uppercase tracking-wider hidden sm:block">
                 1. {mode === "bubut" ? "Data Pelanggan" : "Pilih Kendaraan"}
               </h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-1.5 relative">
-                  <label className="text-xs font-medium text-muted-foreground">Pelanggan <span className="text-red-500">*</span></label>
-                  {loadingOptions ? <Skeleton className="h-10 w-full" /> : (
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          value={pelangganSearch}
-                          onFocus={() => setShowPelDropdown(true)}
-                          onChange={e => setPelangganSearch(e.target.value)}
-                          onBlur={() => setTimeout(() => setShowPelDropdown(false), 200)}
-                          placeholder="Cari nama / No HP..."
-                          className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        />
-                        {showPelDropdown && (
-                          <div className="absolute top-11 left-0 z-50 w-full max-h-48 overflow-y-auto bg-background border border-surface-border rounded-xl shadow-lg p-1">
-                            {filteredPelanggan.length === 0 ? (
-                              <div className="p-2 text-xs text-muted-foreground text-center">Tidak ditemukan.</div>
-                            ) : filteredPelanggan.map(p => (
-                              <div
-                                key={p.id}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setPelangganId(p.id.toString());
-                                  setPelangganSearch(p.name);
-                                  setShowPelDropdown(false);
-                                }}
-                                className={`px-3 py-2 text-sm rounded-lg cursor-pointer flex justify-between items-center ${pelangganId === p.id.toString() ? "bg-primary/10 text-primary" : "hover:bg-surface-hover"}`}
-                              >
-                                <div><p className="font-semibold">{p.name}</p><p className="text-[10px] text-muted-foreground">{p.phone}</p></div>
-                                {pelangganId === p.id.toString() && <Check size={14} />}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <button type="button" onClick={() => setShowAddPelanggan(true)}
-                        className="px-3 py-2 border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 rounded-xl flex items-center justify-center transition-colors" title="Tambah Pelanggan Baru">
-                        <UserPlus size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {mode !== "bubut" ? (
-                  <div className="space-y-1.5 relative">
-                    <label className="text-xs font-medium text-muted-foreground">Kendaraan</label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          disabled={!pelangganId}
-                          value={kendaraanSearch}
-                          onFocus={() => setShowKenDropdown(true)}
-                          onChange={e => setKendaraanSearch(e.target.value)}
-                          onBlur={() => setTimeout(() => setShowKenDropdown(false), 200)}
-                          placeholder={!pelangganId ? "Pilih pelanggan dulu..." : "Cari plat / nama kendaraan..."}
-                          className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
-                        />
-                        {showKenDropdown && pelangganId && (
-                          <div className="absolute top-11 left-0 z-50 w-full max-h-48 overflow-y-auto bg-background border border-surface-border rounded-xl shadow-lg p-1">
-                            {filteredKendaraan.length === 0 ? (
-                              <div className="p-2 text-xs text-muted-foreground text-center">Tidak ditemukan.</div>
-                            ) : filteredKendaraan.map(k => (
-                              <div
-                                key={k.id}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setKendaraanId(k.id.toString());
-                                  setKendaraanSearch(`${k.name} - ${k.plat}`);
-                                  setShowKenDropdown(false);
-                                }}
-                                className={`px-3 py-2 text-sm rounded-lg cursor-pointer flex justify-between items-center ${kendaraanId === k.id.toString() ? "bg-primary/10 text-primary" : "hover:bg-surface-hover"}`}
-                              >
-                                <div><p className="font-semibold">{k.plat}</p><p className="text-[10px] text-muted-foreground">{k.name}</p></div>
-                                {kendaraanId === k.id.toString() && <Check size={14} />}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <button type="button" onClick={() => setShowAddKendaraan(true)} disabled={!pelangganId}
-                        className="px-3 py-2 border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 rounded-xl flex items-center justify-center transition-colors disabled:opacity-50" title="Tambah Kendaraan Baru">
-                        <Car size={16} />
-                      </button>
-                    </div>
-                    {kendaraanId && (
-                      <div className="mt-3 space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">Odometer Saat Masuk (km) <span className="text-[10px] opacity-70">— opsional, otomatis update kendaraan</span></label>
-                        <input type="number" min="0" value={odometerMasuk} onChange={e => setOdometerMasuk(e.target.value)}
-                          placeholder="Contoh: 45000"
-                          className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono" />
-                      </div>
-                    )}
-                  </div>
-                ) : (
+              <div className="space-y-4">
+                <CustomerVehicleForm
+                  mode={mode}
+                  pelangganId={pelangganId}
+                  setPelangganId={setPelangganId}
+                  kendaraanId={kendaraanId}
+                  setKendaraanId={setKendaraanId}
+                  odometerMasuk={odometerMasuk}
+                  setOdometerMasuk={setOdometerMasuk}
+                  pelangganSearch={pelangganSearch}
+                  setPelangganSearch={setPelangganSearch}
+                  kendaraanSearch={kendaraanSearch}
+                  setKendaraanSearch={setKendaraanSearch}
+                />
+                
+                {mode === "bubut" && (
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground">Nama Walk-in (opsional)</label>
                     <input type="text" value={namaBubut} onChange={e => setNamaBubut(e.target.value)}
@@ -788,8 +698,8 @@ export default function CreateSpkPage() {
             </section>
 
             {/* ── Section 2: Detail Pekerjaan ── */}
-            <section>
-              <h3 className="text-sm font-semibold mb-4 text-primary uppercase tracking-wider">
+            <section className={`sm:block ${currentStep === 2 ? 'block animate-in fade-in slide-in-from-right-4' : 'hidden'}`}>
+              <h3 className="text-sm font-semibold mb-4 text-primary uppercase tracking-wider hidden sm:block">
                 2. {mode === "rutin" ? "Keluhan & Pilih Jasa" : mode === "modifikasi" ? "Deskripsi Proyek" : "Deskripsi Pekerjaan Bubut"}
               </h3>
 
@@ -802,6 +712,11 @@ export default function CreateSpkPage() {
                     <textarea value={keluhan} onChange={e => setKeluhan(e.target.value)} rows={2}
                       className="w-full bg-surface border border-surface-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                       placeholder="Deskripsikan keluhan kendaraan..." />
+                  </div>
+
+                  {/* Paket Servis Cepat */}
+                  <div className="pt-2">
+                    <ServiceBundlePicker onSelectBundle={handleSelectBundle} />
                   </div>
 
                   {/* Pilih Jasa dari master */}
@@ -1193,8 +1108,8 @@ export default function CreateSpkPage() {
             </section>
 
             {/* ── Section 3: Penugasan & Prioritas ── */}
-            <section>
-              <h3 className="text-sm font-semibold mb-4 text-primary uppercase tracking-wider">3. Penugasan & Prioritas</h3>
+            <section className={`sm:block ${currentStep === 3 ? 'block animate-in fade-in slide-in-from-right-4' : 'hidden'}`}>
+              <h3 className="text-sm font-semibold mb-4 text-primary uppercase tracking-wider hidden sm:block">3. Penugasan & Prioritas</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Tugaskan Mekanik</label>
@@ -1230,8 +1145,8 @@ export default function CreateSpkPage() {
             </section>
           </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-surface-border bg-surface-hover/30 flex justify-end gap-3">
+          {/* Footer Desktop */}
+          <div className="p-4 border-t border-surface-border bg-surface-hover/30 hidden sm:flex justify-end gap-3">
             <Link href="/app/spk" className="px-4 py-2 text-sm font-medium border border-surface-border rounded-xl hover:bg-surface transition-colors">
               Batal
             </Link>
@@ -1251,9 +1166,10 @@ export default function CreateSpkPage() {
       {(() => {
         const stickyTotal = mode === "rutin" ? (totalJasa + totalSparepart) : (totalEstimasi + totalSparepart);
         const itemCount = mode === "rutin" ? (selectedJasaItems.length + selectedSparepartItems.length) : (stages.filter(s => s.nama).length + selectedSparepartItems.length);
-        if (stickyTotal <= 0 && itemCount === 0) return null;
+        const isEmpty = stickyTotal <= 0 && itemCount === 0;
+        
         return (
-          <div className="fixed bottom-0 left-0 right-0 z-30 bg-surface/95 backdrop-blur-md border-t border-surface-border shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+          <div className={`fixed bottom-16 lg:bottom-0 left-0 right-0 z-30 bg-surface/95 backdrop-blur-md border-t border-surface-border shadow-2xl animate-in slide-in-from-bottom-4 duration-300 ${isEmpty ? 'sm:hidden' : ''}`}>
             <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{mode === "rutin" ? "Subtotal" : "Estimasi Total"}</p>
@@ -1264,43 +1180,52 @@ export default function CreateSpkPage() {
                     : `${stages.filter(s => s.nama).length} tahapan${selectedSparepartItems.length > 0 ? ` • ${selectedSparepartItems.length} sparepart` : ""}${estimasiSelesai ? ` • ETA: ${estimasiSelesai}` : ""}${stickyTotal > 0 && dpPctNow > 0 ? ` • DP min: ${formatRp(Math.ceil((stickyTotal * dpPctNow) / 100))}` : ""}`}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => { const f = document.querySelector("form") as HTMLFormElement | null; f?.requestSubmit(); }}
-                disabled={submitting}
-                className="shrink-0 px-5 py-3 text-sm font-bold bg-primary text-primary-foreground rounded-xl shadow-glossy-primary btn-glossy disabled:opacity-70 flex items-center gap-2"
-              >
-                {submitting ? <><Loader2 size={16} className="animate-spin" /> Memproses</> : <><Save size={16} /> Buat SPK</>}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.innerWidth < 640 && currentStep > 1) {
+                      setCurrentStep((prev) => (prev - 1) as 1 | 2 | 3);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                  }}
+                  className={`shrink-0 p-3 sm:hidden ${currentStep > 1 ? 'flex' : 'hidden'} text-sm font-bold border border-surface-border rounded-xl hover:bg-surface-hover items-center justify-center`}
+                >
+                  <ArrowLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.innerWidth < 640 && currentStep < 3) {
+                      if (currentStep === 1 && !pelangganId) {
+                        toast.error("Pelanggan Belum Dipilih", "Silakan lengkapi data pelanggan terlebih dahulu.");
+                        return;
+                      }
+                      setCurrentStep((prev) => (prev + 1) as 1 | 2 | 3);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                      return;
+                    }
+                    const f = document.querySelector("form") as HTMLFormElement | null; f?.requestSubmit(); 
+                  }}
+                  disabled={submitting}
+                  className="shrink-0 px-5 py-3 text-sm font-bold bg-primary text-primary-foreground rounded-xl shadow-glossy-primary btn-glossy disabled:opacity-70 flex items-center gap-2"
+                >
+                  {submitting ? <><Loader2 size={16} className="animate-spin" /> <span className="hidden sm:inline">Memproses</span></> : (
+                    <>
+                      <span className="hidden sm:inline-flex items-center gap-2"><Save size={16} /> Buat SPK</span>
+                      <span className="sm:hidden inline-flex items-center gap-2">
+                        {currentStep < 3 ? `Lanjut` : <><Save size={16} /> Buat</>}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         );
       })()}
 
-      {/* QUICK CREATE MODALS */}
-      {showAddPelanggan && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-background border border-surface-border rounded-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-surface-border flex justify-between items-center bg-surface-hover/30">
-              <h3 className="font-bold flex items-center gap-2"><UserPlus size={16} className="text-primary"/> Pelanggan Baru</h3>
-              <button onClick={() => setShowAddPelanggan(false)} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
-            </div>
-            <form onSubmit={handleAddPelanggan} className="p-5 space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Nama <span className="text-red-500">*</span></label>
-                <input type="text" value={newPelangganName} onChange={e => setNewPelangganName(e.target.value)} placeholder="Contoh: Budi Santoso" className="w-full bg-surface rounded-xl px-3 py-2.5 text-sm border focus:ring-2 focus:ring-primary/50" autoFocus />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">No. Telepon / WA <span className="text-red-500">*</span></label>
-                <input type="text" value={newPelangganPhone} onChange={e => setNewPelangganPhone(e.target.value)} placeholder="Contoh: 08123456789" className="w-full bg-surface rounded-xl px-3 py-2.5 text-sm border focus:ring-2 focus:ring-primary/50" />
-              </div>
-              <button type="submit" disabled={addingPelanggan || !newPelangganName || !newPelangganPhone} className="w-full mt-2 py-2.5 bg-primary text-white font-medium rounded-xl disabled:opacity-50 flex justify-center items-center gap-2">
-                {addingPelanggan ? <Loader2 size={16} className="animate-spin" /> : "Simpan Pelanggan"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+
 
       {/* MODAL REVIEW PRE-SUBMIT */}
       {showReview && (
@@ -1429,29 +1354,7 @@ export default function CreateSpkPage() {
         </div>
       )}
 
-      {showAddKendaraan && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-background border border-surface-border rounded-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-surface-border flex justify-between items-center bg-surface-hover/30">
-              <h3 className="font-bold flex items-center gap-2"><Car size={16} className="text-primary"/> Kendaraan Baru</h3>
-              <button onClick={() => setShowAddKendaraan(false)} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
-            </div>
-            <form onSubmit={handleAddKendaraan} className="p-5 space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Nama Kendaraan <span className="text-red-500">*</span></label>
-                <input type="text" value={newKendaraanName} onChange={e => setNewKendaraanName(e.target.value)} placeholder="Contoh: Honda Vario 150" className="w-full bg-surface rounded-xl px-3 py-2.5 text-sm border focus:ring-2 focus:ring-primary/50" autoFocus />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Plat Nomor <span className="text-red-500">*</span></label>
-                <input type="text" value={newKendaraanPlat} onChange={e => setNewKendaraanPlat(e.target.value)} placeholder="Contoh: B 1234 ABC" className="w-full bg-surface rounded-xl px-3 py-2.5 text-sm border focus:ring-2 focus:ring-primary/50 uppercase" />
-              </div>
-              <button type="submit" disabled={addingKendaraan || !newKendaraanName || !newKendaraanPlat} className="w-full mt-2 py-2.5 bg-primary text-white font-medium rounded-xl disabled:opacity-50 flex justify-center items-center gap-2">
-                {addingKendaraan ? <Loader2 size={16} className="animate-spin" /> : "Simpan Kendaraan"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+
 
     </div>
   );

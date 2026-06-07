@@ -3,6 +3,7 @@ import db from '../../config/db';
 import { authMiddleware, requireRole } from '../../middleware/auth';
 import { sendSuccess } from '../../shared/utils';
 import { createRateLimiter } from '../../middleware/rateLimit';
+import { notifyBookingBaru } from '../whatsapp/whatsapp.notification';
 
 // Rate limiter: max 5 booking requests per IP per 10 minutes
 const bookingLimiter = createRateLimiter({
@@ -180,8 +181,10 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction) =>
        LEFT JOIN pelanggan p ON p.id = s.pelangganId
        LEFT JOIN kendaraan k ON k.id = s.kendaraanId
        LEFT JOIN mekanik m ON m.id = s.mekanikId
-       WHERE s.status IN ('antri', 'dikerjakan')
-       ORDER BY s.prioritas DESC, s.createdAt ASC LIMIT 20`
+       WHERE s.status = 'dikerjakan'
+          OR (s.status = 'antri' AND s.createdAt >= ? AND s.createdAt < ?)
+       ORDER BY s.prioritas DESC, s.createdAt ASC LIMIT 20`,
+      [today, tomorrow]
     );
 
     // Anonymize names: "Budi Santoso" → "B***o"
@@ -254,6 +257,14 @@ router.post('/booking', bookingLimiter, async (req: Request, res: Response, next
         });
         return;
       }
+      // Check if booking date is Sunday (0 = Sunday)
+      if (bookingDate.getDay() === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Booking hari Minggu tidak tersedia. Bengkel tutup setiap hari Minggu.',
+        });
+        return;
+      }
     }
 
     // Sanitize text inputs — strip HTML tags
@@ -287,6 +298,9 @@ router.post('/booking', bookingLimiter, async (req: Request, res: Response, next
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+
+    // Notify admin via WhatsApp
+    notifyBookingBaru(bookingId).catch(() => {});
 
     sendSuccess(res, {
       id: bookingId,

@@ -20,7 +20,7 @@ export default function FooterSection({ header, footer }: FooterSectionProps) {
           <div>
             <h4 className="font-bold text-sm mb-3">Layanan</h4>
             <ul className="space-y-2 text-xs opacity-60">
-              <li>Servis Rutin Motor &amp; Mobil</li>
+              <li>Servis Rutin Motor</li>
               <li>Modifikasi &amp; Performance</li>
               <li>Jasa Bubut Custom CNC</li>
               <li>Detailing &amp; Coating</li>
@@ -46,8 +46,8 @@ export default function FooterSection({ header, footer }: FooterSectionProps) {
           </div>
         </div>
         <div className="border-t border-white/10 mt-8 pt-8 flex flex-col sm:flex-row items-center justify-between text-[10px] opacity-40">
-          <p>&copy; 2026 MMT Racing. All rights reserved.</p>
-          <p>Built with ❤️ in Yogyakarta</p>
+          <p>&copy; {new Date().getFullYear()} MMT Racing. All rights reserved.</p>
+          <p>Built with ❤️ in Cilacap</p>
         </div>
       </div>
     </footer>

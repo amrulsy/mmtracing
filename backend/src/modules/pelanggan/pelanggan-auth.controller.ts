@@ -64,15 +64,53 @@ export const pelangganAuthController = {
       const token = jwt.sign(
         { userId: user.id, isCustomer: true },
         env.jwt.secret,
-        { expiresIn: env.jwt.expiresIn } as jwt.SignOptions
+        { expiresIn: '15m' } as jwt.SignOptions
+      );
+
+      const refreshToken = jwt.sign(
+        { userId: user.id, isCustomer: true, isRefresh: true },
+        env.jwt.secret,
+        { expiresIn: env.jwt.refreshExpiresIn } as jwt.SignOptions
       );
 
       sendSuccess(res, {
         token,
+        refreshToken,
         user: { id: user.id, name: user.name, phone }
       }, 'Login berhasil');
     } catch (error) {
       next(error);
+    }
+  },
+
+  async refreshToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { refreshToken } = req.body;
+      if (!refreshToken) throw new BadRequestError('Refresh token wajib diisi');
+
+      const decoded = jwt.verify(refreshToken, env.jwt.secret) as { userId: number, isCustomer?: boolean, isRefresh?: boolean };
+      if (!decoded.isRefresh || !decoded.isCustomer) throw new UnauthorizedError('Token tidak valid untuk refresh');
+
+      const user = await db.queryOne<{ id: number }>(
+        'SELECT id FROM pelanggan WHERE id = ?', [decoded.userId]
+      );
+      if (!user) throw new UnauthorizedError('User tidak ditemukan');
+
+      const newToken = jwt.sign(
+        { userId: user.id, isCustomer: true },
+        env.jwt.secret,
+        { expiresIn: '15m' } as jwt.SignOptions
+      );
+
+      const newRefreshToken = jwt.sign(
+        { userId: user.id, isCustomer: true, isRefresh: true },
+        env.jwt.secret,
+        { expiresIn: env.jwt.refreshExpiresIn } as jwt.SignOptions
+      );
+
+      sendSuccess(res, { token: newToken, refreshToken: newRefreshToken }, 'Token berhasil diperbarui');
+    } catch (error) {
+      next(new UnauthorizedError('Refresh token tidak valid atau sudah kedaluwarsa'));
     }
   },
 

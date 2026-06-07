@@ -1,38 +1,33 @@
 import db from '../config/db';
+import { appCache, CACHE_TTL } from './cache';
 
-// In-memory cache map for application settings
-const settingsCache = new Map<string, string>();
+const SETTING_PREFIX = 'setting:';
 
 /**
  * Get setting value from cache, or fallback to database if not in cache.
+ * Uses TTL-backed appCache (30 min TTL) — auto-expires so DB changes are picked up.
  */
 export const getSetting = async (key: string): Promise<string | null> => {
-  if (settingsCache.has(key)) {
-    return settingsCache.get(key) || null;
-  }
+  const cacheKey = SETTING_PREFIX + key;
 
-  const setting = await db.queryOne<{ value: string }>(
-    'SELECT `value` FROM settings WHERE `key` = ?', [key]
-  );
-
-  if (setting) {
-    settingsCache.set(key, setting.value);
-    return setting.value;
-  }
-
-  return null;
+  return appCache.getOrSet(cacheKey, async () => {
+    const setting = await db.queryOne<{ value: string }>(
+      'SELECT `value` FROM settings WHERE `key` = ?', [key]
+    );
+    return setting?.value ?? null;
+  }, CACHE_TTL.VERY_LONG);
 };
 
 /**
  * Invalidate a specific setting key from the cache.
  */
 export const invalidateSetting = (key: string) => {
-  settingsCache.delete(key);
+  appCache.invalidate(SETTING_PREFIX + key);
 };
 
 /**
  * Clear all cached settings.
  */
 export const invalidateAllSettings = () => {
-  settingsCache.clear();
+  appCache.invalidatePrefix(SETTING_PREFIX);
 };

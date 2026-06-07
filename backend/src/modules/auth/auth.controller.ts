@@ -11,6 +11,15 @@ export class AuthController {
     } catch (e) { next(e); }
   }
 
+  async refreshToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { refreshToken } = req.body;
+      if (!refreshToken) return res.status(400).json({ success: false, message: 'Refresh token wajib diisi' });
+      const result = await authService.refreshToken(refreshToken);
+      sendSuccess(res, result, 'Token berhasil diperbarui');
+    } catch (e) { next(e); }
+  }
+
   async me(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const profile = await authService.getProfile(req.user!.id);

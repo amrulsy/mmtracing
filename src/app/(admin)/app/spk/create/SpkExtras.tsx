@@ -77,7 +77,9 @@ export function SparepartPicker({
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     {sp.kode && <span className="uppercase text-muted-foreground mr-1">{sp.kode} ·</span>}
                     {sp.merk && <span className="uppercase">{sp.merk} ·</span>}
-                    Sisa Stok: {sp.stok}
+                    <span className={sp.stok <= 0 ? "text-red-500 font-semibold" : sp.stok < 5 ? "text-amber-500 font-medium" : "text-emerald-500"}>
+                      Sisa Stok: {sp.stok}
+                    </span>
                   </p>
                 </div>
                 <div className="flex items-center gap-2 ml-2 shrink-0">
@@ -89,7 +91,8 @@ export function SparepartPicker({
                     </button>
                   ) : (
                     <button type="button" onClick={() => addSparepart(sp)}
-                      className="w-7 h-7 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary/90 transition-colors">
+                      disabled={sp.stok <= 0}
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${sp.stok <= 0 ? "bg-surface-hover text-muted-foreground cursor-not-allowed" : "bg-primary text-white hover:bg-primary/90"}`}>
                       <Plus size={13} />
                     </button>
                   )}

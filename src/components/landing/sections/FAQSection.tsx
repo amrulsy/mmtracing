@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, HelpCircle } from "lucide-react";
 import AnimatedSection from "../ui/AnimatedSection";
+import type { FAQItem } from "../types";
 
 const FAQ_DATA = [
   {
@@ -25,14 +26,15 @@ const FAQ_DATA = [
     q: "Apa saja metode pembayaran yang diterima?",
     a: "Kami menerima pembayaran tunai, transfer bank (BCA, BRI, Mandiri), dan e-wallet (GoPay, OVO, DANA, ShopeePay).",
   },
-  {
-    q: "Apakah melayani mobil juga?",
-    a: "Ya, kami juga melayani servis dan modifikasi mobil. Silakan konsultasi terlebih dahulu via WhatsApp untuk layanan mobil.",
-  },
 ];
 
-export default function FAQSection() {
+interface FAQSectionProps {
+  faqs?: FAQItem[];
+}
+
+export default function FAQSection({ faqs }: FAQSectionProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const items = faqs?.length ? faqs : FAQ_DATA;
 
   return (
     <section id="faq" className="py-16 lg:py-24">
@@ -44,7 +46,7 @@ export default function FAQSection() {
         </AnimatedSection>
         <AnimatedSection>
           <div className="space-y-3">
-            {FAQ_DATA.map((faq, i) => {
+            {items.map((faq, i) => {
               const isOpen = openIndex === i;
               return (
                 <div key={i} className={`glass-panel overflow-hidden transition-all duration-300 ${isOpen ? "shadow-md border-primary/20" : ""}`}>

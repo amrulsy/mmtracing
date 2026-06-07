@@ -2,6 +2,7 @@ import { appEventEmitter } from '../../shared/eventEmitter';
 import { sseManager } from '../../shared/sse';
 import db from '../../config/db';
 import crypto from 'crypto';
+import logger from '../../config/logger';
 import { 
   notifySpkCreated, 
   notifySpkSelesai, 
@@ -18,9 +19,19 @@ export function initializeEventListeners() {
   });
 
   // SPK Selesai
-  appEventEmitter.on('spk:selesai', (payload: { spkId: number, noSpk: string, status: string, isLunas?: boolean, noInvoice?: string }) => {
+  appEventEmitter.on('spk:selesai', async (payload: { spkId: number, noSpk: string, status: string, isLunas?: boolean, noInvoice?: string }) => {
     sseManager.broadcast('spk:selesai', payload);
     notifySpkSelesai(payload.spkId);
+
+    // Sync booking status to 'selesai' jika ada booking yang terhubung
+    try {
+      await db.execute(
+        "UPDATE bookings SET status = 'selesai', updatedAt = NOW() WHERE spkId = ? AND status != 'selesai'",
+        [payload.spkId]
+      );
+    } catch (err) {
+      logger.error('[Event] Gagal sync booking status:', err);
+    }
 
     if (payload.isLunas && payload.noInvoice) {
       notifyGatePassReleased(payload.spkId, payload.noInvoice);
@@ -71,5 +82,5 @@ export function initializeEventListeners() {
     sseManager.broadcast('notifikasi:new', payload);
   });
   
-  console.log('[Event Listener] Initialized successfully');
+  logger.info('[Event Listener] Initialized successfully');
 }

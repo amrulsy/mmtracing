@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { UnauthorizedError } from '../shared/errors';
 import db from '../config/db';
+import { appCache, CACHE_TTL } from '../shared/cache';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -26,17 +27,19 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, env.jwt.secret) as { userId: number };
 
-    const user = await db.queryOne<{
-      id: number; name: string; username: string; email: string | null;
-      roleId: number; status: string; roleName: string; permissions: any;
-    }>(
-      `SELECT u.id, u.name, u.username, u.email, u.roleId, u.status,
-              r.name AS roleName, r.permissions
-       FROM users u
-       JOIN roles r ON r.id = u.roleId
-       WHERE u.id = ?`,
-      [decoded.userId],
-    );
+    const user = await appCache.getOrSet(`auth_user_${decoded.userId}`, async () => {
+      return await db.queryOne<{
+        id: number; name: string; username: string; email: string | null;
+        roleId: number; status: string; roleName: string; permissions: any;
+      }>(
+        `SELECT u.id, u.name, u.username, u.email, u.roleId, u.status,
+                r.name AS roleName, r.permissions
+         FROM users u
+         JOIN roles r ON r.id = u.roleId
+         WHERE u.id = ?`,
+        [decoded.userId],
+      );
+    }, CACHE_TTL.LONG);
 
     if (!user || user.status !== 'aktif') {
       throw new UnauthorizedError('User tidak aktif atau tidak ditemukan');

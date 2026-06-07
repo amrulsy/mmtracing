@@ -18,7 +18,7 @@ export default function ServicesSection({ services }: ServicesSectionProps) {
       <div className="max-w-7xl mx-auto px-4 lg:px-8">
         <AnimatedSection className="text-center mb-12">
           <span className="text-xs font-bold uppercase tracking-widest text-primary">Layanan Kami</span>
-          <h2 className="text-3xl lg:text-4xl font-black mt-2">Solusi Lengkap untuk Kendaraan Anda</h2>
+          <h2 className="text-3xl lg:text-4xl font-black mt-2">Solusi Lengkap untuk Motor Anda</h2>
           <p className="text-muted-foreground mt-3 max-w-xl mx-auto">Dari perawatan rutin hingga modifikasi presisi tinggi — semua dikerjakan di satu tempat.</p>
         </AnimatedSection>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">

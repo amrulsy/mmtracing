@@ -23,7 +23,8 @@ import {
   HelpCircle,
   ClipboardCheck,
   Shield,
-  Receipt
+  Receipt,
+  Layers
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ const navGroups = [
     items: [
       { name: "Sparepart", href: "/app/master/sparepart", icon: Package },
       { name: "Jasa & Layanan", href: "/app/master/jasa", icon: Hammer },
+      { name: "Paket Servis", href: "/app/master/service-bundles", icon: Layers },
       { name: "Supplier", href: "/app/master/supplier", icon: Truck },
       { name: "Inventaris", href: "/app/inventaris", icon: Boxes },
     ],

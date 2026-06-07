@@ -91,11 +91,19 @@ router.get('/stats', authMiddleware, async (_req: Request, res: Response, next: 
 router.put('/:id', authMiddleware, requireRole('Admin', 'Kasir'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(String(req.params.id));
-    const { status, catatan } = req.body;
+    const { status, catatan, alasanPenolakan } = req.body;
+
+    // Validasi status
+    const validStatuses = ['baru', 'dikonfirmasi', 'selesai', 'dibatalkan', 'ditolak'];
+    if (status && !validStatuses.includes(status)) {
+      res.status(400).json({ success: false, message: 'Status tidak valid' });
+      return;
+    }
 
     const updateData: any = {};
     if (status) updateData.status = status;
     if (catatan !== undefined) updateData.catatan = catatan;
+    if (alasanPenolakan !== undefined && status === 'ditolak') updateData.alasanPenolakan = alasanPenolakan;
 
     // Auto-match pelanggan by WhatsApp saat dikonfirmasi
     if (status === 'dikonfirmasi') {

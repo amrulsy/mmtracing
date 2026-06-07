@@ -1,4 +1,5 @@
 import db from '../config/db';
+import logger from '../config/logger';
 
 type AuditAction = 'create' | 'update' | 'delete' | 'login' | 'logout' | 'stok_masuk' | 'stok_keluar' | 'opname' | string;
 type AuditModule = 'spk' | 'pembayaran' | 'inventaris' | 'sparepart' | 'jasa' | 'pelanggan' | 'mekanik' | 'garansi' | 'auth' | 'booking' | 'settings' | string;
@@ -87,7 +88,7 @@ export async function logActivity(params: {
     });
   } catch (err) {
     // Never let audit logging break the main flow
-    console.error('[AuditHelper] Failed to log activity:', err);
+    logger.error('[AuditHelper] Failed to log activity:', err);
   }
 }
 

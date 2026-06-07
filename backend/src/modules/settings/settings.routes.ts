@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import { invalidateSetting } from '../../shared/settingsCache';
+import { appCache } from '../../shared/cache';
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -50,6 +51,7 @@ router.put('/users/:id', authMiddleware, requireRole('Admin'), async (req: Reque
     if (password) updateData.password = await bcrypt.hash(password, 12);
     const uid = Number(req.params.id);
     await db.update('users', { ...updateData, updatedAt: new Date() }, 'id = ?', [uid]);
+    appCache.invalidate(`auth_user_${uid}`);
     const data = await db.queryOne('SELECT id, name, username, email, roleId, status FROM users WHERE id = ?', [uid]);
     sendSuccess(res, data, 'User berhasil diperbarui');
   } catch (e) { next(e); }
@@ -71,6 +73,7 @@ router.delete('/users/:id', authMiddleware, requireRole('Admin'), async (req: Au
       }
     }
     await db.execute('DELETE FROM users WHERE id = ?', [targetId]);
+    appCache.invalidate(`auth_user_${targetId}`);
     sendSuccess(res, null, 'User berhasil dihapus');
   } catch (e) { next(e); }
 });

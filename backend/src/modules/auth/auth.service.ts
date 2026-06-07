@@ -35,12 +35,19 @@ export class AuthService {
       targetName: user.name,
     });
 
+    // Access token — short-lived, signed with primary secret
     const token = jwt.sign({ userId: user.id }, env.jwt.secret, {
       expiresIn: env.jwt.expiresIn,
     } as jwt.SignOptions);
 
+    // Refresh token — long-lived, signed with SEPARATE secret
+    const refreshToken = jwt.sign({ userId: user.id, isRefresh: true }, env.jwt.refreshSecret, {
+      expiresIn: env.jwt.refreshExpiresIn,
+    } as jwt.SignOptions);
+
     return {
       token,
+      refreshToken,
       user: {
         id: user.id,
         name: user.name,
@@ -50,6 +57,35 @@ export class AuthService {
         avatar: user.avatar,
       },
     };
+  }
+
+  async refreshToken(token: string) {
+    try {
+      // Verify with REFRESH secret (separate from access token secret)
+      const decoded = jwt.verify(token, env.jwt.refreshSecret) as { userId: number, isRefresh?: boolean };
+      if (!decoded.isRefresh) throw new UnauthorizedError('Token tidak valid untuk refresh');
+
+      const user = await db.queryOne<{ id: number; status: string }>(
+        'SELECT id, status FROM users WHERE id = ?', [decoded.userId]
+      );
+      if (!user) throw new UnauthorizedError('User tidak ditemukan');
+      if (user.status !== 'aktif') throw new UnauthorizedError('Akun tidak aktif');
+
+      // Issue new access token (primary secret)
+      const newToken = jwt.sign({ userId: user.id }, env.jwt.secret, {
+        expiresIn: env.jwt.expiresIn,
+      } as jwt.SignOptions);
+
+      // Issue new refresh token (refresh secret) — token rotation
+      const newRefreshToken = jwt.sign({ userId: user.id, isRefresh: true }, env.jwt.refreshSecret, {
+        expiresIn: env.jwt.refreshExpiresIn,
+      } as jwt.SignOptions);
+
+      return { token: newToken, refreshToken: newRefreshToken };
+    } catch (e) {
+      if (e instanceof UnauthorizedError) throw e;
+      throw new UnauthorizedError('Refresh token tidak valid atau sudah kedaluwarsa');
+    }
   }
 
   async getProfile(userId: number) {

@@ -2,7 +2,9 @@ import db, { Queryable } from '../../config/db';
 import { NotFoundError, BadRequestError } from '../../shared/errors';
 import { sseManager } from '../../shared/sse';
 import { generateSpkNo, generateInvoiceNo } from '../../shared/utils';
+import { randomUUID, randomInt } from 'crypto';
 import { releaseGatePass } from '../../shared/gate-pass';
+import { appEventEmitter } from '../../shared/eventEmitter';
 import { getSetting } from '../../shared/settingsCache';
 import { CreateSpkInput, UpdateSpkStatusInput, AddSpkItemInput, UpdateSpkItemInput, AddSpkStageInput } from './spk.schema';
 
@@ -161,11 +163,13 @@ export class SpkService {
         }
       }
 
+      const now = new Date();
       const spkId = await tx.insert('spk', {
         noSpk, pelangganId: input.pelangganId, kendaraanId: input.kendaraanId || null,
         mekanikId: input.mekanikId || null, createdById: userId, mode: input.mode,
         keluhan: input.keluhan, judulProyek: input.judulProyek, spesifikasi: input.spesifikasi,
         totalHarga, minimumDp, diskon, estimasiSelesai, prioritas: input.prioritas || 'normal', catatan: input.catatan,
+        createdAt: now, updatedAt: now,
       });
 
       for (const it of itemsToCreate) {
@@ -189,9 +193,13 @@ export class SpkService {
 
       const jatuhTempo = new Date();
       jatuhTempo.setDate(jatuhTempo.getDate() + 30);
+      
+      const pin = String(randomInt(0, 1000000)).padStart(6, '0');
+      
       await tx.insert('pembayaran', {
         noInvoice: generateInvoiceNo(), spkId, totalTagihan: Math.max(0, totalHarga - diskon),
         sisaBayar: Math.max(0, totalHarga - diskon), jatuhTempo,
+        createdAt: now, updatedAt: now, publicId: randomUUID(), accessPin: pin,
       });
 
       await tx.insert('activity_logs', {
@@ -199,10 +207,12 @@ export class SpkService {
         detail: JSON.stringify({ mode: input.mode, totalHarga, pelangganId: input.pelangganId }),
       });
 
-      return spkId;
+      return { spkId, noSpk };
     });
 
-    return this.findById(spk);
+    appEventEmitter.emit('spk:created', { spkId: spk.spkId, noSpk: spk.noSpk });
+
+    return this.findById(spk.spkId);
   }
 
   async updateStatus(id: number, input: UpdateSpkStatusInput, userId?: number) {
@@ -343,11 +353,18 @@ export class SpkService {
       });
     });
 
-    // Broadcast SSE event
-    const eventType = input.status === 'selesai' ? 'spk:selesai' 
-      : input.status === 'kendala' ? 'spk:kendala' 
-      : 'spk:updated';
-    sseManager.broadcast(eventType as any, { spkId: id, noSpk: spk.noSpk, status: input.status });
+    // Gunakan appEventEmitter agar dilanjutkan ke WA dan SSE melalui listener
+    if (input.status === 'selesai') {
+      const pembayaran = await db.queryOne<{status: string, noInvoice: string}>('SELECT status, noInvoice FROM pembayaran WHERE spkId = ? LIMIT 1', [id]);
+      const lunas = pembayaran?.status === 'lunas';
+      appEventEmitter.emit('spk:selesai', { spkId: id, noSpk: spk.noSpk, status: input.status, isLunas: lunas, noInvoice: pembayaran?.noInvoice });
+    } else if (input.status === 'kendala') {
+      appEventEmitter.emit('spk:kendala', { spkId: id, noSpk: spk.noSpk, status: input.status });
+    } else if (input.status === 'dibatalkan') {
+      appEventEmitter.emit('spk:dibatalkan', { spkId: id, noSpk: spk.noSpk, status: input.status });
+    } else {
+      appEventEmitter.emit('spk:updated', { spkId: id, noSpk: spk.noSpk, status: input.status });
+    }
 
     // Return data terbaru
     return this.findById(id);
@@ -367,6 +384,8 @@ export class SpkService {
         targetId: id, targetName: spk.noSpk, detail: JSON.stringify({ progress }),
       });
     });
+
+    appEventEmitter.emit('spk:progress', { spkId: id, progress });
 
     return this.findById(id);
   }
@@ -440,7 +459,7 @@ export class SpkService {
   // ============================================================
 
   /** Hitung ulang totalHarga dan minimumDp SPK dari semua items atau stages */
-  private async recalcTotalHarga(tx: Queryable, spkId: number): Promise<number> {
+  public async recalcTotalHarga(tx: Queryable, spkId: number): Promise<number> {
     const [itemsRow, stagesRow, spkData] = await Promise.all([
       tx.queryOne<{ t: number }>('SELECT COALESCE(SUM(subtotal),0) AS t FROM spk_items WHERE spkId = ?', [spkId]),
       tx.queryOne<{ t: number }>('SELECT COALESCE(SUM(estimasiBiaya),0) AS t FROM spk_stages WHERE spkId = ?', [spkId]),
@@ -468,7 +487,7 @@ export class SpkService {
   }
 
   /** Hitung ulang progress SPK otomatis dari status checklist */
-  private async recalcProgress(tx: Queryable, spkId: number): Promise<number> {
+  public async recalcProgress(tx: Queryable, spkId: number): Promise<number> {
     const spkData = await tx.queryOne<any>('SELECT progress, status FROM spk WHERE id = ?', [spkId]);
     if (!spkData) return 0;
 
@@ -490,208 +509,6 @@ export class SpkService {
       await tx.update('spk', { progress }, 'id = ?', [spkId]);
     }
     return progress;
-  }
-
-  async addItem(spkId: number, input: AddSpkItemInput, userId?: number) {
-    const spk = await db.queryOne<any>('SELECT id, noSpk, status FROM spk WHERE id = ?', [spkId]);
-    if (!spk) throw new NotFoundError('SPK');
-    if (spk.status === 'selesai' || spk.status === 'dibatalkan') {
-      throw new BadRequestError(`Tidak bisa menambah item pada SPK yang sudah ${spk.status}`);
-    }
-
-    const subtotal = input.hargaSatuan * input.qty;
-
-    await db.transaction(async (tx) => {
-      let hpp = 0;
-      if (input.type === 'jasa' && input.jasaId) {
-        const j = await tx.queryOne<any>('SELECT hargaModal FROM jasa WHERE id = ?', [input.jasaId]);
-        hpp = Number(j?.hargaModal || 0);
-      }
-      if (input.type === 'sparepart' && input.sparepartId) {
-        const sp = await tx.queryOne<any>('SELECT name, stok, hargaBeli FROM sparepart WHERE id = ? FOR UPDATE', [input.sparepartId]);
-        if (!sp) throw new BadRequestError('Sparepart tidak ditemukan');
-        if (sp.stok < input.qty) {
-          throw new BadRequestError(`Stok "${sp.name}" tidak mencukupi (tersisa ${sp.stok}, butuh ${input.qty})`);
-        }
-        hpp = Number(sp.hargaBeli) || 0;
-        const r = await tx.execute('UPDATE sparepart SET stok = stok - ? WHERE id = ? AND stok >= ?', [input.qty, input.sparepartId, input.qty]);
-        if (r.affectedRows === 0) {
-          throw new BadRequestError(`Stok "${sp.name}" tidak mencukupi saat proses simultan`);
-        }
-        await tx.insert('inventaris_log', {
-          sparepartId: input.sparepartId, type: 'keluar', qty: input.qty,
-          keterangan: `Tambah item SPK ${spk.noSpk}`,
-        });
-      }
-
-      let existingItem: any = null;
-      if (input.type === 'sparepart' && input.sparepartId) {
-        existingItem = await tx.queryOne("SELECT * FROM spk_items WHERE spkId = ? AND type = 'sparepart' AND sparepartId = ? LIMIT 1", [spkId, input.sparepartId]);
-      } else if (input.type === 'jasa' && input.jasaId) {
-        existingItem = await tx.queryOne("SELECT * FROM spk_items WHERE spkId = ? AND type = 'jasa' AND jasaId = ? LIMIT 1", [spkId, input.jasaId]);
-      }
-
-      if (existingItem) {
-        const newQty = existingItem.qty + input.qty;
-        const newHargaSatuan = existingItem.hargaSatuan;
-        const newSubtotal = newQty * Number(newHargaSatuan);
-        const oldHpp = Number(existingItem.hargaModal) * existingItem.qty;
-        const newHppContrib = hpp * input.qty;
-        const weightedHpp = newQty > 0 ? Math.round((oldHpp + newHppContrib) / newQty) : 0;
-        await tx.update('spk_items', { qty: newQty, subtotal: newSubtotal, hargaModal: weightedHpp }, 'id = ?', [existingItem.id]);
-      } else {
-        await tx.insert('spk_items', {
-          spkId, type: input.type,
-          sparepartId: input.type === 'sparepart' ? (input.sparepartId ?? null) : null,
-          jasaId: input.type === 'jasa' ? (input.jasaId ?? null) : null,
-          nama: input.nama, qty: input.qty, hargaModal: hpp, hargaSatuan: input.hargaSatuan, subtotal,
-        });
-      }
-
-      await this.recalcTotalHarga(tx, spkId);
-
-      await tx.insert('activity_logs', {
-        userId: userId ?? null, action: 'add_item', module: 'spk',
-        targetId: spkId, targetName: spk.noSpk,
-        detail: JSON.stringify({ nama: input.nama, qty: input.qty, type: input.type, subtotal }),
-      });
-    });
-
-    return this.findById(spkId);
-  }
-
-  async removeItem(spkId: number, itemId: number, userId?: number) {
-    const spk = await db.queryOne<any>('SELECT id, noSpk, status FROM spk WHERE id = ?', [spkId]);
-    if (!spk) throw new NotFoundError('SPK');
-    if (spk.status === 'selesai' || spk.status === 'dibatalkan') {
-      throw new BadRequestError(`Tidak bisa menghapus item pada SPK yang sudah ${spk.status}`);
-    }
-
-    const item = await db.queryOne<any>('SELECT * FROM spk_items WHERE id = ? AND spkId = ?', [itemId, spkId]);
-    if (!item) throw new NotFoundError('Item SPK');
-
-    await db.transaction(async (tx) => {
-      if (item.type === 'sparepart' && item.sparepartId) {
-        const sp = await tx.queryOne('SELECT id FROM sparepart WHERE id = ?', [item.sparepartId]);
-        if (sp) {
-          await tx.execute('UPDATE sparepart SET stok = stok + ? WHERE id = ?', [item.qty, item.sparepartId]);
-          await tx.insert('inventaris_log', {
-            sparepartId: item.sparepartId, type: 'masuk', qty: item.qty,
-            keterangan: `Item dihapus dari SPK ${spk.noSpk}`,
-          });
-        }
-      }
-
-      await tx.execute('DELETE FROM spk_items WHERE id = ?', [itemId]);
-      await this.recalcTotalHarga(tx, spkId);
-
-      await tx.insert('activity_logs', {
-        userId: userId ?? null, action: 'remove_item', module: 'spk',
-        targetId: spkId, targetName: spk.noSpk,
-        detail: JSON.stringify({ nama: item.nama, qty: item.qty }),
-      });
-    });
-
-    return this.findById(spkId);
-  }
-
-  async updateItem(spkId: number, itemId: number, input: UpdateSpkItemInput, userId?: number) {
-    const spk = await db.queryOne<any>('SELECT id, noSpk, status FROM spk WHERE id = ?', [spkId]);
-    if (!spk) throw new NotFoundError('SPK');
-    if (spk.status === 'selesai' || spk.status === 'dibatalkan') {
-      throw new BadRequestError(`Tidak bisa mengubah item pada SPK yang sudah ${spk.status}`);
-    }
-
-    const item = await db.queryOne<any>('SELECT * FROM spk_items WHERE id = ? AND spkId = ?', [itemId, spkId]);
-    if (!item) throw new NotFoundError('Item SPK');
-
-    await db.transaction(async (tx) => {
-      const newQty = input.qty ?? item.qty;
-      const newHarga = input.hargaSatuan ?? Number(item.hargaSatuan);
-      const qtyDelta = newQty - item.qty;
-
-      if (item.type === 'sparepart' && item.sparepartId && qtyDelta !== 0) {
-        if (qtyDelta > 0) {
-          const sp = await tx.queryOne<any>('SELECT name, stok FROM sparepart WHERE id = ? FOR UPDATE', [item.sparepartId]);
-          if (!sp || sp.stok < qtyDelta) {
-            throw new BadRequestError(`Stok "${sp?.name}" tidak mencukupi (tersisa ${sp?.stok ?? 0}, butuh tambahan ${qtyDelta})`);
-          }
-          const r = await tx.execute('UPDATE sparepart SET stok = stok - ? WHERE id = ? AND stok >= ?', [qtyDelta, item.sparepartId, qtyDelta]);
-          if (r.affectedRows === 0) {
-            throw new BadRequestError(`Stok "${sp.name}" tidak mencukupi saat proses simultan`);
-          }
-          await tx.insert('inventaris_log', { sparepartId: item.sparepartId, type: 'keluar', qty: qtyDelta, keterangan: `Edit item SPK ${spk.noSpk}` });
-        } else {
-          await tx.execute('UPDATE sparepart SET stok = stok + ? WHERE id = ?', [Math.abs(qtyDelta), item.sparepartId]);
-          await tx.insert('inventaris_log', { sparepartId: item.sparepartId, type: 'masuk', qty: Math.abs(qtyDelta), keterangan: `Edit item SPK ${spk.noSpk}` });
-        }
-      }
-
-      await tx.update('spk_items', { qty: newQty, hargaSatuan: newHarga, subtotal: newQty * newHarga, status: input.status ?? item.status }, 'id = ?', [itemId]);
-
-      await this.recalcTotalHarga(tx, spkId);
-      if (input.status) await this.recalcProgress(tx, spkId);
-
-      await tx.insert('activity_logs', {
-        userId: userId ?? null, action: 'update_item', module: 'spk',
-        targetId: spkId, targetName: spk.noSpk,
-        detail: JSON.stringify({ nama: item.nama, oldQty: item.qty, newQty }),
-      });
-    });
-
-    return this.findById(spkId);
-  }
-
-  async updateStage(spkId: number, stageId: number, input: { status?: 'pending' | 'in_progress' | 'done' }, userId?: number) {
-    const spk = await db.queryOne<any>('SELECT id, noSpk, status FROM spk WHERE id = ?', [spkId]);
-    if (!spk) throw new NotFoundError('SPK');
-    if (spk.status === 'selesai' || spk.status === 'dibatalkan') {
-      throw new BadRequestError(`Tidak bisa mengubah tahapan pada SPK yang sudah ${spk.status}`);
-    }
-
-    const stage = await db.queryOne<any>('SELECT * FROM spk_stages WHERE id = ? AND spkId = ?', [stageId, spkId]);
-    if (!stage) throw new NotFoundError('Tahapan SPK');
-
-    await db.transaction(async (tx) => {
-      await tx.update('spk_stages', { status: input.status ?? stage.status }, 'id = ?', [stageId]);
-      await this.recalcProgress(tx, spkId);
-
-      await tx.insert('activity_logs', {
-        userId: userId ?? null, action: 'update_stage', module: 'spk',
-        targetId: spkId, targetName: spk.noSpk,
-        detail: JSON.stringify({ nama: stage.nama, newStatus: input.status }),
-      });
-    });
-
-    return this.findById(spkId);
-  }
-
-  async addStage(spkId: number, input: AddSpkStageInput, userId?: number) {
-    const spk = await db.queryOne<any>('SELECT id, noSpk, status FROM spk WHERE id = ?', [spkId]);
-    if (!spk) throw new NotFoundError('SPK');
-    if (spk.status === 'selesai' || spk.status === 'dibatalkan') {
-      throw new BadRequestError(`Tidak bisa menambah tahapan pada SPK yang sudah ${spk.status}`);
-    }
-
-    await db.transaction(async (tx) => {
-      const lastStage = await tx.queryOne<any>('SELECT urutan FROM spk_stages WHERE spkId = ? ORDER BY urutan DESC LIMIT 1', [spkId]);
-      const nextUrutan = (lastStage?.urutan ?? 0) + 1;
-
-      await tx.insert('spk_stages', {
-        spkId, urutan: nextUrutan, nama: input.nama,
-        estimasiBiaya: input.estimasiBiaya, durasiHari: input.durasiHari, status: 'pending',
-      });
-
-      await this.recalcTotalHarga(tx, spkId);
-
-      await tx.insert('activity_logs', {
-        userId: userId ?? null, action: 'add_stage', module: 'spk',
-        targetId: spkId, targetName: spk.noSpk,
-        detail: JSON.stringify({ nama: input.nama, urutan: nextUrutan, estimasiBiaya: input.estimasiBiaya }),
-      });
-    });
-
-    return this.findById(spkId);
   }
 
   // ── Tambah foto/gambar SPK (referensi/progress/lampiran) ──────

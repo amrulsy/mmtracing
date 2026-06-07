@@ -24,6 +24,7 @@ interface Booking {
   keluhan: string | null;
   status: string;
   catatan: string | null;
+  alasanPenolakan: string | null;
   sumber: string;
   pelangganId: number | null;
   spkId: number | null;
@@ -46,6 +47,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
   dikonfirmasi: { label: "Dikonfirmasi", color: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30", icon: Check },
   selesai: { label: "Selesai", color: "bg-neutral-500/15 text-neutral-500 border-neutral-500/30", icon: CheckCircle2 },
   dibatalkan: { label: "Dibatalkan", color: "bg-red-500/15 text-red-500 border-red-500/30", icon: XCircle },
+  ditolak: { label: "Ditolak", color: "bg-orange-500/15 text-orange-500 border-orange-500/30", icon: XCircle },
 };
 
 export default function BookingPage() {
@@ -72,6 +74,10 @@ export default function BookingPage() {
 
   // Converting
   const [convertingId, setConvertingId] = useState<number | null>(null);
+
+  // Rejecting
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const fetchData = useCallback(async () => {
     try {
@@ -151,6 +157,25 @@ export default function BookingPage() {
       if (selectedBooking?.id === id) setSelectedBooking(null);
     } catch {
       toast.error("Gagal menghapus booking");
+    }
+  };
+
+  const rejectBooking = async (id: number) => {
+    if (!rejectReason.trim()) {
+      toast.error("Alasan penolakan wajib diisi");
+      return;
+    }
+    try {
+      await api.put(`/booking/${id}`, { status: "ditolak", alasanPenolakan: rejectReason });
+      toast.success("Booking ditolak");
+      setRejectingId(null);
+      setRejectReason("");
+      fetchData();
+      if (selectedBooking?.id === id) {
+        setSelectedBooking(prev => prev ? { ...prev, status: "ditolak", alasanPenolakan: rejectReason } : null);
+      }
+    } catch {
+      toast.error("Gagal menolak booking");
     }
   };
 
@@ -240,7 +265,7 @@ export default function BookingPage() {
 
         {/* Status Filter Tabs */}
         <div className="flex gap-1 overflow-x-auto pb-1">
-          {["semua", "baru", "dikonfirmasi", "selesai", "dibatalkan"].map(f => (
+          {["semua", "baru", "dikonfirmasi", "selesai", "dibatalkan", "ditolak"].map(f => (
             <button key={f} onClick={() => { setFilter(f); setPage(1); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors capitalize relative ${filter === f ? "bg-primary text-white" : "bg-surface-hover text-muted-foreground hover:text-foreground"}`}>
               {f === "semua" ? "Semua" : STATUS_CONFIG[f]?.label || f}
@@ -392,6 +417,14 @@ export default function BookingPage() {
                 </div>
               )}
 
+              {/* Alasan Penolakan */}
+              {selectedBooking.alasanPenolakan && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] text-orange-500 font-medium">Alasan Penolakan</p>
+                  <p className="text-sm bg-orange-500/10 text-orange-700 p-3 rounded-xl border border-orange-500/20">{selectedBooking.alasanPenolakan}</p>
+                </div>
+              )}
+
               {/* Admin Catatan */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -431,12 +464,40 @@ export default function BookingPage() {
                 </button>
               )}
 
+              {/* Reject input */}
+              {rejectingId === selectedBooking.id && (
+                <div className="space-y-2 animate-in fade-in">
+                  <textarea
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    rows={2}
+                    className="w-full bg-surface border border-orange-500/30 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                    placeholder="Alasan penolakan..."
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => rejectBooking(selectedBooking.id)}
+                      className="flex-1 px-3 py-2 text-xs bg-orange-500 text-white rounded-lg font-medium flex items-center justify-center gap-1"
+                    >
+                      <XCircle size={12} /> Tolak Booking
+                    </button>
+                    <button
+                      onClick={() => { setRejectingId(null); setRejectReason(""); }}
+                      className="px-3 py-2 text-xs border border-surface-border rounded-lg text-muted-foreground hover:text-foreground"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <a href={`https://wa.me/${selectedBooking.whatsapp.replace(/^0/, "62")}`} target="_blank"
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
                   <MessageCircle size={14} /> WhatsApp
                 </a>
-                {selectedBooking.status === "baru" && (
+                {selectedBooking.status === "baru" && rejectingId !== selectedBooking.id && (
                   <button onClick={() => { updateStatus(selectedBooking.id, "dikonfirmasi"); setSelectedBooking(prev => prev ? { ...prev, status: "dikonfirmasi" } : null); }}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium border border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10 transition-colors">
                     <Check size={14} /> Konfirmasi
@@ -446,6 +507,15 @@ export default function BookingPage() {
                   <button onClick={() => { updateStatus(selectedBooking.id, "selesai"); setSelectedBooking(prev => prev ? { ...prev, status: "selesai" } : null); }}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium border border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-colors">
                     <CheckCircle2 size={14} /> Selesai
+                  </button>
+                )}
+                {(selectedBooking.status === "baru" || selectedBooking.status === "dikonfirmasi") && rejectingId !== selectedBooking.id && (
+                  <button
+                    onClick={() => setRejectingId(selectedBooking.id)}
+                    className="p-2 rounded-xl border border-orange-500/30 text-orange-500 hover:bg-orange-500/10 transition-colors"
+                    title="Tolak Booking"
+                  >
+                    <XCircle size={16} />
                   </button>
                 )}
                 <button onClick={() => deleteBooking(selectedBooking.id)}

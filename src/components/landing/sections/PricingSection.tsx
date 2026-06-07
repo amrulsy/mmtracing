@@ -6,13 +6,12 @@ import type { LandingData } from "../types";
 
 interface PricingSectionProps {
   pricingMotor: LandingData["landing_pricing_motor"];
-  pricingMobil: LandingData["landing_pricing_mobil"];
   pricingBubut: LandingData["landing_pricing_bubut"];
 }
 
-export default function PricingSection({ pricingMotor, pricingMobil, pricingBubut }: PricingSectionProps) {
+export default function PricingSection({ pricingMotor, pricingBubut }: PricingSectionProps) {
   const [activeTab, setActiveTab] = useState(0);
-  const tabs = [pricingMotor, pricingMobil, pricingBubut];
+  const tabs = [pricingMotor, pricingBubut];
 
   return (
     <section id="harga" className="py-16 lg:py-24">
@@ -24,7 +23,7 @@ export default function PricingSection({ pricingMotor, pricingMobil, pricingBubu
         </AnimatedSection>
         <AnimatedSection>
           <div className="flex justify-center gap-1 mb-8 bg-surface-hover rounded-xl border border-surface-border p-1 max-w-md mx-auto">
-            {["Motor", "Mobil", "Bubut"].map((t, i) => (
+            {["Motor", "Bubut"].map((t, i) => (
               <button key={i} onClick={() => setActiveTab(i)} className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === i ? "bg-primary text-white shadow-glossy-primary" : "text-muted-foreground hover:bg-surface"}`}>
                 {t}
               </button>

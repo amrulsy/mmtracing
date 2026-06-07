@@ -1,3 +1,4 @@
+import logger from '../../config/logger';
 import path from 'path';
 import fs from 'fs';
 
@@ -16,7 +17,7 @@ async function loadBaileys() {
     return baileysModule;
   } catch (err) {
     baileysLoadError = err as Error;
-    console.error('[WhatsApp] Failed to load Baileys (ESM module):', (err as Error).message);
+    logger.error('[WhatsApp] Failed to load Baileys (ESM module):', (err as Error).message);
     throw baileysLoadError;
   }
 }
@@ -42,6 +43,10 @@ export class WhatsappService {
       const baileys = await loadBaileys();
       const pino = (await import('pino')).default;
       
+      if (!fs.existsSync(authDir)) {
+        fs.mkdirSync(authDir, { recursive: true });
+      }
+
       const { state, saveCreds } = await baileys.useMultiFileAuthState(authDir);
       const { version } = await baileys.fetchLatestBaileysVersion();
 
@@ -56,7 +61,17 @@ export class WhatsappService {
         browser: ['MMT Racing Gateway', 'Chrome', '10.0.0']
       });
 
-      this.sock.ev.on('creds.update', saveCreds);
+      this.sock.ev.on('creds.update', async () => {
+        try {
+          // Ensure directory exists before saving, just in case it was deleted
+          if (!fs.existsSync(authDir)) {
+            fs.mkdirSync(authDir, { recursive: true });
+          }
+          await saveCreds();
+        } catch (err: any) {
+          logger.error('[WhatsApp] Failed to save creds:', err.message);
+        }
+      });
 
       this.sock.ev.on('connection.update', (update: any) => {
         const { connection, lastDisconnect, qr } = update;
@@ -78,8 +93,11 @@ export class WhatsappService {
           if (!shouldReconnect) {
             if (fs.existsSync(authDir)) fs.rmSync(authDir, { recursive: true, force: true });
             this.sock = null;
+            this.initialized = false;
+            this.init();
           } else {
             // Reconnect
+            this.initialized = false;
             setTimeout(() => this.init(), 2000);
           }
         } else if (connection === 'open') {
@@ -88,7 +106,7 @@ export class WhatsappService {
         }
       });
     } catch (error) {
-      console.error('[WhatsApp] Init failed:', (error as Error).message);
+      logger.error('[WhatsApp] Init failed:', (error as Error).message);
       this.status = 'disconnected';
     }
   }
@@ -108,6 +126,7 @@ export class WhatsappService {
     
     this.status = 'disconnected';
     this.qrCode = null;
+    this.initialized = false;
     this.init(); 
   }
 

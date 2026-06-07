@@ -11,6 +11,7 @@ export interface LandingData {
   landing_contact: ContactData;
   landing_footer: FooterData;
   landing_gallery: GalleryItem[];
+  landing_faq?: FAQItem[];
   BENGKEL_LOGO?: string;
 }
 
@@ -56,6 +57,11 @@ export interface TestimonialItem {
   role: string;
   text: string;
   rating: number;
+}
+
+export interface FAQItem {
+  q: string;
+  a: string;
 }
 
 export interface QueueData {

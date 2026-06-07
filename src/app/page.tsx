@@ -17,7 +17,7 @@ async function fetchQueueData(): Promise<QueueData | null> {
   try {
     const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:5000";
     const res = await fetch(`${backendUrl}/api/v1/landing/queue`, {
-      next: { revalidate: 15 },
+      next: { revalidate: 30 },
     });
     const json = await res.json();
     if (json.success) return json.data;
@@ -113,14 +113,6 @@ function FAQJsonLd() {
         acceptedAnswer: {
           "@type": "Answer",
           text: "Kami menerima pembayaran tunai, transfer bank (BCA, BRI, Mandiri), dan e-wallet (GoPay, OVO, DANA, ShopeePay).",
-        },
-      },
-      {
-        "@type": "Question",
-        name: "Apakah melayani mobil juga?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Ya, kami juga melayani servis dan modifikasi mobil. Silakan konsultasi terlebih dahulu via WhatsApp untuk layanan mobil.",
         },
       },
     ],

@@ -25,7 +25,7 @@ export default function USPSection({ usps }: USPSectionProps) {
       <div className="max-w-7xl mx-auto px-4 lg:px-8">
         <AnimatedSection className="text-center mb-12">
           <span className="text-xs font-bold uppercase tracking-widest text-primary">Kenapa MMT Racing?</span>
-          <h2 className="text-3xl lg:text-4xl font-black mt-2">Pilihan Tepat untuk Kendaraan Anda</h2>
+          <h2 className="text-3xl lg:text-4xl font-black mt-2">Pilihan Tepat untuk Motor Anda</h2>
         </AnimatedSection>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {usps.map((usp, i) => {

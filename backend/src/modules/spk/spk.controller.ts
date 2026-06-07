@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { spkService } from './spk.service';
+import { spkItemsService } from './spk-items.service';
+import { spkStagesService } from './spk-stages.service';
 import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils';
 import { AuthRequest } from '../../middleware/auth';
 
@@ -61,14 +63,14 @@ export class SpkController {
   // ── Item Management ──────────────────────────────────────────
   async addItem(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const data = await spkService.addItem(Number(req.params.id), req.body, req.user?.id);
+      const data = await spkItemsService.addItem(Number(req.params.id), req.body, req.user?.id);
       sendSuccess(res, data, 'Item berhasil ditambahkan');
     } catch (e) { next(e); }
   }
 
   async removeItem(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const data = await spkService.removeItem(
+      const data = await spkItemsService.removeItem(
         Number(req.params.id),
         Number(req.params.itemId),
         req.user?.id
@@ -79,7 +81,7 @@ export class SpkController {
 
   async updateItem(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const data = await spkService.updateItem(
+      const data = await spkItemsService.updateItem(
         Number(req.params.id),
         Number(req.params.itemId),
         req.body,
@@ -91,7 +93,7 @@ export class SpkController {
 
   async updateStage(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const data = await spkService.updateStage(
+      const data = await spkStagesService.updateStage(
         Number(req.params.id),
         Number(req.params.stageId),
         req.body,
@@ -103,7 +105,7 @@ export class SpkController {
 
   async addStage(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const data = await spkService.addStage(Number(req.params.id), req.body, req.user?.id);
+      const data = await spkStagesService.addStage(Number(req.params.id), req.body, req.user?.id);
       sendSuccess(res, data, 'Tahapan berhasil ditambahkan');
     } catch (e) { next(e); }
   }

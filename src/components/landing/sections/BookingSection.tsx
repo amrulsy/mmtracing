@@ -4,7 +4,7 @@ import { useState, type FormEvent, useEffect } from "react";
 import { 
   Calendar, ArrowRight, Check, Loader2, AlertCircle, 
   CheckCircle2, Wrench, Settings, Hammer, Zap, 
-  MessageCircle, Copy, CarFront
+  MessageCircle, Copy, Bike
 } from "lucide-react";
 import AnimatedSection from "../ui/AnimatedSection";
 import type { ContactData, BookingFormData } from "../types";
@@ -20,7 +20,7 @@ const LAYANAN_OPTIONS = [
   { id: "Express Service", icon: Zap, desc: "Layanan prioritas tanpa antri lama", est: "< 30 Menit" },
 ];
 
-const JENIS_KENDARAAN = ["Motor Matic", "Motor Sport", "Motor Bebek", "Mobil", "Tanpa Kendaraan (Bawa Part)"];
+const JENIS_KENDARAAN = ["Motor Matic", "Motor Sport", "Motor Bebek", "Tanpa Kendaraan (Bawa Part)"];
 
 export default function BookingSection({ contact }: BookingSectionProps) {
   const [bookingForm, setBookingForm] = useState<BookingFormData>({
@@ -46,9 +46,16 @@ export default function BookingSection({ contact }: BookingSectionProps) {
     else setWaError("");
   };
 
+  const isSunday = (date: string) => {
+    if (!date) return false;
+    return new Date(`${date}T00:00:00`).getDay() === 0;
+  };
+
+  const isDateClosed = /minggu|sunday/i.test(contact.hoursClosed || "") && isSunday(bookingForm.tanggal);
+
   const isWaValid = /^(08|628)[0-9]{8,12}$/.test(bookingForm.whatsapp.replace(/[^0-9]/g, ""));
   const canGoStep2 = bookingForm.nama.trim().length >= 2 && isWaValid && bookingForm.jenisKendaraan;
-  const canGoStep3 = canGoStep2 && bookingForm.layanan;
+  const canGoStep3 = canGoStep2 && bookingForm.layanan && !isDateClosed;
 
   const isTanpaKendaraan = bookingForm.jenisKendaraan === "Tanpa Kendaraan (Bawa Part)";
 
@@ -272,7 +279,8 @@ export default function BookingSection({ contact }: BookingSectionProps) {
                     <div className="grid sm:grid-cols-2 gap-5">
                       <div>
                         <label className={labelCls}>Tanggal Kedatangan</label>
-                        <input type="date" min={todayStr} value={f.tanggal} onChange={(e) => setF({ tanggal: e.target.value })} className={inputCls} />
+                        <input type="date" min={todayStr} value={f.tanggal} onChange={(e) => setF({ tanggal: e.target.value })} className={`${inputCls} ${isDateClosed ? "ring-2 ring-red-500/50 border-red-500/50" : ""}`} />
+                        {isDateClosed && <p className="text-[10px] text-red-500 mt-1.5">Booking hari Minggu belum tersedia. Silakan pilih hari lain.</p>}
                       </div>
                       <div>
                         <label className={labelCls}>Jam Kedatangan (Opsional)</label>
@@ -304,7 +312,7 @@ export default function BookingSection({ contact }: BookingSectionProps) {
                   <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                     <div className="bg-surface-hover/30 rounded-2xl p-5 lg:p-6 border border-surface-border space-y-6 relative overflow-hidden">
                       {/* Watermark icon */}
-                      <CarFront className="absolute -right-4 -bottom-4 text-surface-border/50 w-32 h-32 rotate-[-15deg] pointer-events-none" />
+                      <Bike className="absolute -right-4 -bottom-4 text-surface-border/50 w-32 h-32 rotate-[-15deg] pointer-events-none" />
                       
                       <div>
                         <h4 className="text-sm font-bold text-primary flex items-center gap-2 mb-4 uppercase tracking-wider">

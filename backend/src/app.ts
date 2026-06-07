@@ -1,3 +1,4 @@
+import logger from './config/logger';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -38,8 +39,9 @@ import searchRoutes from './modules/search/search.routes';
 import landingRoutes from './modules/landing/landing.routes';
 import bookingRoutes from './modules/booking/booking.routes';
 import uploadRoutes from './modules/upload/upload.routes';
+import bundleRoutes from './modules/service-bundles/bundle.routes';
+import { serverAdapter } from './modules/whatsapp/bull-board';
 import { initializeEventListeners } from './modules/events/event.listener';
-import { initBackgroundJobs } from './jobs/cron';
 import { startCronJobs } from './jobs/index';
 
 const app = express();
@@ -47,12 +49,23 @@ const app = express();
 // Initialize Event Listeners for Decoupling
 initializeEventListeners();
 
-// Initialize Background Cron Jobs
-initBackgroundJobs();
 startCronJobs();
+
+// Initialize Queue Workers
+import './modules/whatsapp/wa.queue';
+
+import crypto from 'crypto';
 
 // ==========================================
 // MIDDLEWARE
+// ==========================================
+// Add Correlation ID / Request ID
+app.use((req, res, next) => {
+  const reqId = crypto.randomUUID();
+  (req as any).id = reqId;
+  res.setHeader('X-Request-Id', reqId);
+  next();
+});
 // ==========================================
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ 
@@ -125,6 +138,10 @@ app.use(`${API}/search`, searchRoutes);
 app.use(`${API}/landing`, landingRoutes);
 app.use(`${API}/booking`, bookingRoutes);
 app.use(`${API}/upload`, uploadRoutes);
+app.use(`${API}/service-bundles`, bundleRoutes);
+
+// Mounting Dashboard Queue (Bull-Board)
+app.use(`${API}/admin/queues`, serverAdapter.getRouter());
 
 // ==========================================
 // ERROR HANDLING

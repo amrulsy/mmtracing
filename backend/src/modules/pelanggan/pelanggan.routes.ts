@@ -110,7 +110,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // POST /pelanggan
 router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const body = { ...req.body, phone: normalizePhone(req.body.phone) };
+    const body = { ...req.body, phone: normalizePhone(req.body.phone), updatedAt: new Date() };
     const newId = await db.insert('pelanggan', body);
     const data = await db.queryOne('SELECT * FROM pelanggan WHERE id = ?', [newId]);
     await db.insert('activity_logs', {
@@ -129,12 +129,13 @@ router.post('/with-kendaraan', validate(createWithKendaraanSchema), async (req: 
     pelangganBody.phone = normalizePhone(pelangganBody.phone);
 
     const result = await db.transaction(async (tx) => {
+      pelangganBody.updatedAt = new Date();
       const pelangganId = await tx.insert('pelanggan', pelangganBody);
       const pelanggan = await tx.queryOne('SELECT * FROM pelanggan WHERE id = ?', [pelangganId]);
       const kendaraanCreated = [] as any[];
       if (Array.isArray(kendaraan) && kendaraan.length) {
         for (const k of kendaraan) {
-          const kId = await tx.insert('kendaraan', { ...k, plat: normalizePlat(k.plat), pelangganId });
+          const kId = await tx.insert('kendaraan', { ...k, plat: normalizePlat(k.plat), pelangganId, updatedAt: new Date() });
           const created = await tx.queryOne('SELECT * FROM kendaraan WHERE id = ?', [kId]);
           kendaraanCreated.push(created);
         }

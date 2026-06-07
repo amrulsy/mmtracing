@@ -11,6 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://mmtracing.com"),
   title: {
     default: "MMT Racing | Bengkel Motor, Modifikasi & Jasa Bubut Custom Cilacap",
     template: "%s | MMT Racing",
@@ -35,6 +36,13 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "MMT Racing" }],
   creator: "MMT Racing",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-icon.svg", type: "image/svg+xml" }],
+  },
   openGraph: {
     type: "website",
     locale: "id_ID",
@@ -42,11 +50,20 @@ export const metadata: Metadata = {
     title: "MMT Racing | Bengkel Motor, Modifikasi & Jasa Bubut Custom Cilacap",
     description: "Spesialis servis rutin, modifikasi presisi tinggi, dan jasa bubut custom untuk motor. Cek antrian dan booking online di MMT Racing Cilacap.",
     siteName: "MMT Racing",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "MMT Racing - Bengkel Motor, Modifikasi, dan Jasa Bubut Custom Cilacap",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "MMT Racing | Bengkel Motor, Modifikasi & Jasa Bubut Cilacap",
     description: "Spesialis servis rutin, modifikasi presisi tinggi, dan jasa bubut custom untuk motor di Widarapayung Wetan, Binangun, Cilacap.",
+    images: ["/opengraph-image"],
   },
   robots: {
     index: true,
@@ -67,6 +84,10 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" }, // Zinc-950
+  ],
 };
 
 export default function RootLayout({

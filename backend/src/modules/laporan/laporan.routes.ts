@@ -142,7 +142,12 @@ router.get('/pelanggan', async (req: Request, res: Response, next: NextFunction)
     const repeatPelanggan = repeatData.filter((r: any) => r.cnt > 1).length;
     const repeatRate = uniquePelangganWithSpk > 0 ? (repeatPelanggan / uniquePelangganWithSpk) * 100 : 0;
 
-    sendSuccess(res, { topSpenders, totalPelanggan, pelangganBaru, repeatRate, repeatPelanggan, uniquePelangganWithSpk });
+    const mappedTopSpenders = topSpenders.map((p: any) => ({
+      ...p,
+      _count: { spk: p.spkCount }
+    }));
+
+    sendSuccess(res, { topSpenders: mappedTopSpenders, totalPelanggan, pelangganBaru, repeatRate, repeatPelanggan, uniquePelangganWithSpk });
   } catch (e) { next(e); }
 });
 

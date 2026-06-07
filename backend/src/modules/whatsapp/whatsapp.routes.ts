@@ -9,6 +9,11 @@ router.use(authMiddleware);
 
 router.get('/status', async (_req: Request, res: Response, next: NextFunction) => {
   try {
+    // Inisialisasi gateway jika belum (init aman dipanggil berkali-kali karena ada flag initialized)
+    whatsappService.init().catch((err) => {
+      console.error('[WhatsApp] Error during lazy init:', err);
+    });
+
     let qrDataURL = null;
     if (whatsappService.status === 'qr' && whatsappService.qrCode) {
       qrDataURL = await QRCode.toDataURL(whatsappService.qrCode);

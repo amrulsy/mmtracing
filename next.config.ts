@@ -1,7 +1,18 @@
 import type { NextConfig } from "next";
+import withPWAInit from "@ducanh2912/next-pwa";
+
+const withPWA = withPWAInit({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development",
+  register: true,
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
+  reloadOnOnline: true,
+});
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  turbopack: {},
   async rewrites() {
     const backend = process.env.BACKEND_URL || "http://127.0.0.1:5000";
     return [
@@ -11,4 +22,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);

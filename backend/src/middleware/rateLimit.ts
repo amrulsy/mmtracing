@@ -1,4 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
+import { redis } from '../config/redis';
 
 interface RateLimitOptions {
   /** Time window in milliseconds (default: 10 minutes) */
@@ -9,13 +12,8 @@ interface RateLimitOptions {
   message?: string;
 }
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
 /**
- * In-memory rate limiter middleware factory.
+ * Redis-backed rate limiter middleware factory.
  * Tracks requests per IP within a sliding window.
  * 
  * Usage: 
@@ -29,60 +27,34 @@ export function createRateLimiter(options: RateLimitOptions = {}) {
     message = 'Terlalu banyak permintaan. Silakan coba lagi dalam beberapa menit.',
   } = options;
 
-  const store = new Map<string, RateLimitEntry>();
+  const isProduction = process.env.NODE_ENV === 'production';
+  const hasRedisUrl = !!process.env.REDIS_URL;
 
-  // Cleanup expired entries every minute
-  const cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of store.entries()) {
-      if (now > entry.resetAt) {
-        store.delete(key);
-      }
-    }
-  }, 60_000);
+  const storeOptions = hasRedisUrl ? {
+    store: new RedisStore({
+      // @ts-expect-error - Known issue with rate-limit-redis and ioredis types
+      sendCommand: (...args: string[]) => {
+        if (redis.status !== 'ready') return Promise.resolve(); 
+        // @ts-ignore
+        return redis.call(...args);
+      },
+      prefix: 'rl:', // Prefix for Redis keys
+    })
+  } : {};
 
-  // Allow Node to exit
-  if (cleanupInterval.unref) {
-    cleanupInterval.unref();
-  }
-
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const now = Date.now();
-
-    let entry = store.get(ip);
-
-    // If no entry or window expired, create new
-    if (!entry || now > entry.resetAt) {
-      entry = { count: 1, resetAt: now + windowMs };
-      store.set(ip, entry);
-      setRateLimitHeaders(res, max, max - 1, entry.resetAt);
-      next();
-      return;
-    }
-
-    // Increment count
-    entry.count++;
-
-    if (entry.count > max) {
-      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-      setRateLimitHeaders(res, max, 0, entry.resetAt);
-      res.set('Retry-After', String(retryAfter));
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    ...storeOptions,
+    handler: (req: Request, res: Response) => {
       res.status(429).json({
         success: false,
         message,
-        retryAfter,
+        retryAfter: Math.ceil(windowMs / 1000),
       });
-      return;
-    }
-
-    setRateLimitHeaders(res, max, max - entry.count, entry.resetAt);
-    next();
-  };
+    },
+  });
 }
 
-function setRateLimitHeaders(res: Response, limit: number, remaining: number, resetAt: number) {
-  res.set('X-RateLimit-Limit', String(limit));
-  res.set('X-RateLimit-Remaining', String(Math.max(0, remaining)));
-  res.set('X-RateLimit-Reset', String(Math.ceil(resetAt / 1000)));
-}

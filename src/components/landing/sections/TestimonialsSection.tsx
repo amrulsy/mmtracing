@@ -9,6 +9,20 @@ interface TestimonialsSectionProps {
   testimonials: TestimonialItem[];
 }
 
+const AVATAR_COLORS = [
+  "from-primary/30 to-primary/10 text-primary border-primary/20",
+  "from-emerald-500/30 to-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  "from-blue-500/30 to-blue-500/10 text-blue-600 border-blue-500/20",
+  "from-amber-500/30 to-amber-500/10 text-amber-600 border-amber-500/20",
+  "from-purple-500/30 to-purple-500/10 text-purple-600 border-purple-500/20",
+];
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.charAt(0).toUpperCase();
+}
+
 export default function TestimonialsSection({ testimonials }: TestimonialsSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -51,8 +65,8 @@ export default function TestimonialsSection({ testimonials }: TestimonialsSectio
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-4 flex-1">&quot;{t.text}&quot;</p>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-primary flex items-center justify-center text-sm font-bold border border-primary/10">
-                      {t.name.charAt(0)}
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${AVATAR_COLORS[i % AVATAR_COLORS.length]} flex items-center justify-center text-sm font-bold border`}>
+                      {getInitials(t.name)}
                     </div>
                     <div>
                       <p className="text-sm font-bold">{t.name}</p>
