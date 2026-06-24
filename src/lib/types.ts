@@ -36,11 +36,13 @@ export interface User {
   roleId: number;
   roleName: string;
   role?: Role;
+  permissions?: Record<string, string>;
 }
 
 export interface Role {
   id: number;
   name: string;
+  permissions?: Record<string, string>;
 }
 
 export interface LoginPayload {

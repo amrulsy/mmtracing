@@ -4,6 +4,7 @@ import { env } from '../config/env';
 import { UnauthorizedError } from '../shared/errors';
 import db from '../config/db';
 import { appCache, CACHE_TTL } from '../shared/cache';
+import { PERMISSION_LEVELS } from '../shared/permissions';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -13,7 +14,7 @@ export interface AuthRequest extends Request {
     email: string | null;
     roleId: number;
     roleName: string;
-    permissions: string[];
+    permissions: Record<string, string>;
   };
 }
 
@@ -31,9 +32,10 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
       return await db.queryOne<{
         id: number; name: string; username: string; email: string | null;
         roleId: number; status: string; roleName: string; permissions: any;
+        isProtected: number;
       }>(
         `SELECT u.id, u.name, u.username, u.email, u.roleId, u.status,
-                r.name AS roleName, r.permissions
+                r.name AS roleName, r.permissions, r.isProtected
          FROM users u
          JOIN roles r ON r.id = u.roleId
          WHERE u.id = ?`,
@@ -45,10 +47,16 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
       throw new UnauthorizedError('User tidak aktif atau tidak ditemukan');
     }
 
-    let perms: string[] = [];
+    let perms: Record<string, string> = {};
     if (user.permissions) {
-      const raw = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
-      if (Array.isArray(raw)) perms = raw;
+      try {
+        const raw = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions;
+        if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+          perms = raw;
+        }
+      } catch (e) {
+        // Fallback to empty object if JSON parsing fails
+      }
     }
 
     req.user = {
@@ -73,10 +81,17 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
   }
 }
 
+/**
+ * @deprecated Use requirePermission() instead. Kept only for backward compatibility.
+ */
 export function requireRole(...roles: string[]) {
   return (req: AuthRequest, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new UnauthorizedError());
+    }
+    // Admin bypass as superuser
+    if (req.user.roleName === 'Admin') {
+      return next();
     }
     if (!roles.includes(req.user.roleName)) {
       return next(new UnauthorizedError('Tidak memiliki akses untuk role ini'));
@@ -85,18 +100,24 @@ export function requireRole(...roles: string[]) {
   };
 }
 
-export function requirePermission(permission: string) {
+export function requirePermission(moduleName: string, minLevel: 'view' | 'edit' | 'full' = 'view') {
   return (req: AuthRequest, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new UnauthorizedError());
     }
-    // Owner / Admin bypass
+    // Admin bypass — role named "Admin" always has full access
     if (req.user.roleName === 'Admin') {
       return next();
     }
-    if (req.user.permissions && req.user.permissions.includes(permission)) {
+    
+    const userLevelStr = req.user.permissions?.[moduleName] || 'none';
+    const userLevel = PERMISSION_LEVELS[userLevelStr as keyof typeof PERMISSION_LEVELS] || 0;
+    const requiredLevel = PERMISSION_LEVELS[minLevel] || 0;
+
+    if (userLevel >= requiredLevel) {
       return next();
     }
-    return next(new UnauthorizedError(`Akses ditolak: Membutuhkan izin '${permission}'`));
+    
+    return next(new UnauthorizedError(`Akses ditolak: Membutuhkan izin '${minLevel}' pada modul '${moduleName}'`));
   };
 }

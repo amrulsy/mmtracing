@@ -51,7 +51,10 @@ if (hasRedis) {
     add: async (name: string, data: any, opts: any) => {
       setTimeout(async () => {
         try {
-          if (whatsappService.status !== 'connected') return;
+          if (whatsappService.status !== 'connected') {
+            logger.warn(`[WhatsApp Fallback] Message dropped because status is ${whatsappService.status}`);
+            return;
+          }
           await whatsappService.sendMessage(data.jid, data.text);
           logger.info(`[WhatsApp Fallback] Pesan berhasil dikirim ke ${data.jid}`);
         } catch (error: any) {

@@ -7,6 +7,7 @@ import { env } from '../../config/env';
 import { sendSuccess } from '../../shared/utils';
 import { BadRequestError, UnauthorizedError } from '../../shared/errors';
 import logger from '../../config/logger';
+import { sendOtp } from '../whatsapp/whatsapp.notification';
 
 export const pelangganOtpController = {
   async requestOtp(req: Request, res: Response, next: NextFunction) {
@@ -25,8 +26,11 @@ export const pelangganOtpController = {
       // Store in Redis or Memory (Valid for 5 minutes)
       await safeSetex(`OTP:${phoneClean}`, 300, otp);
 
-      // DEV: log OTP to terminal (disable/remove in production once WhatsApp gateway is integrated)
+      // Log OTP to terminal
       logger.debug(`[WA-OTP] OTP untuk ${phoneClean}: ${otp}`);
+
+      // Send via WhatsApp Queue
+      await sendOtp(phoneClean, otp);
 
       sendSuccess(res, null, 'Kode OTP telah dikirim ke WhatsApp Anda. Berlaku 5 menit.');
     } catch (e) {
@@ -66,16 +70,22 @@ export const pelangganOtpController = {
         user = { id: insertId, name: `Pelanggan-${phoneClean.slice(-4)}` };
       }
 
-      // Generate Tokens
+      // Generate Tokens (same as password login)
       const token = jwt.sign(
         { userId: user.id, isCustomer: true },
         env.jwt.secret,
-        { expiresIn: '7d' } as jwt.SignOptions
+        { expiresIn: '15m' } as jwt.SignOptions
       );
 
-      // We give a 7-day token for OTP logins
+      const refreshToken = jwt.sign(
+        { userId: user.id, isCustomer: true, isRefresh: true },
+        env.jwt.refreshSecret,
+        { expiresIn: env.jwt.refreshExpiresIn } as jwt.SignOptions
+      );
+
       sendSuccess(res, {
         token,
+        refreshToken,
         user: { id: user.id, name: user.name, phone: phoneClean }
       }, 'Login berhasil');
     } catch (e) {

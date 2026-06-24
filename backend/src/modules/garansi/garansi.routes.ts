@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated, sendPaginated, parsePagination } from '../../shared/utils';
 import { BadRequestError, NotFoundError } from '../../shared/errors';
@@ -62,7 +62,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /garansi/sync-status — Auto-update garansi statuses in DB
-router.post('/sync-status', requireRole('Admin'), async (_req: Request, res: Response, next: NextFunction) => {
+router.post('/sync-status', requirePermission('monitoring', 'full'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const now = new Date();
     const almostExpiredDate = new Date();
@@ -122,7 +122,7 @@ router.post('/claim', validate(claimSchema), async (req: Request, res: Response,
 });
 
 // PUT /garansi/claim/:id — resolve claim
-router.put('/claim/:id', requireRole('Admin'), validate(claimUpdateSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/claim/:id', requirePermission('monitoring', 'full'), validate(claimUpdateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const claimId = Number(req.params.id);
     await db.update('garansi_claims', { status: req.body.status, resolution: req.body.resolution, updatedAt: new Date() }, 'id = ?', [claimId]);

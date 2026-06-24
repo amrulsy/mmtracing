@@ -8,11 +8,11 @@ import { GlobalSearch } from "@/components/layout/global-search";
 export function Topbar() {
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-30 h-14 lg:h-16 border-b border-surface-border glass px-4 lg:px-8 flex items-center justify-between lg:sticky lg:left-auto lg:right-auto select-none">
+      <header className="fixed top-0 left-0 right-0 z-30 h-14 lg:h-16 border-b border-surface-border bg-background px-4 lg:px-8 flex items-center justify-between lg:sticky lg:left-auto lg:right-auto select-none">
         <div className="flex items-center gap-3">
           {/* Mobile branding */}
           <Link href="/app" className="lg:hidden flex items-center gap-2">
-            <div className="w-7 h-7 rounded bg-primary flex items-center justify-center text-white text-sm font-bold shadow-glossy-primary">
+            <div className="w-7 h-7 rounded bg-primary flex items-center justify-center text-white text-sm font-bold">
               M
             </div>
             <span className="font-bold text-lg tracking-tight">MMT Racing</span>
@@ -35,7 +35,7 @@ export function Topbar() {
       </header>
 
       {/* Mobile search bar */}
-      <div className="fixed top-14 left-0 right-0 z-20 lg:hidden px-4 py-2 bg-background/80 backdrop-blur-lg border-b border-surface-border select-none">
+      <div className="fixed top-14 left-0 right-0 z-20 lg:hidden px-4 py-2 bg-background border-b border-surface-border select-none">
         <GlobalSearch isMobile />
       </div>
     </>

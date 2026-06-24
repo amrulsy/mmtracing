@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated, sendPaginated, parsePagination } from '../../shared/utils';
 import { NotFoundError, BadRequestError } from '../../shared/errors';
@@ -78,7 +78,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requireRole('Admin'), validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('master', 'full'), validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const newId = await db.insert('mekanik', req.body);
     const data = await db.queryOne('SELECT * FROM mekanik WHERE id = ?', [newId]);
@@ -91,7 +91,7 @@ router.post('/', requireRole('Admin'), validate(createSchema), async (req: Reque
   } catch (e) { next(e); }
 });
 
-router.put('/:id', requireRole('Admin'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('master', 'full'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     await db.update('mekanik', { ...req.body, updatedAt: new Date() }, 'id = ?', [id]);
@@ -105,7 +105,7 @@ router.put('/:id', requireRole('Admin'), validate(updateSchema), async (req: Req
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('master', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     const mekanik = await db.queryOne<{ name: string }>('SELECT name FROM mekanik WHERE id = ?', [id]);

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated, sendPaginated, parsePagination } from '../../shared/utils';
 import { NotFoundError, BadRequestError } from '../../shared/errors';
@@ -123,7 +123,7 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
 });
 
 // POST /pelanggan/with-kendaraan — registrasi pelanggan + kendaraan dalam 1 transaksi
-router.post('/with-kendaraan', validate(createWithKendaraanSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/with-kendaraan', requirePermission('master', 'edit'), validate(createWithKendaraanSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { kendaraan, ...pelangganBody } = req.body;
     pelangganBody.phone = normalizePhone(pelangganBody.phone);
@@ -153,7 +153,7 @@ router.post('/with-kendaraan', validate(createWithKendaraanSchema), async (req: 
 });
 
 // PUT /pelanggan/:id
-router.put('/:id', requireRole('Admin'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('master', 'full'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = { ...req.body };
     if (body.phone) body.phone = normalizePhone(body.phone);
@@ -170,7 +170,7 @@ router.put('/:id', requireRole('Admin'), validate(updateSchema), async (req: Req
 });
 
 // DELETE /pelanggan/:id — soft delete (set deletedAt)
-router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('master', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     const pelanggan = await db.queryOne<{ name: string }>('SELECT name FROM pelanggan WHERE id = ? AND deletedAt IS NULL', [id]);
@@ -190,7 +190,7 @@ router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, 
 });
 
 // POST /pelanggan/:id/restore — kembalikan pelanggan yang di-soft-delete
-router.post('/:id/restore', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/restore', requirePermission('master', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     await db.update('pelanggan', { deletedAt: null, updatedAt: new Date() }, 'id = ?', [id]);
@@ -208,7 +208,7 @@ router.post('/:id/restore', requireRole('Admin'), async (req: Request, res: Resp
 // POST /pelanggan/:id/merge-into — gabungkan sourceId ke targetId
 // Semua kendaraan & SPK & loyaltyPoints dipindahkan ke targetId,
 // lalu source di-soft-delete.
-router.post('/:id/merge-into', requireRole('Admin'), validate(mergeSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/merge-into', requirePermission('master', 'full'), validate(mergeSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const sourceId = Number(req.params.id);
     const { targetId } = req.body as { targetId: number };

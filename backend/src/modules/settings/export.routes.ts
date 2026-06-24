@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import db from '../../config/db';
 
 const router = Router();
 
 // Endpoint for GET /api/v1/:entity/export
-router.get('/:entity/export', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:entity/export', authMiddleware, requirePermission('laporan', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const entityKey = String(req.params.entity);
     

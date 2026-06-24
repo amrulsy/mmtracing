@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Phone, KeyRound, ArrowRight, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { setPortalTokens } from "@/lib/portalFetch";
 
 export default function PortalLogin() {
   const router = useRouter();
@@ -64,8 +65,8 @@ export default function PortalLogin() {
         return;
       }
 
-      // Store token
-      localStorage.setItem("mmt_customer_token", data.data.token);
+      // Store token(s)
+      setPortalTokens(data.data.token, data.data.refreshToken);
       router.push("/portal/dashboard");
     } catch (err) {
       setStatus("error");
@@ -78,7 +79,7 @@ export default function PortalLogin() {
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md glass-panel p-8 animate-in fade-in zoom-in-95 duration-500">
+      <div className="w-full max-w-sm md:max-w-md glass-panel p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-500">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-black mb-2">Portal Pelanggan</h1>
           <p className="text-sm text-muted-foreground">
@@ -102,7 +103,7 @@ export default function PortalLogin() {
               </div>
             </div>
 
-            <button disabled={status === "loading" || phone.length < 9} type="submit" className="w-full btn-glossy bg-primary text-white py-3.5 rounded-xl font-bold text-sm shadow-glossy-primary flex items-center justify-center gap-2 mt-6 disabled:opacity-50">
+            <button disabled={status === "loading" || phone.length < 9} type="submit" className="w-full bg-red-600 text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 mt-6 disabled:opacity-50">
               {status === "loading" ? <Loader2 className="animate-spin" size={18} /> : "Kirim Kode OTP"}
               {!status && <ArrowRight size={18} />}
             </button>
@@ -121,7 +122,7 @@ export default function PortalLogin() {
               <button type="button" onClick={() => { setStep(1); setMsg(""); setStatus("idle"); setOtp(""); }} className="px-4 py-3.5 rounded-xl border border-surface-border hover:bg-surface-hover text-muted-foreground transition-colors shrink-0">
                 <ArrowLeft size={18} />
               </button>
-              <button disabled={status === "loading" || otp.length !== 6} type="submit" className="flex-1 btn-glossy bg-primary text-white py-3.5 rounded-xl font-bold text-sm shadow-glossy-primary flex items-center justify-center gap-2 disabled:opacity-50">
+              <button disabled={status === "loading" || otp.length !== 6} type="submit" className="flex-1 bg-red-600 text-white py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                 {status === "loading" ? <Loader2 className="animate-spin" size={18} /> : "Masuk"}
               </button>
             </div>

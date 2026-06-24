@@ -41,6 +41,7 @@ import bookingRoutes from './modules/booking/booking.routes';
 import uploadRoutes from './modules/upload/upload.routes';
 import bundleRoutes from './modules/service-bundles/bundle.routes';
 import { serverAdapter } from './modules/whatsapp/bull-board';
+import { whatsappService } from './modules/whatsapp/whatsapp.service';
 import { initializeEventListeners } from './modules/events/event.listener';
 import { startCronJobs } from './jobs/index';
 
@@ -53,6 +54,9 @@ startCronJobs();
 
 // Initialize Queue Workers
 import './modules/whatsapp/wa.queue';
+
+// Auto-start WhatsApp Gateway if previously connected
+whatsappService.init().catch(err => logger.error('[WhatsApp] Auto-init failed:', err));
 
 import crypto from 'crypto';
 
@@ -105,7 +109,8 @@ app.use('/uploads', express.static(path.resolve(env.upload.dir)));
 const API = '/api/v1';
 
 app.get(`${API}/health`, (_req, res) => {
-  res.json({ success: true, message: 'MMT Racing API is running [V2-RESTARTED]', timestamp: new Date().toISOString() });
+  logger.info("Health check pinged!");
+  res.json({ success: true, message: 'MMT Racing API is running [V3]', timestamp: new Date().toISOString() });
 });
 
 app.use(`${API}`, exportRoutes);
@@ -149,3 +154,4 @@ app.use(`${API}/admin/queues`, serverAdapter.getRouter());
 app.use(errorHandler);
 
 export default app;
+// trigger restart

@@ -1,6 +1,33 @@
 import winston from 'winston';
 import { env } from './env';
 
+// Override console methods to filter out spammy libsignal logs
+const originalConsoleInfo = console.info;
+console.info = function (...args: any[]) {
+  const msg = typeof args[0] === 'string' ? args[0] : '';
+  if (
+    msg.includes('Closing session:') ||
+    msg.includes('Opening session:') ||
+    msg.includes('Removing old closed session:')
+  ) {
+    return; // Suppress libsignal session spam
+  }
+  originalConsoleInfo.apply(console, args);
+};
+
+const originalConsoleWarn = console.warn;
+console.warn = function (...args: any[]) {
+  const msg = typeof args[0] === 'string' ? args[0] : '';
+  if (
+    msg.includes('Session already closed') ||
+    msg.includes('Session already open') ||
+    msg.includes('Decrypted message with closed session')
+  ) {
+    return; // Suppress libsignal session spam
+  }
+  originalConsoleWarn.apply(console, args);
+};
+
 // Custom log levels: add 'crit' between 'error' and 'warn'
 const customLevels = {
   levels: {

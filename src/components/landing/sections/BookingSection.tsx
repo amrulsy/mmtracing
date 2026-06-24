@@ -73,7 +73,7 @@ export default function BookingSection({ contact }: BookingSectionProps) {
         setBookingStatus("success");
         setBookingIdStr(`#${json.data.id}`);
         setBookingMsg(json.message || "Booking berhasil! Kami akan menghubungi via WhatsApp.");
-        const waContact = contact.whatsapp || "62274123456";
+        const waContact = contact.whatsapp || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "62274123456";
         const kendStr = isTanpaKendaraan ? `Part: ${bookingForm.merkTipe || "Bawa Part"}` : `Kendaraan: ${bookingForm.jenisKendaraan} ${bookingForm.merkTipe}`;
         const waMsg = encodeURIComponent(`Halo MMT Racing,\nSaya ${bookingForm.nama} baru saja booking online #${json.data.id}.\nLayanan: ${bookingForm.layanan}\n${kendStr}\nTanggal: ${bookingForm.tanggal || "Secepatnya"}\nMohon konfirmasinya. Terima kasih!`);
         setTimeout(() => { window.open(`https://wa.me/${waContact}?text=${waMsg}`, "_blank"); }, 2000);

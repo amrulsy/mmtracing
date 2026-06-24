@@ -18,9 +18,9 @@
   --color-muted-foreground: var(--muted-foreground);
 
   /* Custom Glossy Utilities */
-  --shadow-glossy: 0 4px 30px rgba(0, 0, 0, 0.1);
-  --shadow-glossy-primary: 0 4px 20px rgba(220, 38, 38, 0.3);
-  --shadow-glossy-primary-dark: 0 4px 20px rgba(239, 68, 68, 0.4);
+  --shadow-glossy: none;
+  --shadow-glossy-primary: none;
+  --shadow-glossy-primary-dark: none;
 }
 
 @layer base {
@@ -28,9 +28,9 @@
     --background: #f8fafc;
     --foreground: #020617;
     
-    --surface: rgba(255, 255, 255, 0.8);
-    --surface-hover: rgba(241, 245, 249, 0.9);
-    --surface-border: rgba(226, 232, 240, 0.6);
+    --surface: #ffffff;
+    --surface-hover: #f1f5f9;
+    --surface-border: #e2e8f0;
     
     /* Modern Red */
     --primary: #dc2626;
@@ -46,9 +46,9 @@
     --background: #09090b; /* Deep black/zinc */
     --foreground: #fafafa;
     
-    --surface: rgba(24, 24, 27, 0.5); /* Glassy zinc-900 */
-    --surface-hover: rgba(39, 39, 42, 0.7);
-    --surface-border: rgba(63, 63, 70, 0.4);
+    --surface: #111113; /* Solid zinc-900 */
+    --surface-hover: #1a1a1d;
+    --surface-border: #27272a;
     
     /* Bright Red for dark mode contrast */
     --primary: #ef4444;
@@ -82,20 +82,10 @@
 /* Custom Glossy Classes */
 @layer utilities {
   .glass {
-    @apply bg-surface backdrop-blur-md border border-surface-border shadow-glossy;
+    @apply bg-surface border border-surface-border;
   }
   .glass-panel {
-    @apply bg-surface backdrop-blur-xl border border-surface-border shadow-glossy rounded-2xl;
-  }
-  .btn-glossy {
-    @apply relative overflow-hidden transition-all duration-300 ease-out;
-  }
-  .btn-glossy::after {
-    content: '';
-    @apply absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 opacity-0 transition-opacity duration-300;
-  }
-  .btn-glossy:hover::after {
-    @apply opacity-100;
+    @apply bg-surface border border-surface-border rounded-xl;
   }
 }
 
@@ -192,6 +182,48 @@
       font-size: 1.5rem !important;
     }
   }
+}
+
+/* ═══════════════════════════════════════
+   PORTAL — Skeleton Shimmer
+   ═══════════════════════════════════════ */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-hover) 25%,
+    var(--surface-border) 50%,
+    var(--surface-hover) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════
+   PORTAL — Star Rating
+   ═══════════════════════════════════════ */
+.star-rating {
+  display: inline-flex;
+  gap: 4px;
+}
+.star-rating .star {
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.star-rating .star:hover {
+  transform: scale(1.2);
+}
+.star-rating .star.active {
+  color: #f59e0b;
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.4));
+}
+.star-rating .star.inactive {
+  color: var(--muted-foreground);
+  opacity: 0.3;
 }
 
 /* ═══════════════════════════════════════

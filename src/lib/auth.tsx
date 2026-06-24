@@ -38,9 +38,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setTokenState(existingToken);
 
-    api.get<User>("/auth/me")
+    api.get<any>("/auth/me")
       .then((res) => {
-        setUser(res.data);
+        const d = res.data;
+        setUser({
+          id: d.id,
+          name: d.name,
+          username: d.username,
+          email: d.email ?? null,
+          roleId: d.roleId ?? 0,
+          roleName: d.roleName ?? d.role ?? "",
+          permissions: d.permissions ?? {},
+        });
       })
       .catch(() => {
         // Token invalid — clear it
@@ -58,7 +67,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setToken(newToken);
     setTokenState(newToken);
-    setUser(userData);
+    // Map response to User interface (backend may return roleId/roleName/permissions)
+    setUser({
+      id: userData.id,
+      name: userData.name,
+      username: userData.username,
+      email: userData.email ?? null,
+      roleId: (userData as any).roleId ?? 0,
+      roleName: (userData as any).roleName ?? (userData as any).role ?? "",
+      permissions: (userData as any).permissions ?? {},
+    });
   }, []);
 
   const logout = useCallback(() => {

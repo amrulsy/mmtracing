@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { whatsappService } from './whatsapp.service';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { sendSuccess } from '../../shared/utils';
 import QRCode from 'qrcode';
 
@@ -28,7 +28,7 @@ router.get('/status', async (_req: Request, res: Response, next: NextFunction) =
   }
 });
 
-router.post('/logout', requireRole('Admin'), async (_req: Request, res: Response, next: NextFunction) => {
+router.post('/logout', requirePermission('settings', 'full'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     await whatsappService.logout();
     sendSuccess(res, null, 'Berhasil mendaftarkan ulang gateway (Logout)');
@@ -37,7 +37,7 @@ router.post('/logout', requireRole('Admin'), async (_req: Request, res: Response
   }
 });
 
-router.post('/retry', requireRole('Admin'), async (_req: Request, res: Response, next: NextFunction) => {
+router.post('/retry', requirePermission('settings', 'full'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     if (whatsappService.status === 'disconnected' || whatsappService.status === 'qr') {
       whatsappService.logout(); // restarts standard
@@ -48,7 +48,7 @@ router.post('/retry', requireRole('Admin'), async (_req: Request, res: Response,
   }
 });
 
-router.post('/test', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/test', requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { phone, message } = req.body;
     if (!phone || !message) {

@@ -1,3 +1,3 @@
 export default function ApprovalPage() {
-  return <div>Approval Page</div>;
+ return <div>Approval Page</div>;
 }

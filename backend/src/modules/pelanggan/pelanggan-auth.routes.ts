@@ -3,6 +3,7 @@ import { pelangganAuthController } from './pelanggan-auth.controller';
 import { pelangganOtpController } from './pelanggan-otp.controller';
 import { customerAuthMiddleware } from '../../middleware/customerAuth';
 import { createRateLimiter } from '../../middleware/rateLimit';
+import { upload } from '../../middleware/upload';
 
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -35,6 +36,28 @@ router.post('/verify-otp', loginLimiter, pelangganOtpController.verifyOtp);
 
 // Protected routes
 router.get('/me', customerAuthMiddleware, pelangganAuthController.me);
+router.put('/profile', customerAuthMiddleware, pelangganAuthController.updateProfile);
+router.post('/avatar', customerAuthMiddleware, upload.single('image'), pelangganAuthController.uploadAvatar);
 router.get('/history', customerAuthMiddleware, pelangganAuthController.history);
+router.get('/spk/:id', customerAuthMiddleware, pelangganAuthController.spkDetail);
+router.get('/pembayaran', customerAuthMiddleware, pelangganAuthController.getPembayaran);
+
+// Loyalty endpoints
+router.get('/loyalty', customerAuthMiddleware, pelangganAuthController.getLoyalty);
+router.get('/loyalty/history', customerAuthMiddleware, pelangganAuthController.getLoyaltyHistory);
+router.get('/loyalty/rewards', customerAuthMiddleware, pelangganAuthController.getLoyaltyRewards);
+router.post('/loyalty/redeem', customerAuthMiddleware, pelangganAuthController.redeemLoyalty);
+
+// Garansi endpoints
+router.get('/garansi', customerAuthMiddleware, pelangganAuthController.getGaransi);
+router.post('/garansi/claim', customerAuthMiddleware, pelangganAuthController.claimGaransi);
+
+// Notifikasi endpoints
+router.get('/notifikasi', customerAuthMiddleware, pelangganAuthController.getNotifikasi);
+router.put('/notifikasi/read-all', customerAuthMiddleware, pelangganAuthController.markReadAllNotifikasi);
+
+// Review endpoints
+router.post('/review', customerAuthMiddleware, pelangganAuthController.submitReview);
+router.get('/review/:spkId', customerAuthMiddleware, pelangganAuthController.checkReview);
 
 export default router;

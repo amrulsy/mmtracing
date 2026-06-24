@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { bundleController } from './bundle.controller';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { createBundleSchema, updateBundleSchema } from './bundle.schema';
 
@@ -13,8 +13,8 @@ router.get('/', bundleController.findAll);
 router.get('/:id', bundleController.findById);
 
 // Admin only routes
-router.post('/', requireRole('Admin'), validate(createBundleSchema), bundleController.create);
-router.put('/:id', requireRole('Admin'), validate(updateBundleSchema), bundleController.update);
-router.delete('/:id', requireRole('Admin'), bundleController.delete);
+router.post('/', requirePermission('master', 'full'), validate(createBundleSchema), bundleController.create);
+router.put('/:id', requirePermission('master', 'full'), validate(updateBundleSchema), bundleController.update);
+router.delete('/:id', requirePermission('master', 'full'), bundleController.delete);
 
 export default router;

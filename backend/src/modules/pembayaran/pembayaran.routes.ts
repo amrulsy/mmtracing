@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendPaginated } from '../../shared/utils';
 import { createRateLimiter } from '../../middleware/rateLimit';
@@ -56,7 +56,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response, next: Nex
 });
 
 // POST /pembayaran/:id/bayar — Bayar (parsial / lunas)
-router.post('/:id/bayar', authMiddleware, requireRole('Admin', 'Kasir'), validate(bayarSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/bayar', authMiddleware, requirePermission('pembayaran', 'edit'), validate(bayarSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await pembayaranService.bayar(Number(req.params.id), req.body, (req as any).user?.id);
     sendSuccess(res, data, `Pembayaran Rp ${req.body.jumlah.toLocaleString('id-ID')} berhasil dicatat.`);
@@ -64,7 +64,7 @@ router.post('/:id/bayar', authMiddleware, requireRole('Admin', 'Kasir'), validat
 });
 
 // POST /pembayaran/:id/refund — Rollback lunas: reset invoice, hapus garansi & poin
-router.post('/:id/refund', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/refund', authMiddleware, requirePermission('pembayaran', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await pembayaranService.refund(Number(req.params.id), (req as any).user?.id);
     sendSuccess(res, data, 'Invoice berhasil di-refund. Garansi dan poin terkait telah dihapus.');

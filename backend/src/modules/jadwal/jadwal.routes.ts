@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated } from '../../shared/utils';
 
@@ -60,7 +60,7 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
 });
 
 // PUT /jadwal/:id
-router.put('/:id', requireRole('Admin', 'Mekanik'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('monitoring', 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     await db.update('jadwal', { ...req.body, updatedAt: new Date() }, 'id = ?', [id]);
@@ -70,7 +70,7 @@ router.put('/:id', requireRole('Admin', 'Mekanik'), async (req: Request, res: Re
 });
 
 // DELETE /jadwal/:id
-router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('monitoring', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await db.execute('DELETE FROM jadwal WHERE id = ?', [Number(req.params.id)]);
     sendSuccess(res, null, 'Jadwal berhasil dihapus');

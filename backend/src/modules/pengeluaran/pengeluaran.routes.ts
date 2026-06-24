@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated, sendPaginated, parsePagination } from '../../shared/utils';
 import { BadRequestError } from '../../shared/errors';
@@ -83,7 +83,7 @@ router.get('/categories', async (_req: Request, res: Response, next: NextFunctio
   } catch (e) { next(e); }
 });
 
-router.post('/categories', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/categories', requirePermission('pembayaran', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const newId = await db.insert('kategori_pengeluaran', { name: req.body.name });
     const data = await db.queryOne('SELECT * FROM kategori_pengeluaran WHERE id = ?', [newId]);
@@ -91,7 +91,7 @@ router.post('/categories', requireRole('Admin'), async (req: Request, res: Respo
   } catch (e) { next(e); }
 });
 
-router.put('/categories/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/categories/:id', requirePermission('pembayaran', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const katId = Number(req.params.id);
     await db.update('kategori_pengeluaran', { name: req.body.name }, 'id = ?', [katId]);
@@ -100,7 +100,7 @@ router.put('/categories/:id', requireRole('Admin'), async (req: Request, res: Re
   } catch (e) { next(e); }
 });
 
-router.delete('/categories/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/categories/:id', requirePermission('pembayaran', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     const inUse = await db.queryVal<number>('SELECT COUNT(*) FROM pengeluaran WHERE kategoriId = ?', [id]);
@@ -112,7 +112,7 @@ router.delete('/categories/:id', requireRole('Admin'), async (req: Request, res:
   } catch (e) { next(e); }
 });
 
-router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('pengeluaran', 'edit'), validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const newId = await db.insert('pengeluaran', req.body);
     const data = await db.queryOne('SELECT * FROM pengeluaran WHERE id = ?', [newId]);
@@ -120,7 +120,7 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
   } catch (e) { next(e); }
 });
 
-router.put('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('pembayaran', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const peId = Number(req.params.id);
     await db.update('pengeluaran', { ...req.body, updatedAt: new Date() }, 'id = ?', [peId]);
@@ -129,7 +129,7 @@ router.put('/:id', requireRole('Admin'), async (req: Request, res: Response, nex
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('pembayaran', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     await db.execute('DELETE FROM pengeluaran WHERE id = ?', [Number(req.params.id)]);
     sendSuccess(res, null, 'Pengeluaran berhasil dihapus');

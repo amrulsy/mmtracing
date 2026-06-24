@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import {
   Wrench, Moon, Sun, Home, Tag, List, Calendar,
-  MessageCircle, AlertCircle,
+  MessageCircle, AlertCircle, Search,
 } from "lucide-react";
 
 // Types (re-exported for page.tsx backward compat)
@@ -38,7 +38,7 @@ function Navbar({
   logo?: string; mounted: boolean; theme?: string; setTheme: (t: string) => void;
 }) {
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-background/90 backdrop-blur-xl border-b border-surface-border shadow-sm" : "bg-transparent"}`}>
+    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-background border-b border-surface-border shadow-sm" : "bg-transparent"}`}>
       <div className="max-w-7xl mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           {logo ? (
@@ -64,14 +64,20 @@ function Navbar({
           <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-muted-foreground" aria-label="Toggle tema gelap/terang">
             {mounted ? (theme === "dark" ? <Sun size={16} /> : <Moon size={16} />) : <Moon size={16} />}
           </button>
-          <a href="#booking" className="btn-glossy bg-primary text-white px-6 py-3 rounded-2xl text-sm font-black shadow-glossy-primary hover:shadow-glossy-primary-dark ring-2 ring-primary/20 hover:ring-primary/40 transition-all">Booking Online</a>
+          <Link href="/track" className="flex items-center gap-1.5 text-sm font-bold text-primary hover:text-primary/80 transition-colors">
+            <Search size={16} /> Lacak SPK
+          </Link>
+          <a href="#booking" className="bg-red-600 text-white px-6 py-3 rounded-2xl text-sm font-black transition-all">Booking Online</a>
         </div>
         {/* Mobile */}
         <div className="lg:hidden flex items-center gap-2">
           <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="p-2 rounded-lg hover:bg-surface-hover transition-colors text-muted-foreground" aria-label="Toggle tema gelap/terang" suppressHydrationWarning>
             {mounted ? (theme === "dark" ? <Sun size={18} /> : <Moon size={18} />) : <Moon size={18} />}
           </button>
-          <Link href="/login" className="text-xs font-medium text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg border border-surface-border">Login</Link>
+          <Link href="/track" className="text-xs font-bold text-primary px-3 py-1.5 rounded-lg border border-primary/20 bg-primary/10 flex items-center gap-1">
+            <Search size={12} /> Lacak
+          </Link>
+          <Link href="/portal/login" className="text-xs font-medium text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg border border-surface-border">Login</Link>
         </div>
       </div>
     </nav>
@@ -90,7 +96,7 @@ function MobileBottomNav({ activeSection, scrollToSection }: { activeSection: st
 
   return (
     <div className="fixed bottom-4 left-3 right-3 z-50 lg:hidden safe-bottom">
-      <nav className="bg-background/70 backdrop-blur-2xl border border-surface-border/50 rounded-[20px] shadow-[0_8px_40px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_40px_rgba(0,0,0,0.4)] px-1 py-1 flex items-center justify-around gap-0.5" aria-label="Navigasi utama mobile">
+      <nav className="bg-background border-t border-surface-border/50 px-1 py-1 flex items-center justify-around gap-0.5" aria-label="Navigasi utama mobile">
         {items.map((item) => {
           const isActive = activeSection === item.id;
           return (
@@ -189,7 +195,7 @@ export default function LandingClient({ initialData, initialQueue }: LandingClie
           </div>
           <h2 className="text-xl font-bold">Gagal Memuat Halaman</h2>
           <p className="text-sm text-muted-foreground">Tidak dapat terhubung ke server. Silakan coba lagi.</p>
-          <button onClick={() => window.location.reload()} className="btn-glossy bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-glossy-primary">Muat Ulang</button>
+          <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold">Muat Ulang</button>
         </div>
       </div>
     );
@@ -197,7 +203,7 @@ export default function LandingClient({ initialData, initialQueue }: LandingClie
 
   // Resolved data with defaults
   const header = data?.landing_header || { logoText: "M", brandName: "MMT Racing", subtitle: "Workshop & Custom Fabrication" };
-  const contact: ContactData = data?.landing_contact || { address: "", addressDetail: "", hours: "", hoursClosed: "", phone: "", email: "", whatsapp: "62274123456", mapsEmbed: "" };
+  const contact: ContactData = data?.landing_contact || { address: "", addressDetail: "", hours: "", hoursClosed: "", phone: "", email: "", whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "62274123456", mapsEmbed: "" };
   const hero = data?.landing_hero || { tagline: "Bengkel Terpercaya Sejak 2016", title: "Servis Berkualitas, Modifikasi Presisi Tinggi", subtitle: "Spesialis servis rutin, modifikasi, dan jasa bubut custom untuk motor." };
   const footer = data?.landing_footer || { description: "", hourWeekday: "", hourSaturday: "", hourSunday: "" };
   const gallery = data?.landing_gallery || [];

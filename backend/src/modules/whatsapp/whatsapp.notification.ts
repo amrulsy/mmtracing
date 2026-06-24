@@ -246,3 +246,21 @@ export async function notifyBookingBaru(bookingId: number) {
     logger.error('[WA] notifyBookingBaru error:', e.message);
   }
 }
+
+/** 9. Mengirim OTP Login — called when customer requests OTP */
+export async function sendOtp(phone: string, otp: string) {
+  try {
+    const msg = `*MMT Racing*\n\nKode OTP Anda adalah: *${otp}*\n\nBerlaku selama 5 menit. Jangan berikan kode ini kepada siapapun.`;
+
+    let jid = phone.replace(/[^0-9]/g, '');
+    if (jid.startsWith('0')) jid = '62' + jid.slice(1);
+
+    await waQueue.add('send-message', { jid, text: msg }, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 }
+    });
+    logger.info(`[WA] Queued OTP to ${jid}`);
+  } catch (e: any) {
+    logger.error('[WA] sendOtp error:', e.message);
+  }
+}

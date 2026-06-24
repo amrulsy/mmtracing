@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated, sendPaginated, parsePagination } from '../../shared/utils';
 import { NotFoundError, BadRequestError } from '../../shared/errors';
@@ -113,7 +113,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('master', 'edit'), validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = { ...req.body, plat: normalizePlat(req.body.plat), updatedAt: new Date() };
     const newId = await db.insert('kendaraan', body);
@@ -127,7 +127,7 @@ router.post('/', validate(createSchema), async (req: Request, res: Response, nex
   } catch (e) { next(e); }
 });
 
-router.put('/:id', validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('master', 'edit'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body: any = { ...req.body };
     if (body.plat) body.plat = normalizePlat(body.plat);
@@ -146,7 +146,7 @@ router.put('/:id', validate(updateSchema), async (req: Request, res: Response, n
 });
 
 // DELETE /kendaraan/:id — soft delete
-router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('master', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     const kendaraan = await db.queryOne<{ name: string; plat: string }>(
@@ -166,7 +166,7 @@ router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, 
 });
 
 // POST /kendaraan/:id/restore
-router.post('/:id/restore', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/restore', requirePermission('master', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     await db.update('kendaraan', { deletedAt: null, updatedAt: new Date() }, 'id = ?', [id]);

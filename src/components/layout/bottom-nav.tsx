@@ -112,7 +112,7 @@ export function BottomNav() {
       {/* More Sheet Overlay */}
       {showMore && (
         <div
-          className="fixed inset-0 z-[90] bg-black/40 backdrop-blur-sm lg:hidden animate-in fade-in duration-200"
+          className="fixed inset-0 z-[90] bg-black/50 lg:hidden animate-in fade-in duration-200"
           onClick={() => setShowMore(false)}
         />
       )}
@@ -167,7 +167,7 @@ export function BottomNav() {
                         <div
                           className={cn(
                             "w-10 h-10 rounded-xl flex items-center justify-center transition-colors relative",
-                            isActive ? "bg-primary text-white shadow-glossy-primary" : "bg-surface-hover"
+                            isActive ? "bg-primary text-white" : "bg-surface-hover"
                           )}
                         >
                           <item.icon size={20} />
@@ -190,8 +190,7 @@ export function BottomNav() {
 
       {/* Bottom Tab Bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-[80] lg:hidden select-none">
-        {/* Frosted glass background */}
-        <div className="bg-background/80 backdrop-blur-xl border-t border-surface-border safe-bottom">
+        <div className="bg-background border-t border-surface-border safe-bottom">
           <div className="flex items-start justify-around px-2 pt-1.5 pb-2">
             {primaryTabs.map((tab) => {
               const isMore = tab.href === "#more";

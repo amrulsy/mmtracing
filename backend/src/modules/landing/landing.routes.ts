@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { sendSuccess } from '../../shared/utils';
 import { createRateLimiter } from '../../middleware/rateLimit';
 import { notifyBookingBaru } from '../whatsapp/whatsapp.notification';
@@ -10,6 +10,13 @@ const bookingLimiter = createRateLimiter({
   windowMs: 10 * 60 * 1000,
   max: 5,
   message: 'Terlalu banyak permintaan booking. Silakan coba lagi dalam beberapa menit.',
+});
+
+// Rate limiter: max 10 tracking attempts per IP per 5 minutes (prevent PIN brute force)
+const trackingLimiter = createRateLimiter({
+  windowMs: 5 * 60 * 1000,
+  max: 10,
+  message: 'Terlalu banyak percobaan. Silakan tunggu beberapa menit.',
 });
 
 const router = Router();
@@ -138,7 +145,7 @@ router.get('/content', async (_req: Request, res: Response, next: NextFunction) 
 });
 
 // PUT /landing/content — PROTECTED (Admin only)
-router.put('/content', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/content', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = req.body as Record<string, any>;
     const validKeys = Object.keys(LANDING_DEFAULTS);
@@ -306,6 +313,83 @@ router.post('/booking', bookingLimiter, async (req: Request, res: Response, next
       id: bookingId,
       message: `Booking berhasil! Nomor booking: #${bookingId}`,
     }, 'Booking berhasil dikirim');
+  } catch (e) {
+    next(e);
+  }
+});
+
+// POST /landing/track — PUBLIC (Live Tracking SPK without login)
+router.post('/track', trackingLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const noSpk = String(req.body.noSpk || '').trim().toUpperCase();
+    const accessPin = String(req.body.accessPin || '').trim();
+    if (!noSpk || !accessPin) {
+      res.status(400).json({ success: false, message: 'Nomor SPK dan PIN Akses wajib diisi' });
+      return;
+    }
+
+    // Cari SPK berdasarkan noSpk
+    const spk = await db.queryOne<any>("SELECT * FROM spk WHERE noSpk = ?", [noSpk]);
+    if (!spk) {
+      res.status(404).json({ success: false, message: 'SPK tidak ditemukan' });
+      return;
+    }
+
+    // Cari pembayaran untuk mencocokkan accessPin
+    const pembayaran = await db.queryOne<any>("SELECT * FROM pembayaran WHERE spkId = ? AND accessPin = ?", [spk.id, accessPin]);
+    if (!pembayaran) {
+      res.status(401).json({ success: false, message: 'PIN Akses salah' });
+      return;
+    }
+
+    // Fetch related data
+    const [kendaraan, mekanik, items, stages, photos] = await Promise.all([
+      spk.kendaraanId ? db.queryOne("SELECT * FROM kendaraan WHERE id = ?", [spk.kendaraanId]) : null,
+      spk.mekanikId ? db.queryOne("SELECT * FROM mekanik WHERE id = ?", [spk.mekanikId]) : null,
+      db.query("SELECT i.*, sp.name AS spName, j.name AS jName FROM spk_items i LEFT JOIN sparepart sp ON sp.id = i.sparepartId LEFT JOIN jasa j ON j.id = i.jasaId WHERE i.spkId = ?", [spk.id]),
+      db.query("SELECT * FROM spk_stages WHERE spkId = ? ORDER BY urutan ASC", [spk.id]),
+      db.query("SELECT * FROM spk_photos WHERE spkId = ? ORDER BY createdAt DESC", [spk.id])
+    ]);
+
+    const enrichedItems = items.map((i: any) => ({
+      ...i,
+      sparepart: i.sparepartId ? { id: i.sparepartId, name: i.spName } : null,
+      jasa: i.jasaId ? { id: i.jasaId, name: i.jName } : null,
+    }));
+
+    spk.kendaraan = kendaraan;
+    spk.mekanik = mekanik;
+    spk.items = enrichedItems;
+    spk.stages = stages;
+    spk.photos = photos;
+    spk.pembayaran = pembayaran;
+
+    sendSuccess(res, spk, 'Data SPK berhasil ditemukan');
+  } catch (e) {
+    next(e);
+  }
+});
+
+// GET /landing/reviews — PUBLIC (recent public reviews)
+router.get('/reviews', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const reviews = await db.query(`
+      SELECT r.rating, r.comment, r.tags, r.createdAt, p.name AS pelangganName
+      FROM customer_reviews r
+      JOIN pelanggan p ON p.id = r.pelangganId
+      WHERE r.isPublic = 1
+      ORDER BY r.createdAt DESC LIMIT 10
+    `);
+
+    // Anonymize reviewer names (Budi Santoso -> B***o)
+    const anonymized = reviews.map((r: any) => ({
+      ...r,
+      pelangganName: r.pelangganName && r.pelangganName.length > 2
+        ? r.pelangganName[0] + '***' + r.pelangganName.slice(-1)
+        : '***'
+    }));
+
+    sendSuccess(res, anonymized, 'Public reviews berhasil diambil');
   } catch (e) {
     next(e);
   }

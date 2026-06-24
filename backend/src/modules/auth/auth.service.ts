@@ -10,9 +10,9 @@ export class AuthService {
     const user = await db.queryOne<{
       id: number; name: string; username: string; email: string | null;
       password: string; status: string; avatar: string | null;
-      roleId: number; roleName: string;
+      roleId: number; roleName: string; rolePermissions: any;
     }>(
-      `SELECT u.*, r.name AS roleName
+      `SELECT u.*, r.name AS roleName, r.permissions AS rolePermissions
        FROM users u JOIN roles r ON r.id = u.roleId
        WHERE u.username = ? OR u.email = ? LIMIT 1`,
       [input.username, input.username],
@@ -45,6 +45,15 @@ export class AuthService {
       expiresIn: env.jwt.refreshExpiresIn,
     } as jwt.SignOptions);
 
+    // Parse permissions from role
+    let permissions: Record<string, string> = {};
+    if (user.rolePermissions) {
+      try {
+        const raw = typeof user.rolePermissions === 'string' ? JSON.parse(user.rolePermissions) : user.rolePermissions;
+        if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) permissions = raw;
+      } catch (_e) { /* ignore parse errors */ }
+    }
+
     return {
       token,
       refreshToken,
@@ -53,7 +62,9 @@ export class AuthService {
         name: user.name,
         username: user.username,
         email: user.email,
-        role: user.roleName,
+        roleId: user.roleId,
+        roleName: user.roleName,
+        permissions,
         avatar: user.avatar,
       },
     };
@@ -91,21 +102,34 @@ export class AuthService {
   async getProfile(userId: number) {
     const user = await db.queryOne<{
       id: number; name: string; username: string; email: string | null;
-      avatar: string | null; lastLogin: Date | null; roleName: string;
+      avatar: string | null; lastLogin: Date | null;
+      roleId: number; roleName: string; rolePermissions: any;
     }>(
       `SELECT u.id, u.name, u.username, u.email, u.avatar, u.lastLogin,
-              r.name AS roleName
+              u.roleId, r.name AS roleName, r.permissions AS rolePermissions
        FROM users u JOIN roles r ON r.id = u.roleId
        WHERE u.id = ?`,
       [userId],
     );
     if (!user) throw new NotFoundError('User');
+
+    // Parse permissions
+    let permissions: Record<string, string> = {};
+    if (user.rolePermissions) {
+      try {
+        const raw = typeof user.rolePermissions === 'string' ? JSON.parse(user.rolePermissions) : user.rolePermissions;
+        if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) permissions = raw;
+      } catch (_e) { /* ignore parse errors */ }
+    }
+
     return {
       id: user.id,
       name: user.name,
       username: user.username,
       email: user.email,
-      role: user.roleName,
+      roleId: user.roleId,
+      roleName: user.roleName,
+      permissions,
       avatar: user.avatar,
       lastLogin: user.lastLogin,
     };

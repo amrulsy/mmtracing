@@ -1,8 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../../config/db';
-import { authMiddleware, requireRole, AuthRequest } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission, AuthRequest } from '../../middleware/auth';
 import { sendSuccess, sendCreated } from '../../shared/utils';
+import { PERMISSION_MODULES } from '../../shared/permissions';
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
@@ -23,7 +24,7 @@ router.get('/pub/profile', async (_req: Request, res: Response, next: NextFuncti
 });
 
 // ===== USER MANAGEMENT =====
-router.get('/users', authMiddleware, requireRole('Admin'), async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/users', authMiddleware, requirePermission('settings', 'full'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await db.query(
       `SELECT u.id, u.name, u.username, u.email, u.roleId, u.status, u.lastLogin,
@@ -34,7 +35,7 @@ router.get('/users', authMiddleware, requireRole('Admin'), async (_req: Request,
   } catch (e) { next(e); }
 });
 
-router.post('/users', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/users', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { password, ...rest } = req.body;
     const hashed = await bcrypt.hash(password, 12);
@@ -44,7 +45,7 @@ router.post('/users', authMiddleware, requireRole('Admin'), async (req: Request,
   } catch (e) { next(e); }
 });
 
-router.put('/users/:id', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/users/:id', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { password, ...rest } = req.body;
     const updateData: any = rest;
@@ -57,7 +58,7 @@ router.put('/users/:id', authMiddleware, requireRole('Admin'), async (req: Reque
   } catch (e) { next(e); }
 });
 
-router.delete('/users/:id', authMiddleware, requireRole('Admin'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/users/:id', authMiddleware, requirePermission('settings', 'full'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const targetId = Number(req.params.id);
     if (req.user?.id === targetId) {
@@ -78,6 +79,13 @@ router.delete('/users/:id', authMiddleware, requireRole('Admin'), async (req: Au
   } catch (e) { next(e); }
 });
 
+// ===== PERMISSION MODULES (untuk frontend roles page) =====
+router.get('/modules', authMiddleware, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    sendSuccess(res, PERMISSION_MODULES);
+  } catch (e) { next(e); }
+});
+
 // ===== ROLES =====
 router.get('/roles', authMiddleware, async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -87,28 +95,51 @@ router.get('/roles', authMiddleware, async (_req: Request, res: Response, next: 
   } catch (e) { next(e); }
 });
 
-router.post('/roles', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/roles', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const newId = await db.insert('roles', req.body);
+    const payload = { ...req.body };
+    if (payload.permissions && typeof payload.permissions !== 'string') {
+      payload.permissions = JSON.stringify(payload.permissions);
+    }
+    const newId = await db.insert('roles', payload);
     const data = await db.queryOne('SELECT * FROM roles WHERE id = ?', [newId]);
     sendCreated(res, data);
   } catch (e) { next(e); }
 });
 
-router.put('/roles/:id', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/roles/:id', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const roleId = Number(req.params.id);
+    // Protect Admin role from name change
+    const existing = await db.queryOne<any>('SELECT name FROM roles WHERE id = ?', [roleId]);
+    if (existing?.name === 'Admin' && req.body.name && req.body.name !== 'Admin') {
+      return res.status(400).json({ success: false, message: 'Tidak dapat mengubah nama role Admin.' });
+    }
     const updateBody: any = { name: req.body.name, description: req.body.description };
     if (req.body.permissions !== undefined) updateBody.permissions = typeof req.body.permissions === 'string' ? req.body.permissions : JSON.stringify(req.body.permissions);
     await db.update('roles', updateBody, 'id = ?', [roleId]);
+    // Invalidate auth cache for all users with this role
+    const affectedUsers = await db.query('SELECT id FROM users WHERE roleId = ?', [roleId]);
+    for (const u of affectedUsers) appCache.invalidate(`auth_user_${u.id}`);
     const data = await db.queryOne('SELECT * FROM roles WHERE id = ?', [roleId]);
     sendSuccess(res, data, 'Role berhasil diperbarui');
   } catch (e) { next(e); }
 });
 
-router.delete('/roles/:id', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/roles/:id', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await db.execute('DELETE FROM roles WHERE id = ?', [Number(req.params.id)]);
+    const roleId = Number(req.params.id);
+    // Protect Admin role from deletion
+    const role = await db.queryOne<any>('SELECT name FROM roles WHERE id = ?', [roleId]);
+    if (role?.name === 'Admin') {
+      return res.status(400).json({ success: false, message: 'Role Admin tidak dapat dihapus.' });
+    }
+    // Check if role still has active users
+    const userCount = await db.queryVal<number>('SELECT COUNT(*) FROM users WHERE roleId = ?', [roleId]);
+    if (userCount && userCount > 0) {
+      return res.status(400).json({ success: false, message: `Role ini masih memiliki ${userCount} user aktif. Pindahkan user ke role lain terlebih dahulu.` });
+    }
+    await db.execute('DELETE FROM roles WHERE id = ?', [roleId]);
     sendSuccess(res, null, 'Role berhasil dihapus');
   } catch (e) { next(e); }
 });
@@ -126,7 +157,7 @@ router.get('/config', authMiddleware, async (_req: Request, res: Response, next:
   } catch (e) { next(e); }
 });
 
-router.put('/config', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/config', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const entries = Object.entries(req.body as Record<string, unknown>);
     await db.transaction(async (tx) => {
@@ -148,7 +179,7 @@ router.get('/profile', authMiddleware, async (_req: Request, res: Response, next
   } catch (e) { next(e); }
 });
 
-router.put('/profile', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/profile', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const entries = Object.entries(req.body as Record<string, unknown>);
     await db.transaction(async (tx) => {
@@ -161,7 +192,7 @@ router.put('/profile', authMiddleware, requireRole('Admin'), async (req: Request
   } catch (e) { next(e); }
 });
 
-router.put('/whatsapp', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/whatsapp', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     for (const [key, value] of Object.entries(req.body)) {
       await db.upsert('settings', { key, value: String(value), group: 'whatsapp' }, ['value']);
@@ -171,7 +202,7 @@ router.put('/whatsapp', authMiddleware, requireRole('Admin'), async (req: Reques
   } catch (e) { next(e); }
 });
 
-router.post('/backup', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/backup', authMiddleware, requirePermission('settings', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const backupData: any = {};
     const users = await db.query('SELECT id, name, username, email, roleId, status FROM users');
@@ -191,7 +222,7 @@ router.post('/backup', authMiddleware, requireRole('Admin'), async (req: Request
   } catch (e) { next(e); }
 });
 
-router.post('/restore', authMiddleware, requireRole('Admin'), upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/restore', authMiddleware, requirePermission('settings', 'full'), upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'File backup tidak ditemukan' });
     const d = fs.readFileSync(req.file.path, 'utf8');

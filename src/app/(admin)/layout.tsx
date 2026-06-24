@@ -3,9 +3,9 @@
 import { AdminLayout } from "@/components/layout/admin-layout";
 
 export default function AdminGroupLayout({
-  children,
+ children,
 }: {
-  children: React.ReactNode;
+ children: React.ReactNode;
 }) {
-  return <AdminLayout>{children}</AdminLayout>;
+ return <AdminLayout>{children}</AdminLayout>;
 }

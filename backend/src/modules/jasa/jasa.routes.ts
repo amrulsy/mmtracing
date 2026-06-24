@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated, sendPaginated, parsePagination } from '../../shared/utils';
 import { NotFoundError, BadRequestError } from '../../shared/errors';
@@ -91,7 +91,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /jasa — create with optional sparepartBundles
-router.post('/', requireRole('Admin'), validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', requirePermission('master', 'full'), validate(createSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sparepartBundles, kode, ...jasaData } = req.body;
     const finalKode = kode || `JS-${Date.now().toString(36).toUpperCase().slice(-5)}`;
@@ -112,7 +112,7 @@ router.post('/', requireRole('Admin'), validate(createSchema), async (req: Reque
 });
 
 // PUT /jasa/:id — update with optional sparepartBundles sync
-router.put('/:id', requireRole('Admin'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', requirePermission('master', 'full'), validate(updateSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     const { sparepartBundles, ...jasaData } = req.body;
@@ -141,7 +141,7 @@ router.put('/:id', requireRole('Admin'), validate(updateSchema), async (req: Req
 });
 
 // DELETE /jasa/:id — with protection
-router.delete('/:id', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', requirePermission('master', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
 

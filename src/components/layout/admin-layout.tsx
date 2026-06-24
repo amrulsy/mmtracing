@@ -35,7 +35,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white font-bold text-xl shadow-glossy-primary animate-pulse">
+          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white font-bold text-xl animate-pulse">
             M
           </div>
           <p className="text-sm text-muted-foreground animate-pulse">Memuat...</p>
@@ -54,7 +54,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen bg-background">
         <Sidebar />
         <div className="flex-1 lg:pl-64 flex flex-col min-h-screen relative overflow-x-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background pointer-events-none" />
           <Topbar />
           <main className="flex-1 pt-[104px] lg:pt-8 px-4 lg:px-8 pb-24 lg:pb-8 relative z-10 w-full max-w-7xl mx-auto">
             {children}

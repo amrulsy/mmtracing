@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { sendSuccess, sendCreated, sendPaginated, parsePagination } from '../../shared/utils';
 import { BadRequestError } from '../../shared/errors';
@@ -64,7 +64,7 @@ const opnameSchema = z.object({
 });
 
 // GET /inventaris/opname — history stok opname
-router.get('/opname', requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.get('/opname', requirePermission('inventaris', 'view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
     const [opnames, totalRow] = await Promise.all([
@@ -135,7 +135,7 @@ router.get('/summary', async (_req: Request, res: Response, next: NextFunction) 
 });
 
 // POST /inventaris/masuk — Stok masuk (single; WAC applied)
-router.post('/masuk', requireRole('Admin'), validate(stokMasukSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/masuk', requirePermission('inventaris', 'edit'), validate(stokMasukSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sparepartId, supplierId, qty, hargaSatuan, noPo, keterangan, tanggal } = req.body;
     const createdAt = tanggal ? new Date(tanggal) : new Date();
@@ -161,7 +161,7 @@ router.post('/masuk', requireRole('Admin'), validate(stokMasukSchema), async (re
 });
 
 // POST /inventaris/masuk/batch — Stok masuk banyak item (1 PO, 1 transaction, WAC, alokasi ongkir)
-router.post('/masuk/batch', requireRole('Admin'), validate(stokMasukBatchSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/masuk/batch', requirePermission('inventaris', 'edit'), validate(stokMasukBatchSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { supplierId, noPo, tanggal, ongkosKirim, keterangan, items } = req.body as z.infer<typeof stokMasukBatchSchema>;
     const createdAt = tanggal ? new Date(tanggal) : new Date();
@@ -224,7 +224,7 @@ router.post('/masuk/batch', requireRole('Admin'), validate(stokMasukBatchSchema)
 });
 
 // POST /inventaris/keluar — Stok keluar manual (di luar SPK)
-router.post('/keluar', requireRole('Admin'), validate(stokKeluarSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/keluar', requirePermission('inventaris', 'edit'), validate(stokKeluarSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sparepartId, qty, keterangan } = req.body;
     const result = await db.transaction(async (tx) => {
@@ -259,7 +259,7 @@ router.post('/keluar', requireRole('Admin'), validate(stokKeluarSchema), async (
 });
 
 // POST /inventaris/retur — Retur ke supplier
-router.post('/retur', requireRole('Admin'), validate(stokReturSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/retur', requirePermission('inventaris', 'edit'), validate(stokReturSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sparepartId, supplierId, qty, keterangan } = req.body;
     const result = await db.transaction(async (tx) => {
@@ -297,7 +297,7 @@ router.post('/retur', requireRole('Admin'), validate(stokReturSchema), async (re
 });
 
 // POST /inventaris/opname
-router.post('/opname', requireRole('Admin'), validate(opnameSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/opname', requirePermission('inventaris', 'edit'), validate(opnameSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { items, catatan } = req.body;
     const operatorName = (req as any).user?.name || 'Admin';

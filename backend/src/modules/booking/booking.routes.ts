@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import db from '../../config/db';
-import { authMiddleware, requireRole } from '../../middleware/auth';
+import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { sendSuccess, generateSpkNo } from '../../shared/utils';
 
 const router = Router();
@@ -88,7 +88,7 @@ router.get('/stats', authMiddleware, async (_req: Request, res: Response, next: 
 });
 
 // PUT /booking/:id — Update booking status + catatan (Admin)
-router.put('/:id', authMiddleware, requireRole('Admin', 'Kasir'), async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', authMiddleware, requirePermission('monitoring', 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(String(req.params.id));
     const { status, catatan, alasanPenolakan } = req.body;
@@ -136,7 +136,7 @@ router.put('/:id', authMiddleware, requireRole('Admin', 'Kasir'), async (req: Re
 });
 
 // POST /booking/:id/convert-to-spk — Convert booking to SPK
-router.post('/:id/convert-to-spk', authMiddleware, requireRole('Admin', 'Kasir'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/convert-to-spk', authMiddleware, requirePermission('monitoring', 'edit'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bookingId = parseInt(String(req.params.id));
     const booking = await db.queryOne<any>('SELECT * FROM bookings WHERE id = ?', [bookingId]);
@@ -220,7 +220,7 @@ router.post('/:id/convert-to-spk', authMiddleware, requireRole('Admin', 'Kasir')
 });
 
 // DELETE /booking/:id — Delete booking (Admin)
-router.delete('/:id', authMiddleware, requireRole('Admin'), async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', authMiddleware, requirePermission('monitoring', 'full'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(String(req.params.id));
     await db.execute('DELETE FROM bookings WHERE id = ?', [id]);

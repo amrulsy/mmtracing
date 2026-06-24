@@ -33,7 +33,7 @@ function getPoolConfig(): mysql.PoolOptions {
 export const pool: Pool = mysql.createPool({
   ...getPoolConfig(),
   waitForConnections: true,
-  connectionLimit: 50,
+  connectionLimit: 15,
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
