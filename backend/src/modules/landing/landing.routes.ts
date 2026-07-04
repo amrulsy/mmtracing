@@ -30,7 +30,7 @@ const LANDING_DEFAULTS: Record<string, string> = {
   }),
   landing_hero: JSON.stringify({
     tagline: "Bengkel Terpercaya Sejak 2016",
-    title: "Servis Berkualitas, Modifikasi Presisi Tinggi",
+    title: "Bengkel Motor Cilacap - Servis Berkualitas, Modifikasi Presisi Tinggi",
     subtitle: "Spesialis servis rutin, modifikasi, dan jasa bubut custom untuk motor & mobil. Dikerjakan mekanik berpengalaman dengan garansi resmi."
   }),
   landing_stats: JSON.stringify([
@@ -40,12 +40,12 @@ const LANDING_DEFAULTS: Record<string, string> = {
     { value: "4.9", label: "Rating Google" }
   ]),
   landing_services: JSON.stringify([
-    { icon: "Wrench", title: "Servis Rutin", desc: "Ganti oli, tune up, CVT clean, ganti kampas rem, dan perawatan berkala lainnya.", color: "from-blue-500 to-blue-600", image: "" },
-    { icon: "Cog", title: "Modifikasi", desc: "Custom exhaust, bore up, suspension upgrade, body kit, dan modifikasi performa.", color: "from-red-500 to-red-600", image: "" },
-    { icon: "Hammer", title: "Jasa Bubut Custom", desc: "Bubut velg, spacer, adapter, shaft, dan komponen custom lainnya dengan presisi CNC.", color: "from-purple-500 to-purple-600", image: "" },
-    { icon: "Shield", title: "Quality Check", desc: "Inspeksi menyeluruh: mesin, kelistrikan, body, ban. Laporan digital lengkap.", color: "from-emerald-500 to-emerald-600", image: "" },
-    { icon: "Eye", title: "Detailing & Coating", desc: "Poles body, nano ceramic coating, engine dress-up untuk tampilan showroom.", color: "from-amber-500 to-amber-600", image: "" },
-    { icon: "Clock", title: "Express Service", desc: "Layanan cepat untuk servis ringan. Selesai dalam 30-60 menit dengan appointment.", color: "from-cyan-500 to-cyan-600", image: "" }
+    { icon: "Wrench", title: "Servis Rutin", desc: "Ganti oli, tune up, CVT clean, ganti kampas rem, dan perawatan berkala lainnya. Mekanik berpengalaman dengan sparepart original. Garansi 7 hari untuk semua servis rutin.", color: "from-blue-500 to-blue-600", image: "" },
+    { icon: "Cog", title: "Modifikasi", desc: "Custom exhaust, bore up, suspension upgrade, body kit, dan modifikasi performa. Konsultasi gratis untuk desain modifikasi sesuai budget dan kebutuhan. Hasil presisi dengan garansi 30 hari.", color: "from-red-500 to-red-600", image: "" },
+    { icon: "Hammer", title: "Jasa Bubut Custom", desc: "Bubut velg, spacer, adapter, shaft, dan komponen custom lainnya dengan presisi CNC 0.01mm. Material berkualitas (aluminium 6061, besi, stainless). Bisa custom sesuai desain customer. Garansi 14 hari.", color: "from-purple-500 to-purple-600", image: "" },
+    { icon: "Shield", title: "Quality Check", desc: "Inspeksi menyeluruh: mesin, kelistrikan, body, ban, dan sistem rem. Laporan digital lengkap via WhatsApp. Deteksi dini masalah sebelum menjadi serius. Cocok untuk beli motor bekas.", color: "from-emerald-500 to-emerald-600", image: "" },
+    { icon: "Eye", title: "Detailing & Coating", desc: "Poles body, nano ceramic coating, engine dress-up untuk tampilan showroom. Protection hingga 6 bulan untuk ceramic coating. Menghilangkan scratch halus dan restore warna original.", color: "from-amber-500 to-amber-600", image: "" },
+    { icon: "Clock", title: "Express Service", desc: "Layanan cepat untuk servis ringan seperti ganti oli, tune up ringan, dan ganti kampas rem. Selesai dalam 30-60 menit dengan appointment. Tidak perlu antri lama, cocok untuk yang sibuk.", color: "from-cyan-500 to-cyan-600", image: "" }
   ]),
   landing_usp: JSON.stringify([
     { icon: "Shield", title: "Garansi Resmi", desc: "Jasa 30 hari, sparepart 6 bulan. Klaim mudah." },
@@ -102,14 +102,14 @@ const LANDING_DEFAULTS: Record<string, string> = {
     hourSunday: "Minggu: Tutup"
   }),
   landing_gallery: JSON.stringify([
-    { title: "Custom Bubut Velg", sub: "Yamaha NMAX", image: "" },
-    { title: "Bore Up 200cc", sub: "Honda PCX", image: "" },
-    { title: "Full Exhaust System", sub: "Kawasaki Ninja 250", image: "" },
-    { title: "Engine Dress Up", sub: "Honda Beat", image: "" },
-    { title: "Bracket Caliper", sub: "Custom CNC", image: "" },
-    { title: "Servis Besar", sub: "Toyota Avanza", image: "" },
-    { title: "Nano Ceramic Coating", sub: "Yamaha R15", image: "" },
-    { title: "CVT Upgrade", sub: "Honda Vario 160", image: "" }
+    { title: "Custom Bubut Velg", sub: "Yamaha NMAX dengan presisi 0.01mm", image: "" },
+    { title: "Bore Up 200cc", sub: "Honda PCX dengan piston custom", image: "" },
+    { title: "Full Exhaust System", sub: "Kawasaki Ninja 250 racing exhaust", image: "" },
+    { title: "Engine Dress Up", sub: "Honda Beat dengan cover custom", image: "" },
+    { title: "Bracket Caliper", sub: "Custom CNC untuk upgrade rem", image: "" },
+    { title: "Servis Besar", sub: "Toyota Avanza tune up lengkap", image: "" },
+    { title: "Nano Ceramic Coating", sub: "Yamaha R15 protection 6 bulan", image: "" },
+    { title: "CVT Upgrade", sub: "Honda Vario 160 dengan van belt racing", image: "" }
   ]),
 };
 

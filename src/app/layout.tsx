@@ -12,6 +12,9 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://mmtracing.com"),
+  alternates: {
+    canonical: 'https://mmtracing.com',
+  },
   title: {
     default: "MMT Racing | Bengkel Motor, Modifikasi & Jasa Bubut Custom Cilacap",
     template: "%s | MMT Racing",

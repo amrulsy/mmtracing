@@ -126,6 +126,98 @@ function FAQJsonLd() {
   );
 }
 
+// JSON-LD: Service Schema — NEW for SEO
+function ServiceJsonLd({ data }: { data: LandingData | null }) {
+  const services = data?.landing_services || [];
+  const contact = data?.landing_contact;
+
+  const serviceData = services.map((service: any) => ({
+    "@type": "Service",
+    name: service.title,
+    description: service.desc,
+    provider: {
+      "@type": "LocalBusiness",
+      name: "MMT Racing",
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: contact?.address || "Widarapayung Wetan, Binangun",
+        addressLocality: "Cilacap",
+        addressRegion: "Jawa Tengah",
+        addressCountry: "ID",
+      },
+      telephone: contact?.phone || "",
+    },
+  }));
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@graph": serviceData }) }}
+    />
+  );
+}
+
+// JSON-LD: BreadcrumbList Schema — NEW for SEO
+function BreadcrumbJsonLd() {
+  const breadcrumbData = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: "https://mmtracing.com",
+      },
+    ],
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbData) }}
+    />
+  );
+}
+
+// JSON-LD: Review/AggregateReview Schema — NEW for SEO
+function ReviewJsonLd({ data }: { data: LandingData | null }) {
+  const testimonials = data?.landing_testimonials || [];
+  
+  const reviewData = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: "MMT Racing",
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "4.9",
+      reviewCount: testimonials.length.toString(),
+      bestRating: "5",
+      worstRating: "1",
+    },
+    review: testimonials.map((testimonial: any) => ({
+      "@type": "Review",
+      author: {
+        "@type": "Person",
+        name: testimonial.name,
+      },
+      reviewRating: {
+        "@type": "Rating",
+        ratingValue: testimonial.rating.toString(),
+        bestRating: "5",
+      },
+      reviewBody: testimonial.text,
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(reviewData) }}
+    />
+  );
+}
+
 export default async function LandingPage() {
   const [data, queueData] = await Promise.all([
     fetchLandingData(),
@@ -136,6 +228,9 @@ export default async function LandingPage() {
     <>
       <BusinessJsonLd data={data} />
       <FAQJsonLd />
+      <ServiceJsonLd data={data} />
+      <BreadcrumbJsonLd />
+      <ReviewJsonLd data={data} />
       <LandingClient initialData={data} initialQueue={queueData} />
     </>
   );

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Disallow admin and private areas
+Disallow: /admin/
+Disallow: /portal/
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://mmtracing.com/sitemap.xml

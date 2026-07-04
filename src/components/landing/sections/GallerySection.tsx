@@ -44,7 +44,7 @@ export default function GallerySection({ gallery }: GallerySectionProps) {
                   onClick={() => openLightbox(i)}
                   className="aspect-square bg-gradient-to-br from-surface-hover to-surface relative rounded-xl overflow-hidden group cursor-pointer border border-surface-border"
                 >
-                  <GalleryImage src={g.image} alt={g.title} />
+                  <GalleryImage src={g.image} alt={`${g.title} - ${g.sub}`} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
                     <div className="text-white">
                       <p className="text-sm font-bold">{g.title}</p>
