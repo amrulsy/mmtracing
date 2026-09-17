@@ -13,6 +13,7 @@ export interface PortalProfile {
   totalTrx: string;
   avatar: string | null;
   createdAt: string;
+  kendaraan?: Kendaraan[];
 }
 
 // ============ Work Order (WO) ============
@@ -139,7 +140,7 @@ export interface Pembayaran {
 // ============ Loyalty ============
 export interface LoyaltyData {
   balance: number;
-  tier: { id: number; name: string } | null;
+  tier: { id: number; name: string; minPoints?: number } | null;
   nextTier: { name: string; minPoints: number } | null;
 }
 
@@ -157,6 +158,15 @@ export interface LoyaltyHistory {
   points: number;
   description: string;
   createdAt: string;
+}
+export interface LoyaltyVoucher {
+  id: number;
+  code: string;
+  status: "tersedia" | "digunakan" | "kedaluwarsa" | "dibatalkan";
+  expiresAt: string | null;
+  usedAt?: string | null;
+  rewardName?: string;
+  rewardDescription?: string | null;
 }
 
 // ============ Garansi ============
@@ -186,6 +196,8 @@ export interface Notifikasi {
   title: string;
   message: string;
   type: string;
+  link?: string | null;
+  woId?: number | null;
   isRead: boolean;
   createdAt: string;
 }

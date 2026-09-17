@@ -301,6 +301,7 @@ export default function BookingPage() {
  <div className="flex items-center gap-2 flex-wrap">
  <span className="font-bold text-sm">{b.nama}</span>
  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${cfg.color}`}>{cfg.label}</span>
+ <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${b.sumber === "landing_bubut" ? "bg-amber-500/15 text-amber-600 border-amber-500/30" : "bg-sky-500/15 text-sky-600 border-sky-500/30"}`}>{b.sumber === "landing_bubut" ? "Bubut" : "Motor"}</span>
  <span className="text-[10px] text-muted-foreground">#{b.id}</span>
  {b.spk && (
  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-500 border border-purple-500/30 font-medium">
@@ -327,7 +328,7 @@ export default function BookingPage() {
  {b.status === "baru" && (
  <button onClick={() => updateStatus(b.id, "dikonfirmasi")} title="Konfirmasi" className="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-600 transition-colors"><Check size={16} /></button>
  )}
- {!b.woId && (b.status === "baru" || b.status === "dikonfirmasi") && (
+ {!b.woId && b.status === "dikonfirmasi" && (
  <button onClick={() => convertToSpk(b.id)} disabled={convertingId === b.id} title="Konversi ke WO"
  className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors disabled:opacity-50">
  {convertingId === b.id ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
@@ -455,7 +456,7 @@ export default function BookingPage() {
  {/* Drawer Footer Actions */}
  <div className="p-5 border-t border-surface-border space-y-2">
  {/* Convert to SPK - primary action */}
- {!selectedBooking.woId && (selectedBooking.status === "baru" || selectedBooking.status === "dikonfirmasi") && (
+ {!selectedBooking.woId && selectedBooking.status === "dikonfirmasi" && (
  <button onClick={() => convertToSpk(selectedBooking.id)} disabled={convertingId === selectedBooking.id}
  className="w-full bg-primary text-white py-2.5 rounded-xl font-bold text-sm hover: flex items-center justify-center gap-2 disabled:opacity-60">
  {convertingId === selectedBooking.id
@@ -501,12 +502,6 @@ export default function BookingPage() {
  <button onClick={() => { updateStatus(selectedBooking.id, "dikonfirmasi"); setSelectedBooking(prev => prev ? { ...prev, status: "dikonfirmasi" } : null); }}
  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium border border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10 transition-colors">
  <Check size={14} /> Konfirmasi
- </button>
- )}
- {selectedBooking.status === "dikonfirmasi" && (
- <button onClick={() => { updateStatus(selectedBooking.id, "selesai"); setSelectedBooking(prev => prev ? { ...prev, status: "selesai" } : null); }}
- className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-medium border border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-colors">
- <CheckCircle2 size={14} /> Selesai
  </button>
  )}
  {(selectedBooking.status === "baru" || selectedBooking.status === "dikonfirmasi") && rejectingId !== selectedBooking.id && (

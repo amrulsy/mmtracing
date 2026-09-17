@@ -1,7 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 import db from '../../config/db';
 import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
-import { sendSuccess, generateWoNo } from '../../shared/utils';
+import { sendSuccess, generateWoNo, generateInvoiceNo } from '../../shared/utils';
+import { notifyBookingStatus } from '../whatsapp/whatsapp.notification';
+import { notifyWoCreated } from '../whatsapp/whatsapp.notification';
 
 const router = Router();
 
@@ -94,12 +97,22 @@ router.put('/:id', authMiddleware, requirePermission('monitoring', 'edit'), asyn
     const { status, catatan, alasanPenolakan } = req.body;
 
     // Validasi status
-    const validStatuses = ['baru', 'dikonfirmasi', 'selesai', 'dibatalkan', 'ditolak'];
+    const validStatuses = ['dikonfirmasi', 'dibatalkan', 'ditolak'];
     if (status && !validStatuses.includes(status)) {
       res.status(400).json({ success: false, message: 'Status tidak valid' });
       return;
     }
 
+    const currentBooking = await db.queryOne<any>('SELECT * FROM bookings WHERE id = ?', [id]);
+    if (!currentBooking) {
+      res.status(404).json({ success: false, message: 'Booking tidak ditemukan' });
+      return;
+    }
+    const transitions: Record<string, string[]> = { baru: ['dikonfirmasi', 'ditolak', 'dibatalkan'], dikonfirmasi: ['dibatalkan'] };
+    if (status && !transitions[currentBooking.status]?.includes(status)) {
+      res.status(400).json({ success: false, message: 'Perubahan status ini tidak diizinkan.' });
+      return;
+    }
     const updateData: any = {};
     if (status) updateData.status = status;
     if (catatan !== undefined) updateData.catatan = catatan;
@@ -107,7 +120,6 @@ router.put('/:id', authMiddleware, requirePermission('monitoring', 'edit'), asyn
 
     // Auto-match pelanggan by WhatsApp saat dikonfirmasi
     if (status === 'dikonfirmasi') {
-      const currentBooking = await db.queryOne<any>('SELECT * FROM bookings WHERE id = ?', [id]);
       if (currentBooking && !currentBooking.pelangganId) {
         const normalizedPhone = currentBooking.whatsapp.replace(/^0/, '62').replace(/[^0-9]/g, '');
         const existingPelanggan = await db.queryOne<{ id: number }>(
@@ -119,6 +131,18 @@ router.put('/:id', authMiddleware, requirePermission('monitoring', 'edit'), asyn
       }
     }
 
+    if (status === 'dikonfirmasi' && currentBooking.tanggal && currentBooking.jamPreferensi) {
+      const scheduleName = `Booking #${id}`;
+      const existingSchedule = await db.queryOne<{ id: number }>('SELECT id FROM jadwal WHERE pekerjaan = ? LIMIT 1', [scheduleName]);
+      if (!existingSchedule) {
+        const [hours, minutes] = String(currentBooking.jamPreferensi).split(':').map(Number);
+        const end = new Date(2000, 0, 1, hours, minutes || 0); end.setHours(end.getHours() + 1);
+        const now = new Date();
+        await db.insert('jadwal', { tanggal: new Date(currentBooking.tanggal), jamMulai: currentBooking.jamPreferensi, jamSelesai: `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`, namaBooking: currentBooking.nama, pekerjaan: scheduleName, kategori: String(currentBooking.layanan).toLowerCase().includes('bubut') ? 'bubut' : 'servis', status: 'dijadwalkan', createdAt: now, updatedAt: now });
+      }
+    }
+    if (status === 'ditolak' || status === 'dibatalkan') await db.execute('DELETE FROM jadwal WHERE pekerjaan = ?', [`Booking #${id}`]);
+
     await db.update('bookings', { ...updateData, updatedAt: new Date() }, 'id = ?', [id]);
     const booking = await db.queryOne<any>(
       `SELECT b.*, p.id AS pId, p.name AS pName, s.id AS sId, s.noWo
@@ -128,6 +152,7 @@ router.put('/:id', authMiddleware, requirePermission('monitoring', 'edit'), asyn
       booking.pelanggan = booking.pId ? { id: booking.pId, name: booking.pName } : null;
       booking.spk = booking.sId ? { id: booking.sId, noWo: booking.noWo } : null;
     }
+    if (status) notifyBookingStatus(id, status).catch(() => {});
 
     sendSuccess(res, booking, 'Status booking diperbarui');
   } catch (e) {
@@ -148,6 +173,10 @@ router.post('/:id/convert-to-spk', authMiddleware, requirePermission('monitoring
       res.status(400).json({ success: false, message: `Booking sudah dikonversi ke SPK #${booking.woId}` });
       return;
     }
+    if (booking.status !== 'dikonfirmasi') {
+      res.status(400).json({ success: false, message: 'Konfirmasi booking terlebih dahulu sebelum membuat SPK.' });
+      return;
+    }
 
     // Determine mode from layanan
     let mode = 'rutin';
@@ -165,10 +194,13 @@ router.post('/:id/convert-to-spk', authMiddleware, requirePermission('monitoring
       if (existing) {
         pelangganId = existing.id;
       } else {
+        const now = new Date();
         pelangganId = await db.insert('pelanggan', {
           name: booking.nama,
           phone: booking.whatsapp,
           type: mode === 'bubut' ? 'bubut' : 'kendaraan',
+          createdAt: now,
+          updatedAt: now,
         });
       }
     }
@@ -182,10 +214,13 @@ router.post('/:id/convert-to-spk', authMiddleware, requirePermission('monitoring
       if (kendaraan) {
         kendaraanId = kendaraan.id;
       } else if (booking.merkTipe || booking.jenisKendaraan) {
+        const now = new Date();
         kendaraanId = await db.insert('kendaraan', {
           pelangganId: pelangganId!,
           name: booking.merkTipe || booking.jenisKendaraan,
           plat: booking.platNomor || '-',
+          createdAt: now,
+          updatedAt: now,
         });
       }
     }
@@ -195,7 +230,8 @@ router.post('/:id/convert-to-spk', authMiddleware, requirePermission('monitoring
 
     // Create SPK
     const noWo = generateWoNo();
-    const woId = await db.insert('spk', {
+    const now = new Date();
+    const woId = await db.insert('work_orders', {
       noWo,
       pelangganId: pelangganId!,
       kendaraanId,
@@ -203,10 +239,32 @@ router.post('/:id/convert-to-spk', authMiddleware, requirePermission('monitoring
       keluhan: booking.keluhan || `Booking Online #${booking.id}: ${booking.layanan}`,
       createdById: userId,
       status: 'antri',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Setiap WO hasil booking harus langsung memiliki invoice. Nilainya
+    // sementara 0 dan akan disinkronkan oleh recalcTotalHarga saat admin
+    // menambahkan jasa atau sparepart.
+    const jatuhTempo = new Date(now);
+    jatuhTempo.setDate(jatuhTempo.getDate() + 30);
+    await db.insert('pembayaran', {
+      noInvoice: generateInvoiceNo(),
+      woId,
+      totalTagihan: 0,
+      totalBayar: 0,
+      sisaBayar: 0,
+      status: 'belum_bayar',
+      jatuhTempo,
+      publicId: randomUUID(),
+      accessPin: String(Math.floor(Math.random() * 1000000)).padStart(6, '0'),
+      createdAt: now,
+      updatedAt: now,
     });
 
     // Link booking to SPK and update status
     await db.update('bookings', { woId, pelangganId, status: 'dikonfirmasi', updatedAt: new Date() }, 'id = ?', [bookingId]);
+    notifyWoCreated(woId).catch(() => {});
 
     sendSuccess(res, {
       woId,

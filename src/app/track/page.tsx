@@ -223,27 +223,44 @@ function SpkDetailView({ spk, onBack }: { spk: any; onBack: () => void }) {
 export default function TrackPage() {
   const [noWo, setNoSpk] = useState("");
   const [accessPin, setAccessPin] = useState("");
+  const [bookingMode, setBookingMode] = useState(false);
+  const [bookingPhone, setBookingPhone] = useState("");
+  const [bookingData, setBookingData] = useState<any>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [msg, setMsg] = useState("");
   const [spk, setSpk] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+    const params = new URLSearchParams(window.location.search);
+    const initialWo = params.get("noWo");
+    const initialPin = params.get("accessPin");
+    const initialBooking = params.get("bookingId");
+    if (initialWo) setNoSpk(initialWo.toUpperCase());
+    if (initialPin) setAccessPin(initialPin);
+    if (initialBooking) { setBookingMode(true); setNoSpk(initialBooking); }
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !noWo || !accessPin || !new URLSearchParams(window.location.search).get("accessPin")) return;
+    (document.getElementById("track-form") as HTMLFormElement | null)?.requestSubmit();
+  }, [mounted, noWo, accessPin]);
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!noWo || !accessPin) return;
+    if (bookingMode ? (!noWo || !bookingPhone) : (!noWo || !accessPin)) return;
 
     setStatus("loading");
     setMsg("");
     setSpk(null);
 
     try {
-      const res = await fetch("/api/v1/landing/track", {
+      const res = await fetch(`/api/v1/landing/${bookingMode ? "booking-status" : "track"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noWo: noWo.trim(), accessPin })
+        body: JSON.stringify(bookingMode ? { bookingId: noWo.trim(), whatsapp: bookingPhone } : { noWo: noWo.trim(), accessPin })
       });
       const data = await res.json();
 
@@ -253,6 +270,7 @@ export default function TrackPage() {
         return;
       }
 
+      if (bookingMode) { setBookingData(data.data); setStatus("success"); return; }
       setSpk(data.data);
       setStatus("success");
     } catch (err) {
@@ -296,6 +314,7 @@ export default function TrackPage() {
       <main className="flex-1 pt-24 pb-20 px-4 max-w-3xl mx-auto w-full relative z-10">
         {!spk ? (
           <div className="max-w-md mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 mt-8 sm:mt-14">
+            {bookingData && <div className="glass-panel p-6 space-y-4"><p className="text-xs text-muted-foreground">Booking #{bookingData.booking.id}</p><h2 className="text-xl font-black capitalize">{bookingData.booking.status === "baru" ? "Menunggu konfirmasi bengkel" : bookingData.booking.status}</h2><p className="text-sm">{bookingData.booking.layanan}</p>{bookingData.booking.tanggal && <p className="text-sm text-muted-foreground">Jadwal: {new Date(bookingData.booking.tanggal).toLocaleDateString("id-ID")} {bookingData.booking.jamPreferensi || ""}</p>}{bookingData.wo && <p className="text-sm text-emerald-600">WO {bookingData.wo.noWo} sudah dibuat. Gunakan menu lacak WO dengan PIN pada nota.</p>}<button type="button" onClick={() => { setBookingData(null); setStatus("idle"); }} className="w-full py-3 rounded-xl border border-surface-border font-bold text-sm">Cek booking lain</button></div>}
             {/* Hero Section */}
             <div className="text-center">
               <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mx-auto mb-5 relative">
@@ -311,7 +330,7 @@ export default function TrackPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleTrack} className="glass-panel p-6 sm:p-8 space-y-5">
+            <form id="track-form" onSubmit={handleTrack} className="glass-panel p-6 sm:p-8 space-y-5">
               {msg && (
                 <div className={`p-4 rounded-xl text-sm font-medium flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-300 ${status === "error" ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"}`}>
                   <AlertCircle size={18} className="shrink-0 mt-0.5" />
@@ -320,27 +339,27 @@ export default function TrackPage() {
               )}
 
               <div>
-                <label className={labelCls}>Nomor WO <span className="text-red-500">*</span></label>
+                <label className={labelCls}>{bookingMode ? "Nomor Booking" : "Nomor WO"} <span className="text-red-500">*</span></label>
                 <input
                   required
                   type="text"
                   value={noWo}
                   onChange={e => setNoSpk(e.target.value.toUpperCase())}
                   className={`${inputCls} font-mono uppercase`}
-                  placeholder="Cth: SPK-20260601-ABCD"
+                  placeholder={bookingMode ? "Cth: 123" : "Cth: SPK-20260601-ABCD"}
                   autoComplete="off"
                 />
               </div>
 
               <div>
-                <label className={labelCls}>PIN Akses <span className="text-red-500">*</span></label>
+                <label className={labelCls}>{bookingMode ? "Nomor WhatsApp" : "PIN Akses"} <span className="text-red-500">*</span></label>
                 <input
                   required
                   type="text"
                   inputMode="numeric"
-                  maxLength={6}
-                  value={accessPin}
-                  onChange={e => setAccessPin(e.target.value.replace(/[^0-9]/g, ""))}
+                  maxLength={bookingMode ? 15 : 6}
+                  value={bookingMode ? bookingPhone : accessPin}
+                  onChange={e => bookingMode ? setBookingPhone(e.target.value) : setAccessPin(e.target.value.replace(/[^0-9]/g, ""))}
                   className={`${inputCls} font-mono tracking-[0.3em] text-center text-lg`}
                   placeholder="• • • • • •"
                   autoComplete="off"
@@ -351,12 +370,12 @@ export default function TrackPage() {
               </div>
 
               <button
-                disabled={status === "loading" || !noWo.trim() || accessPin.length !== 6}
+                disabled={status === "loading" || !noWo.trim() || (bookingMode ? bookingPhone.length < 8 : accessPin.length !== 6)}
                 type="submit"
                 className="w-full btn-glossy bg-primary text-white py-3.5 rounded-xl font-bold text-sm shadow-glossy-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2 active:scale-[0.98] transition-transform"
               >
                 {status === "loading" ? <Loader2 className="animate-spin" size={18} /> : <Search size={18} />}
-                {status === "loading" ? "Mencari..." : "Lacak Kendaraan"}
+                {status === "loading" ? "Mencari..." : bookingMode ? "Cek Status Booking" : "Lacak Kendaraan"}
               </button>
             </form>
 

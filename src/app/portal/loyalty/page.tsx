@@ -6,12 +6,13 @@ import { ArrowLeft, Trophy, Star, Gift, History, Loader2, CheckCircle2 } from "l
 import { portalFetch, portalLogout } from "@/lib/portalFetch";
 import { SkeletonCard, SkeletonKPI } from "@/components/portal/PortalSkeleton";
 import { PortalError } from "@/components/portal/PortalError";
-import type { LoyaltyData, LoyaltyReward, LoyaltyHistory } from "@/types/portal";
+import type { LoyaltyData, LoyaltyReward, LoyaltyHistory, LoyaltyVoucher } from "@/types/portal";
 
 export default function LoyaltyPage() {
   const [data, setData] = useState<LoyaltyData | null>(null);
   const [history, setHistory] = useState<LoyaltyHistory[]>([]);
   const [rewards, setRewards] = useState<LoyaltyReward[]>([]);
+  const [vouchers, setVouchers] = useState<LoyaltyVoucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"rewards" | "history">("rewards");
   const [redeeming, setRedeeming] = useState<number | null>(null);
@@ -21,16 +22,17 @@ export default function LoyaltyPage() {
   const fetchLoyalty = async () => {
     setError(null);
     try {
-      const [loyaltyRes, rewardsRes, historyRes] = await Promise.all([
+      const [loyaltyRes, rewardsRes, historyRes, vouchersRes] = await Promise.all([
         portalFetch("/api/v1/customer-auth/loyalty"),
         portalFetch("/api/v1/customer-auth/loyalty/rewards"),
-        portalFetch("/api/v1/customer-auth/loyalty/history")
+        portalFetch("/api/v1/customer-auth/loyalty/history"),
+        portalFetch("/api/v1/customer-auth/loyalty/vouchers")
       ]);
 
       if (loyaltyRes.status === 401) { portalLogout(); return; }
 
-      const [loyaltyJson, rewardsJson, historyJson] = await Promise.all([
-        loyaltyRes.json(), rewardsRes.json(), historyRes.json()
+      const [loyaltyJson, rewardsJson, historyJson, vouchersJson] = await Promise.all([
+        loyaltyRes.json(), rewardsRes.json(), historyRes.json(), vouchersRes.json()
       ]);
 
       if (loyaltyJson.success) setData(loyaltyJson.data);
@@ -38,6 +40,7 @@ export default function LoyaltyPage() {
 
       if (rewardsJson.success) setRewards(rewardsJson.data);
       if (historyJson.success) setHistory(historyJson.data);
+      if (vouchersJson.success) setVouchers(vouchersJson.data);
     } catch {
       setError({ type: "network", message: "Koneksi bermasalah. Periksa internet Anda." });
     } finally {
@@ -64,12 +67,14 @@ export default function LoyaltyPage() {
         setData(prev => prev ? { ...prev, balance: json.data.balance } : null);
         
         // Refresh history & rewards stock
-        const [rewardsRes, historyRes] = await Promise.all([
+        const [rewardsRes, historyRes, vouchersRes] = await Promise.all([
           portalFetch("/api/v1/customer-auth/loyalty/rewards"),
-          portalFetch("/api/v1/customer-auth/loyalty/history")
+          portalFetch("/api/v1/customer-auth/loyalty/history"),
+          portalFetch("/api/v1/customer-auth/loyalty/vouchers")
         ]);
         setRewards((await rewardsRes.json()).data);
         setHistory((await historyRes.json()).data);
+        setVouchers((await vouchersRes.json()).data);
       } else {
         setMsg({ text: json.message || "Gagal menukar poin", type: "error" });
       }
@@ -99,8 +104,9 @@ export default function LoyaltyPage() {
   }
 
   const progressPercentage = data?.nextTier 
-    ? Math.min(100, ((data.balance ?? 0) / data.nextTier.minPoints) * 100) 
+    ? Math.min(100, Math.max(0, (((data.balance ?? 0) - Number(data.tier?.minPoints || 0)) / Math.max(1, data.nextTier.minPoints - Number(data.tier?.minPoints || 0))) * 100))
     : 100;
+  const pointsToNext = data?.nextTier ? Math.max(0, data.nextTier.minPoints - Number(data.balance || 0)) : 0;
 
   return (
     <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-6 animate-in fade-in duration-500">
@@ -111,6 +117,7 @@ export default function LoyaltyPage() {
         <h1 className="text-xl sm:text-2xl font-black flex items-center gap-2">
           <Trophy className="text-amber-500" size={24} /> MMT Loyalty
         </h1>
+        <Link href="/portal/voucher" className="ml-auto text-xs font-bold text-amber-600 hover:underline flex items-center gap-1"><Gift size={14} /> Voucher Saya</Link>
       </div>
 
       {/* Hero Card */}
@@ -130,7 +137,7 @@ export default function LoyaltyPage() {
           <div className="mt-8 relative z-10">
             <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider mb-2">
               <span className="text-muted-foreground">Progress ke {data.nextTier.name}</span>
-              <span>{data.balance} / {data.nextTier.minPoints}</span>
+              <span>{pointsToNext > 0 ? `${pointsToNext.toLocaleString("id-ID")} poin lagi` : "Target tercapai"}</span>
             </div>
             <div className="w-full bg-background rounded-full h-2.5 border border-surface-border overflow-hidden">
               <div 
@@ -149,6 +156,13 @@ export default function LoyaltyPage() {
         </div>
       )}
 
+      <div className="glass-panel px-4 py-3 border border-amber-500/20 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-500">Cara kerja</p>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">1</span><span><strong className="text-foreground">Servis & bayar</strong> → poin masuk</span></div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">2</span><span><strong className="text-foreground">Kumpulkan</strong> → pantau saldo</span></div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">3</span><span><strong className="text-foreground">Tukar reward</strong> → klaim ke admin</span></div>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-2 p-1 bg-surface-hover border border-surface-border rounded-xl">
         <button 
@@ -165,18 +179,32 @@ export default function LoyaltyPage() {
         </button>
       </div>
 
+      {vouchers.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Voucher Saya</h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {vouchers.slice(0, 4).map((voucher) => (
+              <div key={voucher.id} className={`glass-panel p-4 border-l-4 ${voucher.status === 'tersedia' ? 'border-l-amber-500' : 'border-l-surface-border opacity-70'}`}>
+                <div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">{voucher.rewardName || 'Reward loyalty'}</p><p className="font-mono font-black text-lg tracking-wider mt-1">{voucher.code}</p></div><span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-surface-hover">{voucher.status}</span></div>
+                {voucher.expiresAt && <p className="text-[10px] text-muted-foreground mt-3">Berlaku sampai {new Date(voucher.expiresAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Content */}
       {activeTab === "rewards" ? (
         <div className="grid sm:grid-cols-2 gap-4">
           {rewards.map(reward => {
-            const canRedeem = (data?.balance ?? 0) >= reward.pointsCost && reward.stock > 0;
+                    const canRedeem = (data?.balance ?? 0) >= reward.pointsCost && reward.stock > 0;
             return (
               <div key={reward.id} className="glass-panel p-5 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-black text-lg">{reward.name}</h3>
-                    <span className="text-[10px] font-bold px-2 py-1 bg-surface-hover rounded border border-surface-border">
-                      Sisa {reward.stock}
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded border ${reward.stock > 0 ? 'bg-surface-hover border-surface-border' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                      {reward.stock > 0 ? `Sisa ${reward.stock}` : 'Habis'}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mb-4">{reward.description || "Reward spesial untuk pelanggan setia MMT."}</p>

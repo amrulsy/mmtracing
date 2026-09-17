@@ -1,30 +1,36 @@
 "use client";
 
-import { useState, type FormEvent, useEffect } from "react";
+import { useState, type FormEvent } from "react";
 import { 
   Calendar, ArrowRight, Check, Loader2, AlertCircle, 
   CheckCircle2, Wrench, Settings, Hammer, Zap, 
   MessageCircle, Copy, Bike
 } from "lucide-react";
+import { getWhatsAppUrl } from "../contact";
 import AnimatedSection from "../ui/AnimatedSection";
-import type { ContactData, BookingFormData } from "../types";
+import type { BookingSettings, ContactData, BookingFormData } from "../types";
 
 interface BookingSectionProps {
   contact: ContactData;
+  settings?: BookingSettings;
 }
 
 const LAYANAN_OPTIONS = [
-  { id: "Servis Rutin", icon: Wrench, desc: "Ganti oli, tune up, CVT, kampas rem", est: "30-60 Menit" },
-  { id: "Modifikasi", icon: Settings, desc: "Bore up, exhaust, suspension, body", est: "1-7 Hari" },
-  { id: "Jasa Bubut Custom", icon: Hammer, desc: "Bubut velg, spacer, komponen CNC", est: "1-3 Hari" },
-  { id: "Express Service", icon: Zap, desc: "Layanan prioritas tanpa antri lama", est: "< 30 Menit" },
+  { id: "Servis Rutin", icon: Wrench, desc: "Ganti oli, tune up, CVT, kampas rem", est: "Konfirmasi bengkel" },
+  { id: "Modifikasi", icon: Settings, desc: "Bore up, exhaust, suspension, body", est: "Konfirmasi bengkel" },
+  { id: "Jasa Bubut Custom", icon: Hammer, desc: "Konsultasi kebutuhan komponen custom", est: "Konfirmasi bengkel" },
+  { id: "Express Service", icon: Zap, desc: "Tanyakan ketersediaan layanan prioritas", est: "Konfirmasi bengkel" },
 ];
 
-const JENIS_KENDARAAN = ["Motor Matic", "Motor Sport", "Motor Bebek", "Tanpa Kendaraan (Bawa Part)"];
+const JENIS_KENDARAAN = ["Motor Matic", "Motor Sport", "Motor Bebek"];
 
-export default function BookingSection({ contact }: BookingSectionProps) {
+export default function BookingSection({ contact, settings }: BookingSectionProps) {
+  const whatsapp = getWhatsAppUrl(contact.whatsapp, "Halo, saya ingin booking servis atau konsultasi.");
+  const serviceOptions = settings?.serviceOptions?.length ? settings.serviceOptions.map((item, index) => ({ ...item, category: item.category || (/bubut|cnc|shaft|spacer|adapter|bracket/i.test(item.id) ? "bubut" : "motor"), icon: [Wrench, Settings, Hammer, Zap][index % 4], est: "Konfirmasi bengkel" })) : LAYANAN_OPTIONS.map(item => ({ ...item, category: /bubut/i.test(item.id) ? "bubut" : "motor" }));
+  const vehicleTypes = settings?.vehicleTypes?.length ? settings.vehicleTypes : JENIS_KENDARAAN;
+  const timeSlots = settings?.timeSlots?.length ? settings.timeSlots : ["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00"];
   const [bookingForm, setBookingForm] = useState<BookingFormData>({
-    nama: "", whatsapp: "", jenisKendaraan: "Motor Matic", merkTipe: "",
+    kategori: "motor", nama: "", whatsapp: "", jenisKendaraan: "Motor Matic", merkTipe: "",
     platNomor: "", layanan: "", tanggal: "", jamPreferensi: "", keluhan: "", _hp: "",
   });
   const [bookingStatus, setBookingStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -33,11 +39,7 @@ export default function BookingSection({ contact }: BookingSectionProps) {
   const [bookingStep, setBookingStep] = useState(1);
   const [waError, setWaError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [todayStr, setTodayStr] = useState("");
-
-  useEffect(() => {
-    setTodayStr(new Date().toISOString().split("T")[0]);
-  }, []);
+  const [todayStr] = useState(() => new Date().toISOString().split("T")[0]);
 
   const validateWa = (v: string) => {
     const clean = v.replace(/[^0-9]/g, "");
@@ -46,18 +48,18 @@ export default function BookingSection({ contact }: BookingSectionProps) {
     else setWaError("");
   };
 
-  const isSunday = (date: string) => {
-    if (!date) return false;
-    return new Date(`${date}T00:00:00`).getDay() === 0;
-  };
-
-  const isDateClosed = /minggu|sunday/i.test(contact.hoursClosed || "") && isSunday(bookingForm.tanggal);
+  const closedDays = settings?.closedDays || (/minggu|sunday/i.test(contact.hoursClosed || "") ? ["Minggu"] : []);
+  const isDateClosed = (() => {
+    if (!bookingForm.tanggal) return false;
+    const dayNames = ["minggu", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu"];
+    return closedDays.map((day) => day.trim().toLowerCase()).includes(dayNames[new Date(`${bookingForm.tanggal}T00:00:00`).getDay()]);
+  })();
 
   const isWaValid = /^(08|628)[0-9]{8,12}$/.test(bookingForm.whatsapp.replace(/[^0-9]/g, ""));
   const canGoStep2 = bookingForm.nama.trim().length >= 2 && isWaValid && bookingForm.jenisKendaraan;
   const canGoStep3 = canGoStep2 && bookingForm.layanan && !isDateClosed;
 
-  const isTanpaKendaraan = bookingForm.jenisKendaraan === "Tanpa Kendaraan (Bawa Part)";
+  const isTanpaKendaraan = bookingForm.kategori === "bubut";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -73,10 +75,6 @@ export default function BookingSection({ contact }: BookingSectionProps) {
         setBookingStatus("success");
         setBookingIdStr(`#${json.data.id}`);
         setBookingMsg(json.message || "Booking berhasil! Kami akan menghubungi via WhatsApp.");
-        const waContact = contact.whatsapp || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "62274123456";
-        const kendStr = isTanpaKendaraan ? `Part: ${bookingForm.merkTipe || "Bawa Part"}` : `Kendaraan: ${bookingForm.jenisKendaraan} ${bookingForm.merkTipe}`;
-        const waMsg = encodeURIComponent(`Halo MMT Racing,\nSaya ${bookingForm.nama} baru saja booking online #${json.data.id}.\nLayanan: ${bookingForm.layanan}\n${kendStr}\nTanggal: ${bookingForm.tanggal || "Secepatnya"}\nMohon konfirmasinya. Terima kasih!`);
-        setTimeout(() => { window.open(`https://wa.me/${waContact}?text=${waMsg}`, "_blank"); }, 2000);
       } else {
         setBookingStatus("error");
         setBookingMsg(json.message || "Gagal mengirim booking");
@@ -94,7 +92,7 @@ export default function BookingSection({ contact }: BookingSectionProps) {
   };
 
   const resetForm = () => {
-    setBookingForm({ nama: "", whatsapp: "", jenisKendaraan: "Motor Matic", merkTipe: "", platNomor: "", layanan: "", tanggal: "", jamPreferensi: "", keluhan: "", _hp: "" });
+    setBookingForm({ kategori: "motor", nama: "", whatsapp: "", jenisKendaraan: "Motor Matic", merkTipe: "", platNomor: "", layanan: "", tanggal: "", jamPreferensi: "", keluhan: "", _hp: "" });
     setBookingStep(1);
     setBookingStatus("idle");
   };
@@ -104,7 +102,8 @@ export default function BookingSection({ contact }: BookingSectionProps) {
   const f = bookingForm;
   const setF = (partial: Partial<BookingFormData>) => setBookingForm({ ...bookingForm, ...partial });
 
-  const selectedLayanan = LAYANAN_OPTIONS.find(l => l.id === f.layanan);
+  const visibleServices = serviceOptions.filter(service => service.category === f.kategori);
+  const selectedLayanan = visibleServices.find(l => l.id === f.layanan);
 
   return (
     <section id="booking" className="py-16 lg:py-24 relative overflow-hidden">
@@ -114,8 +113,8 @@ export default function BookingSection({ contact }: BookingSectionProps) {
       <div className="max-w-4xl mx-auto px-4 lg:px-8 relative z-10">
         <AnimatedSection className="text-center mb-10">
           <span className="text-xs font-bold uppercase tracking-widest text-primary">Reservasi Cepat</span>
-          <h2 className="text-3xl lg:text-4xl font-black mt-2">Booking Jadwal Servis</h2>
-          <p className="text-muted-foreground mt-3 max-w-xl mx-auto">Tentukan jadwal Anda tanpa harus antri lama di bengkel. Kami akan mengonfirmasi ketersediaan via WhatsApp.</p>
+          <h2 className="text-3xl lg:text-4xl font-black mt-2">{settings?.heading || "Booking Jadwal Servis"}</h2>
+          <p className="text-muted-foreground mt-3 max-w-xl mx-auto">{settings?.description || "Ajukan kebutuhan dan jadwal pilihan Anda. Ketersediaan waktu menunggu konfirmasi bengkel."}</p>
         </AnimatedSection>
         
         <AnimatedSection>
@@ -142,10 +141,10 @@ export default function BookingSection({ contact }: BookingSectionProps) {
                 </button>
               </div>
               <div className="pt-4 space-y-3">
-                <p className="text-xs font-medium text-emerald-500 animate-pulse">Membuka WhatsApp dalam beberapa detik...</p>
+                <p className="text-xs font-medium text-emerald-500">Simpan ID booking untuk konfirmasi kepada bengkel.</p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                  <a href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(`Halo MMT Racing, saya ingin konfirmasi booking ${bookingIdStr}`)}`} target="_blank" rel="noopener noreferrer" className="btn-glossy bg-[#25D366] text-white px-6 py-2.5 rounded-xl text-sm font-bold w-full sm:w-auto shadow-lg shadow-[#25D366]/20 flex items-center justify-center gap-2">
-                    <MessageCircle size={18} /> Buka WhatsApp Manual
+                  <a href={getWhatsAppUrl(contact.whatsapp, `Halo, saya ingin konfirmasi booking ${bookingIdStr}.`) || "#kontak"} target="_blank" rel="noopener noreferrer" className="btn-glossy bg-[#25D366] text-white px-6 py-2.5 rounded-xl text-sm font-bold w-full sm:w-auto shadow-lg shadow-[#25D366]/20 flex items-center justify-center gap-2">
+                    <MessageCircle size={18} /> {whatsapp ? "Konfirmasi via WhatsApp" : "Informasi kontak"}
                   </a>
                   <button onClick={resetForm} className="px-6 py-2.5 rounded-xl text-sm font-medium border border-surface-border hover:bg-surface-hover transition-colors w-full sm:w-auto">
                     Buat Booking Baru
@@ -182,6 +181,13 @@ export default function BookingSection({ contact }: BookingSectionProps) {
                 {/* STEP 1: Data Diri & Kendaraan */}
                 {bookingStep === 1 && (
                   <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                    <div>
+                      <label className={labelCls}>Kebutuhan Anda <span className="text-red-500">*</span></label>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <button type="button" onClick={() => setF({ kategori: "motor", jenisKendaraan: f.jenisKendaraan === "Tanpa Kendaraan (Bawa Part)" ? "Motor Matic" : f.jenisKendaraan, layanan: "" })} className={`p-4 rounded-xl text-left border transition-all ${f.kategori === "motor" ? "bg-primary/10 border-primary shadow-sm" : "bg-surface-hover/30 border-surface-border hover:bg-surface-hover"}`}><Bike className="mb-2 text-primary" size={22}/><strong className="block text-sm">Servis &amp; Perbaikan Motor</strong><span className="text-xs text-muted-foreground">Bawa motor untuk servis, perbaikan, atau modifikasi.</span></button>
+                        <button type="button" onClick={() => setF({ kategori: "bubut", jenisKendaraan: "Tanpa Kendaraan (Bawa Part)", platNomor: "", layanan: "" })} className={`p-4 rounded-xl text-left border transition-all ${f.kategori === "bubut" ? "bg-primary/10 border-primary shadow-sm" : "bg-surface-hover/30 border-surface-border hover:bg-surface-hover"}`}><Hammer className="mb-2 text-primary" size={22}/><strong className="block text-sm">Jasa Bubut &amp; Komponen Custom</strong><span className="text-xs text-muted-foreground">Bawa part atau siapkan ukuran dan foto referensi.</span></button>
+                      </div>
+                    </div>
                     <div className="grid sm:grid-cols-2 gap-5">
                       <div>
                         <label className={labelCls}>Nama Lengkap <span className="text-red-500">*</span></label>
@@ -197,29 +203,6 @@ export default function BookingSection({ contact }: BookingSectionProps) {
                           {isWaValid && <Check size={16} className="absolute right-4 top-3.5 text-emerald-500" />}
                         </div>
                         {waError && <p className="text-[10px] text-red-500 mt-1.5">{waError}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 gap-5 mt-2">
-                      <div className="sm:col-span-2">
-                        <label className={labelCls}>Kondisi Bawaan <span className="text-red-500">*</span></label>
-                        <div className="flex flex-wrap gap-2">
-                          {JENIS_KENDARAAN.map(jk => (
-                            <button
-                              key={jk} type="button"
-                              onClick={() => { 
-                                if (jk === "Tanpa Kendaraan (Bawa Part)") {
-                                  setF({ jenisKendaraan: jk, platNomor: "" });
-                                } else {
-                                  setF({ jenisKendaraan: jk });
-                                }
-                              }}
-                              className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all border ${f.jenisKendaraan === jk ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]" : "bg-surface-hover/30 border-surface-border text-muted-foreground hover:bg-surface-hover"}`}
-                            >
-                              {jk}
-                            </button>
-                          ))}
-                        </div>
                       </div>
                     </div>
 
@@ -255,7 +238,7 @@ export default function BookingSection({ contact }: BookingSectionProps) {
                     <div>
                       <label className={labelCls}>Pilih Layanan Utama <span className="text-red-500">*</span></label>
                       <div className="grid sm:grid-cols-2 gap-3">
-                        {LAYANAN_OPTIONS.map(l => (
+                        {visibleServices.map(l => (
                           <button
                             key={l.id} type="button"
                             onClick={() => setF({ layanan: l.id })}
@@ -280,13 +263,13 @@ export default function BookingSection({ contact }: BookingSectionProps) {
                       <div>
                         <label className={labelCls}>Tanggal Kedatangan</label>
                         <input type="date" min={todayStr} value={f.tanggal} onChange={(e) => setF({ tanggal: e.target.value })} className={`${inputCls} ${isDateClosed ? "ring-2 ring-red-500/50 border-red-500/50" : ""}`} />
-                        {isDateClosed && <p className="text-[10px] text-red-500 mt-1.5">Booking hari Minggu belum tersedia. Silakan pilih hari lain.</p>}
+                        {isDateClosed && <p className="text-[10px] text-red-500 mt-1.5">Booking pada hari ini belum tersedia. Silakan pilih hari lain.</p>}
                       </div>
                       <div>
                         <label className={labelCls}>Jam Kedatangan (Opsional)</label>
                         <select value={f.jamPreferensi} onChange={(e) => setF({ jamPreferensi: e.target.value })} className={inputCls}>
                           <option value="">Fleksibel (Kapan saja)</option>
-                          {["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00"].map((h) => <option key={h} value={h}>{h}</option>)}
+                          {timeSlots.map((h) => <option key={h} value={h}>{h}</option>)}
                         </select>
                       </div>
                     </div>
@@ -359,7 +342,7 @@ export default function BookingSection({ contact }: BookingSectionProps) {
                       {f.keluhan && (
                         <div className="border-t border-surface-border pt-4">
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Catatan Tambahan</p>
-                          <p className="text-sm text-muted-foreground italic bg-background/50 p-3 rounded-xl border border-surface-border/50">"{f.keluhan}"</p>
+                          <p className="text-sm text-muted-foreground italic bg-background/50 p-3 rounded-xl border border-surface-border/50">&ldquo;{f.keluhan}&rdquo;</p>
                         </div>
                       )}
                     </div>
@@ -379,8 +362,8 @@ export default function BookingSection({ contact }: BookingSectionProps) {
               {/* Quick WA Booking Option */}
               <div className="bg-surface-hover/20 p-4 border-t border-surface-border text-center">
                 <p className="text-xs text-muted-foreground mb-2">Atau tidak ingin repot mengisi form?</p>
-                <a href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent("Halo MMT Racing, saya ingin booking servis / konsultasi.")}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-[#25D366] hover:text-[#25D366]/80 transition-colors">
-                  <MessageCircle size={16} /> Booking Langsung via WhatsApp
+                <a href={whatsapp || "#kontak"} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-[#25D366] hover:text-[#25D366]/80 transition-colors">
+                  <MessageCircle size={16} /> {whatsapp ? "Konsultasi via WhatsApp" : "Informasi kontak bengkel"}
                 </a>
               </div>
             </div>

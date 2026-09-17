@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Calendar, Clock } from "lucide-react";
+import { CheckCircle2, Calendar } from "lucide-react";
 import AnimatedSection from "../ui/AnimatedSection";
 import type { QueueData } from "../types";
 
@@ -12,8 +12,6 @@ interface QueueSectionProps {
 
 export default function QueueSection({ queueData }: QueueSectionProps) {
   const [activeQueueTab, setActiveQueueTab] = useState("Semua");
-  const [lastRefresh] = useState(() => new Date());
-
   const filterQueue = (q: QueueData["queue"][0]) => {
     if (activeQueueTab === "Semua") return true;
     if (activeQueueTab === "Servis Harian") return q.mode?.toLowerCase().includes("servis") || q.mode?.toLowerCase().includes("harian");
@@ -21,9 +19,6 @@ export default function QueueSection({ queueData }: QueueSectionProps) {
     if (activeQueueTab === "Bubut") return q.mode?.toLowerCase().includes("bubut");
     return true;
   };
-
-  // Estimate wait time based on queue count
-  const estimatedWait = queueData ? queueData.antri * 30 : 0; // ~30 min per vehicle
 
   return (
     <section id="antrian" className="py-16 lg:py-24 bg-surface-hover/30">
@@ -50,16 +45,6 @@ export default function QueueSection({ queueData }: QueueSectionProps) {
               <p className="text-[10px] text-muted-foreground font-medium mt-1">Total Aktif</p>
             </div>
           </div>
-
-          {/* Estimated wait — NEW */}
-          {estimatedWait > 0 && (
-            <div className="flex items-center justify-center gap-2 mb-6 text-sm">
-              <Clock size={14} className="text-amber-500" />
-              <span className="text-muted-foreground">
-                Estimasi waktu tunggu: <b className="text-foreground">±{estimatedWait} menit</b>
-              </span>
-            </div>
-          )}
 
           {/* Category filter */}
           <div className="flex flex-wrap justify-center gap-1 mb-6 bg-surface-hover/50 rounded-xl border border-surface-border p-1 max-w-fit mx-auto">
@@ -117,8 +102,8 @@ export default function QueueSection({ queueData }: QueueSectionProps) {
                   <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 flex items-center justify-center mb-4">
                     <CheckCircle2 size={32} className="text-emerald-500" />
                   </div>
-                  <h3 className="font-bold text-lg">Bengkel Siap Melayani!</h3>
-                  <p className="text-sm text-muted-foreground mt-2">Saat ini tidak ada total antrian. Anda bisa langsung datang atau booking online.</p>
+                  <h3 className="font-bold text-lg">Tidak ada antrean tercatat</h3>
+                  <p className="text-sm text-muted-foreground mt-2">Konfirmasikan jam operasional dan jadwal kepada bengkel sebelum datang.</p>
                   <a href="#booking" className="inline-flex items-center gap-2 mt-4 btn-glossy bg-primary text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-glossy-primary">
                     <Calendar size={16} /> Booking Sekarang
                   </a>

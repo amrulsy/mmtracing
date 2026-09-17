@@ -17,8 +17,9 @@ export function PortalHeaderActions() {
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-2">
-      <Link href="/portal/notifikasi" className="relative p-2 rounded-lg hover:bg-surface-hover transition-colors text-muted-foreground hover:text-foreground">
+      <Link href="/portal/notifikasi" aria-label="Notifikasi" className="relative p-2 rounded-lg hover:bg-surface-hover transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1.5">
         <Bell size={18} />
+        <span className="hidden md:inline text-xs font-semibold">Notifikasi</span>
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
         )}

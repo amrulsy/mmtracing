@@ -1,43 +1,20 @@
 "use client";
 
-import { Wrench, Cog, Hammer, Shield, Clock, Users, Star, Eye, Award, Zap, Target } from "lucide-react";
+import { Wrench, Cog, Hammer, ArrowUpRight } from "lucide-react";
 import AnimatedSection from "../ui/AnimatedSection";
 import type { LandingData } from "../types";
 
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  Wrench, Cog, Hammer, Shield, Clock, Users, Star, Eye, Award, Zap, Target,
-};
+const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = { Wrench, Cog, Hammer };
 
-interface ServicesSectionProps {
-  services: LandingData["landing_services"];
-}
-
-export default function ServicesSection({ services }: ServicesSectionProps) {
-  return (
-    <section id="layanan" className="py-16 lg:py-24">
-      <div className="max-w-7xl mx-auto px-4 lg:px-8">
-        <AnimatedSection className="text-center mb-12">
-          <span className="text-xs font-bold uppercase tracking-widest text-primary">Layanan Kami</span>
-          <h2 className="text-3xl lg:text-4xl font-black mt-2">Solusi Lengkap untuk Motor Anda</h2>
-          <p className="text-muted-foreground mt-3 max-w-xl mx-auto">Dari perawatan rutin hingga modifikasi presisi tinggi — semua dikerjakan di satu tempat.</p>
-        </AnimatedSection>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-          {services.map((svc, i) => {
-            const IconComp = ICON_MAP[svc.icon] || Wrench;
-            return (
-              <AnimatedSection key={i} delay={i * 100}>
-                <div className="group glass-panel p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer h-full">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${svc.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg`}>
-                    <IconComp size={22} className="text-white" />
-                  </div>
-                  <h3 className="font-bold text-lg mb-2">{svc.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{svc.desc}</p>
-                </div>
-              </AnimatedSection>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
+export default function ServicesSection({ services }: { services: LandingData["landing_services"] }) {
+  const motor = services.filter((service) => !/bubut|cnc|shaft|spacer|adapter|bracket/i.test(`${service.title} ${service.desc}`));
+  const bubut = services.filter((service) => /bubut|cnc|shaft|spacer|adapter|bracket/i.test(`${service.title} ${service.desc}`));
+  const groups = [
+    { title: "Bengkel motor", kicker: "RAWAT MESIN. SIAPKAN PERJALANAN.", description: "Perawatan, perbaikan, dan modifikasi motor sesuai kebutuhan Anda.", icon: Wrench, services: motor },
+    { title: "Jasa bubut custom", kicker: "DARI KEBUTUHAN MENJADI KOMPONEN.", description: "Konsultasikan ukuran, material, dan fungsi komponen sebelum pengerjaan.", icon: Hammer, services: bubut },
+  ].filter((group) => group.services.length);
+  return <section id="layanan" className="py-16 lg:py-24"><div className="max-w-7xl mx-auto px-4 lg:px-8">
+    <AnimatedSection className="text-center mb-12"><span className="text-xs font-bold uppercase tracking-widest text-primary">Layanan Kami</span><h2 className="text-3xl lg:text-4xl font-black mt-2">Satu bengkel, dua fokus pengerjaan</h2><p className="text-muted-foreground mt-3 max-w-xl mx-auto">Pilih kebutuhan motor atau komponen Anda, lalu mulai dengan konsultasi yang jelas.</p></AnimatedSection>
+    <div className="grid lg:grid-cols-2 gap-5 lg:gap-7">{groups.map((group, index) => <AnimatedSection key={group.title} delay={index * 100}><article className="service-focus-card"><div className="flex items-start justify-between gap-4"><group.icon className="text-primary" size={32} strokeWidth={1.5}/><span className="font-mono text-xs text-muted-foreground">0{index + 1}</span></div><p className="service-kicker">{group.kicker}</p><h3>{group.title}</h3><p className="service-intro">{group.description}</p><div className="service-detail-list">{group.services.map((service) => { const Icon = ICON_MAP[service.icon] || Cog; return <details key={service.title}><summary><span><Icon size={16}/>{service.title}</span><ArrowUpRight size={17}/></summary><p>{service.desc}</p></details>; })}</div><a href="#booking" className="service-focus-link">Diskusikan kebutuhan Anda <ArrowUpRight size={18}/></a></article></AnimatedSection>)}</div>
+  </div></section>;
 }

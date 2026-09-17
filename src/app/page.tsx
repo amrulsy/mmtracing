@@ -1,237 +1,43 @@
 import LandingClient, { type LandingData, type QueueData } from "@/components/landing/LandingClient";
+import type { Metadata } from "next";
 
-// SSR: Fetch landing data at the server level for SEO
-async function fetchLandingData(): Promise<LandingData | null> {
+async function fetchLandingData<T>(endpoint: string, revalidate: number): Promise<T | null> {
   try {
     const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:5000";
-    const res = await fetch(`${backendUrl}/api/v1/landing/content`, {
-      next: { revalidate: 60 },
-    });
+    const res = await fetch(`${backendUrl}/api/v1/landing/${endpoint}`, { next: { revalidate }, signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
     const json = await res.json();
-    if (json.success) return json.data;
-  } catch {}
-  return null;
+    return json.success ? json.data : null;
+  } catch { return null; }
 }
 
-async function fetchQueueData(): Promise<QueueData | null> {
-  try {
-    const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:5000";
-    const res = await fetch(`${backendUrl}/api/v1/landing/queue`, {
-      next: { revalidate: 30 },
-    });
-    const json = await res.json();
-    if (json.success) return json.data;
-  } catch {}
-  return null;
-}
-
-// JSON-LD: LocalBusiness (AutoRepair)
-function BusinessJsonLd({ data }: { data: LandingData | null }) {
-  const contact = data?.landing_contact;
-  const header = data?.landing_header;
-
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "AutoRepair",
-    name: header?.brandName || "MMT Racing",
-    description: data?.landing_hero?.subtitle || "Spesialis servis rutin, modifikasi, dan jasa bubut custom untuk motor di Cilacap.",
-    url: "https://mmtracing.com",
-    telephone: contact?.phone || "",
-    email: contact?.email || "",
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: contact?.address || "Widarapayung Wetan, Binangun",
-      addressLocality: "Cilacap",
-      addressRegion: "Jawa Tengah",
-      addressCountry: "ID",
-    },
-    openingHours: ["Mo-Fr 08:00-17:00", "Sa 08:00-15:00"],
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "4.9",
-      reviewCount: "520",
-    },
-    priceRange: "Rp 40.000 - Rp 450.000",
-    serviceType: [
-      "Servis Rutin Motor",
-      "Modifikasi Motor",
-      "Jasa Bubut Custom",
-      "Bubut Velg Motor",
-      "Express Service",
-    ],
+export async function generateMetadata(): Promise<Metadata> {
+  const data = await fetchLandingData<LandingData>("content", 60);
+  const seo = data?.landing_seo;
+  if (!seo?.title && !seo?.description && !seo?.canonicalUrl) return {};
+  return {
+    title: seo.title || undefined,
+    description: seo.description || undefined,
+    alternates: seo.canonicalUrl ? { canonical: seo.canonicalUrl } : undefined,
+    openGraph: { title: seo.title || undefined, description: seo.description || undefined, url: seo.canonicalUrl || undefined },
   };
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-    />
-  );
-}
-
-// JSON-LD: FAQ Schema — NEW for SEO
-function FAQJsonLd() {
-  const faqData = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: [
-      {
-        "@type": "Question",
-        name: "Berapa biaya servis rutin motor matic?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Biaya servis rutin motor matic mulai dari Rp 40.000 – Rp 80.000 tergantung jenis servis. Sudah termasuk jasa, oli, dan pengecekan komponen penting.",
-        },
-      },
-      {
-        "@type": "Question",
-        name: "Apakah bisa booking online?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Ya! Anda bisa booking langsung melalui formulir di website ini atau chat via WhatsApp. Kami akan konfirmasi jadwal dalam 15 menit pada jam kerja.",
-        },
-      },
-      {
-        "@type": "Question",
-        name: "Berapa lama waktu pengerjaan servis?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Servis rutin biasanya selesai dalam 30–60 menit. Modifikasi dan bubut custom bisa 1–7 hari kerja tergantung kompleksitas pekerjaan.",
-        },
-      },
-      {
-        "@type": "Question",
-        name: "Apakah ada garansi setelah servis?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Ya, semua pekerjaan kami bergaransi. Servis rutin garansi 7 hari, modifikasi garansi 30 hari, dan bubut custom garansi 14 hari.",
-        },
-      },
-      {
-        "@type": "Question",
-        name: "Apa saja metode pembayaran yang diterima?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Kami menerima pembayaran tunai, transfer bank (BCA, BRI, Mandiri), dan e-wallet (GoPay, OVO, DANA, ShopeePay).",
-        },
-      },
-    ],
-  };
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(faqData) }}
-    />
-  );
-}
-
-// JSON-LD: Service Schema — NEW for SEO
-function ServiceJsonLd({ data }: { data: LandingData | null }) {
-  const services = data?.landing_services || [];
-  const contact = data?.landing_contact;
-
-  const serviceData = services.map((service: any) => ({
-    "@type": "Service",
-    name: service.title,
-    description: service.desc,
-    provider: {
-      "@type": "LocalBusiness",
-      name: "MMT Racing",
-      address: {
-        "@type": "PostalAddress",
-        streetAddress: contact?.address || "Widarapayung Wetan, Binangun",
-        addressLocality: "Cilacap",
-        addressRegion: "Jawa Tengah",
-        addressCountry: "ID",
-      },
-      telephone: contact?.phone || "",
-    },
-  }));
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@graph": serviceData }) }}
-    />
-  );
-}
-
-// JSON-LD: BreadcrumbList Schema — NEW for SEO
-function BreadcrumbJsonLd() {
-  const breadcrumbData = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "Home",
-        item: "https://mmtracing.com",
-      },
-    ],
-  };
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbData) }}
-    />
-  );
-}
-
-// JSON-LD: Review/AggregateReview Schema — NEW for SEO
-function ReviewJsonLd({ data }: { data: LandingData | null }) {
-  const testimonials = data?.landing_testimonials || [];
-  
-  const reviewData = {
-    "@context": "https://schema.org",
-    "@type": "LocalBusiness",
-    name: "MMT Racing",
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "4.9",
-      reviewCount: testimonials.length.toString(),
-      bestRating: "5",
-      worstRating: "1",
-    },
-    review: testimonials.map((testimonial: any) => ({
-      "@type": "Review",
-      author: {
-        "@type": "Person",
-        name: testimonial.name,
-      },
-      reviewRating: {
-        "@type": "Rating",
-        ratingValue: testimonial.rating.toString(),
-        bestRating: "5",
-      },
-      reviewBody: testimonial.text,
-    })),
-  };
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(reviewData) }}
-    />
-  );
 }
 
 export default async function LandingPage() {
-  const [data, queueData] = await Promise.all([
-    fetchLandingData(),
-    fetchQueueData(),
-  ]);
-
-  return (
-    <>
-      <BusinessJsonLd data={data} />
-      <FAQJsonLd />
-      <ServiceJsonLd data={data} />
-      <BreadcrumbJsonLd />
-      <ReviewJsonLd data={data} />
-      <LandingClient initialData={data} initialQueue={queueData} />
-    </>
-  );
+  const [data, queueData] = await Promise.all([fetchLandingData<LandingData>("content", 60), fetchLandingData<QueueData>("queue", 30)]);
+  const contact = data?.landing_contact;
+  const isTemplateContent = contact?.whatsapp === "62274123456";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "AutoRepair",
+    name: data?.landing_header?.brandName || "MMT Racing",
+    url: "https://mmtracing.com",
+    ...(!isTemplateContent && contact?.phone ? { telephone: contact.phone } : {}),
+    ...(!isTemplateContent && contact?.email ? { email: contact.email } : {}),
+    ...(!isTemplateContent && contact?.address ? { address: contact.address } : {}),
+  };
+  return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+    <LandingClient initialData={data} initialQueue={queueData} />
+  </>;
 }

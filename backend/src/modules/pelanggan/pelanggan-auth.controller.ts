@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../../config/db';
+import { ensureNotificationSchema } from '../whatsapp/whatsapp.notification';
+import { ensureVoucherSchema, issueVoucher } from '../loyalty/voucher.service';
 import { env } from '../../config/env';
 import { sendSuccess } from '../../shared/utils';
 import { UnauthorizedError, BadRequestError, NotFoundError, ConflictError } from '../../shared/errors';
@@ -130,6 +132,21 @@ export const pelangganAuthController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async dashboard(req: Request, res: Response, next: NextFunction) {
+    try {
+      // @ts-ignore
+      const customerId = req.customerId;
+      const user = await db.queryOne<any>('SELECT id, name, phone, email, address, totalTrx, photoUrl, loyaltyTierId, createdAt FROM pelanggan WHERE id = ?', [customerId]);
+      if (!user) throw new UnauthorizedError('User tidak ditemukan');
+      const [spks, bookings] = await Promise.all([
+        db.query('SELECT id, noWo, status, progress, totalHarga, totalBayar, (totalHarga - COALESCE(totalBayar,0)) AS sisaTagihan, (totalHarga - COALESCE(diskon,0)) AS totalTagihan, mode, createdAt FROM work_orders WHERE pelangganId = ? ORDER BY createdAt DESC LIMIT 20', [customerId]),
+        db.query('SELECT b.id, b.jenisKendaraan, b.merkTipe, b.layanan, b.tanggal, b.jamPreferensi, b.status, b.createdAt FROM bookings b JOIN pelanggan p ON p.phone = b.whatsapp WHERE p.id = ? ORDER BY b.createdAt DESC LIMIT 10', [customerId]),
+      ]);
+      user.kendaraan = await db.query('SELECT id, name, plat, tahun, warna, createdAt, updatedAt FROM kendaraan WHERE pelangganId = ? AND deletedAt IS NULL', [customerId]);
+      sendSuccess(res, { profile: user, spks, activeWo: spks, bookings, unreadCount: 0 }, 'Dashboard pelanggan berhasil diambil');
+    } catch (error) { next(error); }
   },
 
   async history(req: Request, res: Response, next: NextFunction) {
@@ -328,6 +345,7 @@ export const pelangganAuthController = {
 
       if (!rewardId) throw new BadRequestError('rewardId wajib diisi');
 
+      await ensureVoucherSchema();
       const result = await db.transaction(async (tx) => {
         const reward = await tx.queryOne<any>('SELECT * FROM loyalty_rewards WHERE id = ? FOR UPDATE', [rewardId]);
         if (!reward || !reward.isActive) throw new Error('Reward tidak tersedia');
@@ -344,18 +362,29 @@ export const pelangganAuthController = {
           pelangganId: customerId, type: 'redeem', points: -reward.pointsCost,
           description: `Redeem: ${reward.name}`, refType: 'redeem', refId: rewardId,
         });
+        const voucher = await issueVoucher(tx, customerId, rewardId);
         
         const r = await tx.execute('UPDATE loyalty_rewards SET stock = stock - 1 WHERE id = ? AND stock > 0', [rewardId]);
         if (r.affectedRows === 0) throw new Error('Stok reward habis saat proses simultan');
 
-        return balance - reward.pointsCost;
+        return { balance: balance - reward.pointsCost, voucher };
       });
 
-      sendSuccess(res, { balance: result }, 'Poin berhasil ditukar');
+      sendSuccess(res, result, 'Poin berhasil ditukar');
     } catch (error: any) {
       if (error.message && !error.code) return res.status(400).json({ success: false, message: error.message });
       next(error);
     }
+  },
+
+  async getVouchers(req: Request, res: Response, next: NextFunction) {
+    try {
+      // @ts-ignore
+      const customerId = req.customerId;
+      await ensureVoucherSchema();
+      const data = await db.query(`SELECT v.*, r.name AS rewardName, r.description AS rewardDescription FROM vouchers v LEFT JOIN loyalty_rewards r ON r.id = v.rewardId WHERE v.pelangganId = ? ORDER BY v.createdAt DESC`, [customerId]);
+      sendSuccess(res, data, 'Voucher berhasil diambil');
+    } catch (error) { next(error); }
   },
 
   async getGaransi(req: Request, res: Response, next: NextFunction) {
@@ -430,6 +459,9 @@ export const pelangganAuthController = {
 
   async getNotifikasi(req: Request, res: Response, next: NextFunction) {
     try {
+      if (!(await ensureNotificationSchema())) {
+        return res.status(503).json({ success: false, message: 'Notifikasi sedang dipersiapkan. Silakan coba lagi.' });
+      }
       // @ts-ignore
       const customerId = req.customerId;
       const { page = 1, limit = 20 } = req.query;
@@ -439,15 +471,30 @@ export const pelangganAuthController = {
       const spkIdsRes = await db.query("SELECT id FROM work_orders WHERE pelangganId = ?", [customerId]);
       const spkIds = spkIdsRes.map((r: any) => r.id);
 
+      // Notifications are scoped by the customer and, when available, by WO.
+      // The notification module adds these columns lazily for legacy installs.
       let whereClause = "pelangganId = ?";
       let params: any[] = [customerId];
 
       if (spkIds.length > 0) {
-        whereClause = `(pelangganId = ? OR woId IN (?))`;
-        params.push(spkIds);
+        whereClause = `(pelangganId = ? OR woId IN (${spkIds.map(() => '?').join(',')}))`;
+        params = [customerId, ...spkIds];
       }
 
-      const rows = await db.query(`SELECT * FROM notifikasi WHERE ${whereClause} ORDER BY createdAt DESC LIMIT ? OFFSET ?`, [...params, limitNum, skip]);
+      const rows = await db.query<any>(`SELECT * FROM notifikasi WHERE ${whereClause} ORDER BY createdAt DESC LIMIT ? OFFSET ?`, [...params, limitNum, skip]);
+      // Backfill tujuan kwitansi untuk notifikasi pembayaran lama yang masih
+      // menyimpan link umum ke daftar pembayaran.
+      const woIds = rows.filter((row: any) => row.type === 'pembayaran' && row.woId).map((row: any) => row.woId);
+      if (woIds.length) {
+        const payments = await db.query<any>(`SELECT woId, publicId, accessPin FROM pembayaran WHERE woId IN (${woIds.map(() => '?').join(',')})`, woIds);
+        const paymentByWo = new Map(payments.map((payment: any) => [payment.woId, payment]));
+        for (const row of rows) {
+          const payment = paymentByWo.get(row.woId);
+          if (row.type === 'pembayaran' && payment?.publicId && (!row.link || row.link.includes('/portal/pembayaran'))) {
+            row.link = `/pub/pembayaran/${encodeURIComponent(payment.publicId)}/kwitansi${payment.accessPin ? `?pin=${encodeURIComponent(payment.accessPin)}` : ''}`;
+          }
+        }
+      }
       const totalRes = await db.queryOne<{ c: number }>(`SELECT COUNT(*) AS c FROM notifikasi WHERE ${whereClause}`, params);
       const unreadRes = await db.queryOne<{ c: number }>(`SELECT COUNT(*) AS c FROM notifikasi WHERE ${whereClause} AND isRead = 0`, params);
 
@@ -468,6 +515,9 @@ export const pelangganAuthController = {
 
   async markReadAllNotifikasi(req: Request, res: Response, next: NextFunction) {
     try {
+      if (!(await ensureNotificationSchema())) {
+        return res.status(503).json({ success: false, message: 'Notifikasi sedang dipersiapkan. Silakan coba lagi.' });
+      }
       // @ts-ignore
       const customerId = req.customerId;
 
@@ -478,8 +528,8 @@ export const pelangganAuthController = {
       let params: any[] = [customerId];
 
       if (spkIds.length > 0) {
-        whereClause = `(pelangganId = ? OR woId IN (?))`;
-        params.push(spkIds);
+        whereClause = `(pelangganId = ? OR woId IN (${spkIds.map(() => '?').join(',')}))`;
+        params = [customerId, ...spkIds];
       }
 
       await db.execute(`UPDATE notifikasi SET isRead = 1 WHERE ${whereClause} AND isRead = 0`, params);
@@ -487,6 +537,20 @@ export const pelangganAuthController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async markReadNotifikasi(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!(await ensureNotificationSchema())) {
+        return res.status(503).json({ success: false, message: 'Notifikasi sedang dipersiapkan. Silakan coba lagi.' });
+      }
+      // @ts-ignore
+      const customerId = req.customerId;
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ success: false, message: 'ID notifikasi tidak valid' });
+      await db.execute('UPDATE notifikasi SET isRead = 1 WHERE id = ? AND pelangganId = ?', [id, customerId]);
+      sendSuccess(res, null, 'Notifikasi ditandai dibaca');
+    } catch (error) { next(error); }
   },
 
   async submitReview(req: Request, res: Response, next: NextFunction) {

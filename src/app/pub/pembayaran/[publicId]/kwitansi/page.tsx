@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
+import { useSearchParams } from "next/navigation";
 import { Lock, Loader2, AlertCircle, ShieldCheck, Printer, FileText } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
 import { ThermalSep, ThermalDoubleSep, ThermalRow } from "@/components/print/PrintToolbar";
@@ -28,6 +29,7 @@ function getBengkelField(b: BengkelProfile, field: "nama" | "tagline" | "alamat"
 
 export default function PublicKwitansiPage({ params }: { params: Promise<{ publicId: string }> }) {
   const { publicId } = use(params);
+  const searchParams = useSearchParams();
   const [pin, setPin] = useState("");
   const [data, setData] = useState<any>(null);
   const [bengkel, setBengkel] = useState<BengkelProfile>({});
@@ -43,16 +45,25 @@ export default function PublicKwitansiPage({ params }: { params: Promise<{ publi
       .catch(() => {});
   }, []);
 
-  const handleVerify = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (pin.length < 4) return;
+  useEffect(() => {
+    const queryPin = searchParams.get("pin");
+    if (queryPin && queryPin.length >= 4 && !isVerified && !loading) {
+      setPin(queryPin);
+      void handleVerify(queryPin);
+    }
+  }, [searchParams, isVerified, loading]);
+
+  const handleVerify = async (pinOverride?: string | React.FormEvent) => {
+    const value = typeof pinOverride === "string" ? pinOverride : pin;
+    if (typeof pinOverride !== "string" && pinOverride) pinOverride.preventDefault();
+    if (value.length < 4) return;
 
     setLoading(true);
     setError("");
 
     try {
       // FE fetch ke endpoint baru yang query by publicId
-      const res = await fetch(`/api/v1/pembayaran/pub/${publicId}?pin=${pin}`);
+      const res = await fetch(`/api/v1/pembayaran/pub/${publicId}?pin=${value}`);
       const json = await res.json();
 
       if (!res.ok || !json.success) {
@@ -128,6 +139,8 @@ export default function PublicKwitansiPage({ params }: { params: Promise<{ publi
   }
 
   // If verified, show receipt
+  const isLunas = String(data?.status || '').toLowerCase() === 'lunas' || Number(data?.sisaBayar || 0) <= 0 && Number(data?.totalTagihan || 0) > 0;
+  const isParsial = !isLunas && (String(data?.status || '').toLowerCase() === 'parsial' || Number(data?.totalBayar || 0) > 0);
   return (
     <div className="min-h-screen bg-zinc-950 pb-20 print:bg-white print:pb-0">
       {/* Header Info */}
@@ -167,8 +180,8 @@ export default function PublicKwitansiPage({ params }: { params: Promise<{ publi
                  <div className="text-left sm:text-right">
                     <p className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold mb-1">INVOICE</p>
                     <p className="text-xl font-mono font-black">{data.noInvoice}</p>
-                    <div className="mt-3 inline-block px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-white/10 text-white backdrop-blur-md print:border print:border-black print:text-black">
-                        Status: {data.status.replace("_", " ")}
+                    <div className={`mt-3 inline-block px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md print:border print:text-black ${isLunas ? 'bg-emerald-500 text-white print:border-black' : isParsial ? 'bg-amber-500 text-white print:border-black' : 'bg-white/10 text-white print:border-black'}`}>
+                        Status: {isLunas ? 'LUNAS' : isParsial ? 'CICILAN / PARSIAL' : String(data.status || '').replace("_", " ")}
                     </div>
                  </div>
              </div>
@@ -222,6 +235,12 @@ export default function PublicKwitansiPage({ params }: { params: Promise<{ publi
                     <p className="font-bold text-zinc-600 uppercase text-xs tracking-wider">Total Tagihan</p>
                     <p className="text-2xl font-black font-mono text-zinc-900">{formatRupiah(data.totalTagihan)}</p>
                 </div>
+                {isParsial && (
+                    <div className="flex justify-between items-center text-emerald-700 bg-emerald-50 p-4 rounded-2xl mt-4 border border-emerald-100 print:bg-transparent print:p-0">
+                        <p className="font-bold uppercase text-xs tracking-wider">Sudah Dibayar (Cicilan)</p>
+                        <p className="text-xl font-black font-mono">{formatRupiah(data.totalBayar || 0)}</p>
+                    </div>
+                )}
                 {Number(data.sisaBayar) > 0 && (
                     <div className="flex justify-between items-center text-red-600 bg-red-50 p-4 rounded-2xl print:bg-transparent print:p-0 mt-4 border border-red-100">
                         <p className="font-bold uppercase text-xs tracking-wider">Sisa Hutang</p>
@@ -229,6 +248,12 @@ export default function PublicKwitansiPage({ params }: { params: Promise<{ publi
                     </div>
                 )}
              </div>
+
+             {isLunas && (
+               <div className="relative overflow-hidden flex items-center justify-center border-2 border-emerald-500 rounded-2xl py-4 text-emerald-600 print:border-emerald-700 print:text-emerald-700">
+                 <span className="text-3xl sm:text-4xl font-black tracking-[0.35em] rotate-[-3deg]">LUNAS</span>
+               </div>
+             )}
 
              {/* Payment History (Informative Part) */}
              {data.detail && data.detail.length > 0 && (

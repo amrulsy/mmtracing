@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Bell, Check, Loader2, Wrench, Receipt, Trophy, ShieldAlert, CircleDot } from "lucide-react";
 import { portalFetch, portalLogout } from "@/lib/portalFetch";
 import { SkeletonText } from "@/components/portal/PortalSkeleton";
@@ -15,6 +16,7 @@ export default function NotifikasiPage() {
   const [markingAll, setMarkingAll] = useState(false);
   const [error, setError] = useState<{ type: "auth" | "network" | "server"; message: string } | null>(null);
   const { refreshUnread } = useUnreadCount();
+  const router = useRouter();
 
   const fetchNotifikasi = async () => {
     setError(null);
@@ -45,6 +47,16 @@ export default function NotifikasiPage() {
     } finally {
       setMarkingAll(false);
     }
+  };
+
+  const handleNotificationClick = async (item: Notifikasi) => {
+    if (!item.isRead) {
+      setData((current) => current.map((n) => n.id === item.id ? { ...n, isRead: true } : n));
+      refreshUnread();
+      await portalFetch(`/api/v1/customer-auth/notifikasi/${item.id}/read`, { method: "PUT" }).catch(() => {});
+    }
+    const destination = item.link && item.link.startsWith("/") ? item.link : "/portal/dashboard";
+    router.push(destination);
   };
 
   const getIcon = (type: string) => {
@@ -109,9 +121,12 @@ export default function NotifikasiPage() {
         ) : (
           <div className="divide-y divide-surface-border/50">
             {data.map((item) => (
-              <div 
+              <button
+                type="button"
                 key={item.id} 
-                className={`p-4 flex gap-4 transition-colors ${item.isRead ? 'hover:bg-surface-hover/30' : 'bg-primary/5 hover:bg-primary/10'}`}
+                onClick={() => handleNotificationClick(item)}
+                aria-label={`Buka notifikasi: ${item.title}`}
+                className={`w-full text-left p-4 flex gap-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${item.isRead ? 'hover:bg-surface-hover/30' : 'bg-primary/5 hover:bg-primary/10'}`}
               >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${getColor(item.type)}`}>
                   {getIcon(item.type)}
@@ -130,7 +145,7 @@ export default function NotifikasiPage() {
                     {new Date(item.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

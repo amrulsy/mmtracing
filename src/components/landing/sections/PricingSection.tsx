@@ -18,8 +18,8 @@ export default function PricingSection({ pricingMotor, pricingBubut }: PricingSe
       <div className="max-w-7xl mx-auto px-4 lg:px-8">
         <AnimatedSection className="text-center mb-12">
           <span className="text-xs font-bold uppercase tracking-widest text-primary">Daftar Harga</span>
-          <h2 className="text-3xl lg:text-4xl font-black mt-2">Harga Transparan, Tanpa Kejutan</h2>
-          <p className="text-muted-foreground mt-3 max-w-xl mx-auto">Harga sudah termasuk jasa. Sparepart original.</p>
+          <h2 className="text-3xl lg:text-4xl font-black mt-2">Informasi biaya layanan</h2>
+          <p className="text-muted-foreground mt-3 max-w-xl mx-auto">Konfirmasikan cakupan pekerjaan dan biaya akhir kepada bengkel.</p>
         </AnimatedSection>
         <AnimatedSection>
           <div className="flex justify-center gap-1 mb-8 bg-surface-hover rounded-xl border border-surface-border p-1 max-w-md mx-auto">
@@ -40,7 +40,7 @@ export default function PricingSection({ pricingMotor, pricingBubut }: PricingSe
             ))}
           </div>
         </AnimatedSection>
-        <p className="text-center text-xs text-muted-foreground mt-6">* Harga dapat berubah sesuai kondisi kendaraan. Konsultasi gratis via WhatsApp.</p>
+        <p className="text-center text-xs text-muted-foreground mt-6">* Biaya dapat menyesuaikan kondisi kendaraan atau detail komponen. Konsultasikan sebelum pengerjaan.</p>
       </div>
     </section>
   );

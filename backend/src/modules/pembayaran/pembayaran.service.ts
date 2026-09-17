@@ -3,7 +3,7 @@ import { NotFoundError, BadRequestError } from '../../shared/errors';
 import { sseManager } from '../../shared/sse';
 import { releaseGatePass } from '../../shared/gate-pass';
 import { parsePagination } from '../../shared/utils';
-import { notifyReminderPembayaran } from '../whatsapp/whatsapp.notification';
+import { notifyGatePassReleased, notifyReminderPembayaran, notifyPembayaranLunas } from '../whatsapp/whatsapp.notification';
 import crypto from 'crypto';
 import { confirmQrisAttempt, ensureQrisSchema, QrisConfirmation } from './qris.service';
 
@@ -236,7 +236,13 @@ export class PembayaranService {
 
     // WhatsApp: Send payment reminder if partially paid
     if (updated.status === 'parsial') {
-      notifyReminderPembayaran(updated.id);
+      await notifyReminderPembayaran(updated.id);
+    }
+    if (updated.status === 'lunas' && spkRow?.status === 'selesai') {
+      notifyGatePassReleased(updated.woId, updated.noInvoice).catch(() => {});
+    }
+    if (updated.status === 'lunas') {
+      await notifyPembayaranLunas(updated.woId, updated.noInvoice);
     }
 
     return updated;

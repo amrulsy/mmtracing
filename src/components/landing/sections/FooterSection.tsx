@@ -20,10 +20,7 @@ export default function FooterSection({ header, footer }: FooterSectionProps) {
           <div>
             <h4 className="font-bold text-sm mb-3">Layanan</h4>
             <ul className="space-y-2 text-xs opacity-60">
-              <li>Servis Rutin Motor</li>
-              <li>Modifikasi &amp; Performance</li>
-              <li>Jasa Bubut Custom CNC</li>
-              <li>Detailing &amp; Coating</li>
+              {(footer.services || []).map((service) => <li key={service}>{service}</li>)}
             </ul>
           </div>
           <div>

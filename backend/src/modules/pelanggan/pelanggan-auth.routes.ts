@@ -36,6 +36,7 @@ router.post('/verify-otp', loginLimiter, pelangganOtpController.verifyOtp);
 
 // Protected routes
 router.get('/me', customerAuthMiddleware, pelangganAuthController.me);
+router.get('/dashboard', customerAuthMiddleware, pelangganAuthController.dashboard);
 router.put('/profile', customerAuthMiddleware, pelangganAuthController.updateProfile);
 router.post('/avatar', customerAuthMiddleware, upload.single('image'), pelangganAuthController.uploadAvatar);
 router.get('/history', customerAuthMiddleware, pelangganAuthController.history);
@@ -49,6 +50,7 @@ router.get('/loyalty', customerAuthMiddleware, pelangganAuthController.getLoyalt
 router.get('/loyalty/history', customerAuthMiddleware, pelangganAuthController.getLoyaltyHistory);
 router.get('/loyalty/rewards', customerAuthMiddleware, pelangganAuthController.getLoyaltyRewards);
 router.post('/loyalty/redeem', customerAuthMiddleware, pelangganAuthController.redeemLoyalty);
+router.get('/loyalty/vouchers', customerAuthMiddleware, pelangganAuthController.getVouchers);
 
 // Garansi endpoints
 router.get('/garansi', customerAuthMiddleware, pelangganAuthController.getGaransi);
@@ -56,6 +58,7 @@ router.post('/garansi/claim', customerAuthMiddleware, pelangganAuthController.cl
 
 // Notifikasi endpoints
 router.get('/notifikasi', customerAuthMiddleware, pelangganAuthController.getNotifikasi);
+router.put('/notifikasi/:id/read', customerAuthMiddleware, pelangganAuthController.markReadNotifikasi);
 router.put('/notifikasi/read-all', customerAuthMiddleware, pelangganAuthController.markReadAllNotifikasi);
 
 // Review endpoints

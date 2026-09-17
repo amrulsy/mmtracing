@@ -31,6 +31,13 @@ export default function PembayaranPage() {
 
   useEffect(() => { fetchPembayaran(); }, []);
 
+  useEffect(() => {
+    if (!loading) {
+      const target = window.location.hash;
+      if (target) document.querySelector(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [loading, data.length]);
+
   if (loading) {
     return (
       <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-4">
@@ -138,7 +145,7 @@ export default function PembayaranPage() {
                     const isLunas = item.status === "lunas";
                     const isParsial = item.status === "parsial";
                     return (
-              <div key={item.id} className="glass-panel overflow-hidden border border-surface-border/50 transition-all hover:border-surface-border">
+              <div id={`pembayaran-${item.id}`} key={item.id} className="glass-panel overflow-hidden border border-surface-border/50 transition-all hover:border-surface-border target:ring-2 target:ring-primary/60">
                 <div className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">

@@ -11,7 +11,10 @@ export interface LandingData {
   landing_contact: ContactData;
   landing_footer: FooterData;
   landing_gallery: GalleryItem[];
-  landing_faq?: FAQItem[];
+  landing_faq: FAQItem[];
+  landing_booking: BookingSettings;
+  landing_navigation: NavigationSettings;
+  landing_seo: SeoSettings;
   BENGKEL_LOGO?: string;
 }
 
@@ -26,6 +29,30 @@ export interface FooterData {
   hourWeekday: string;
   hourSaturday: string;
   hourSunday: string;
+  services?: string[];
+}
+
+export interface BookingSettings {
+  heading: string;
+  description: string;
+  serviceOptions: { id: string; desc: string; category?: "motor" | "bubut" }[];
+  vehicleTypes: string[];
+  timeSlots: string[];
+  closedDays: string[];
+  slotCapacity: number;
+}
+
+export interface NavigationSettings {
+  items: { label: string; id: string }[];
+  ctaLabel: string;
+  trackLabel: string;
+  portalLabel: string;
+}
+
+export interface SeoSettings {
+  title: string;
+  description: string;
+  canonicalUrl: string;
 }
 
 export interface ContactData {
@@ -83,6 +110,7 @@ export interface QueueItem {
 }
 
 export interface BookingFormData {
+  kategori?: "motor" | "bubut";
   nama: string;
   whatsapp: string;
   jenisKendaraan: string;

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import db from '../../config/db';
 import { authMiddleware } from '../../middleware/auth';
 import { sendSuccess, sendCreated } from '../../shared/utils';
+import { ensureVoucherSchema, issueVoucher } from './voucher.service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -44,6 +45,7 @@ router.post('/redeem', async (req: Request, res: Response, next: NextFunction) =
       return res.status(400).json({ success: false, message: 'pelangganId dan rewardId wajib diisi' });
     }
 
+    await ensureVoucherSchema();
     const result = await db.transaction(async (tx) => {
       const reward = await tx.queryOne<any>('SELECT * FROM loyalty_rewards WHERE id = ? FOR UPDATE', [rewardId]);
       if (!reward || !reward.isActive) {
@@ -66,22 +68,53 @@ router.post('/redeem', async (req: Request, res: Response, next: NextFunction) =
         pelangganId, type: 'redeem', points: -reward.pointsCost,
         description: `Redeem: ${reward.name}`, refType: 'redeem', refId: rewardId,
       });
+      const voucher = await issueVoucher(tx, pelangganId, rewardId);
       const r = await tx.execute(
         'UPDATE loyalty_rewards SET stock = stock - 1 WHERE id = ? AND stock > 0', [rewardId]);
       if (r.affectedRows === 0) {
         throw new Error('Stok reward habis saat proses simultan');
       }
 
-      return balance - reward.pointsCost;
+      return { balance: balance - reward.pointsCost, voucher };
     });
 
-    sendSuccess(res, { balance: result }, 'Poin berhasil ditukar');
+    sendSuccess(res, result, 'Poin berhasil ditukar');
   } catch (e: any) {
     if (e.message && !e.code) {
       return res.status(400).json({ success: false, message: e.message });
     }
     next(e);
   }
+});
+
+router.get('/vouchers/:pelangganId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await ensureVoucherSchema();
+    const data = await db.query('SELECT v.*, r.name AS rewardName FROM vouchers v LEFT JOIN loyalty_rewards r ON r.id = v.rewardId WHERE v.pelangganId = ? ORDER BY v.createdAt DESC', [Number(req.params.pelangganId)]);
+    sendSuccess(res, data);
+  } catch (e) { next(e); }
+});
+
+router.post('/vouchers/validate', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await ensureVoucherSchema();
+    const code = String(req.body?.code || '').trim().toUpperCase();
+    const voucher = await db.queryOne<any>('SELECT v.*, r.name AS rewardName FROM vouchers v LEFT JOIN loyalty_rewards r ON r.id = v.rewardId WHERE v.code = ?', [code]);
+    if (!voucher) return res.status(404).json({ success: false, message: 'Voucher tidak ditemukan' });
+    if (voucher.status !== 'tersedia') return res.status(400).json({ success: false, message: `Voucher berstatus ${voucher.status}` });
+    if (voucher.expiresAt && new Date(voucher.expiresAt) < new Date()) return res.status(400).json({ success: false, message: 'Voucher sudah kedaluwarsa' });
+    sendSuccess(res, voucher);
+  } catch (e) { next(e); }
+});
+
+router.post('/vouchers/:id/use', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await ensureVoucherSchema();
+    const woId = Number(req.body?.woId);
+    const result = await db.execute("UPDATE vouchers SET status = 'digunakan', usedAt = NOW(), usedWoId = ? WHERE id = ? AND status = 'tersedia' AND (expiresAt IS NULL OR expiresAt >= NOW())", [woId || null, Number(req.params.id)]);
+    if (!result.affectedRows) return res.status(400).json({ success: false, message: 'Voucher tidak tersedia, sudah digunakan, atau kedaluwarsa' });
+    sendSuccess(res, null, 'Voucher berhasil digunakan');
+  } catch (e) { next(e); }
 });
 
 // GET /loyalty/history/:pelangganId

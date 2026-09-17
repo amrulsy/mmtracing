@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
-  Wrench, Calendar, ChevronRight, ReceiptText,
+  Wrench, Calendar, ChevronRight, ReceiptText, Bike,
   RefreshCw, User, Clock, CheckCircle2, Trophy, ShieldCheck,
   LogOut, AlertCircle
 } from "lucide-react";
@@ -20,31 +20,25 @@ export default function PortalDashboard() {
   const [spks, setSpks] = useState<PortalSPK[]>([]);
   const [bookings, setBookings] = useState<PortalBooking[]>([]);
   const [error, setError] = useState<{ type: "auth" | "network" | "server"; message: string } | null>(null);
+  const initialLoadRef = useRef(false);
 
   const fetchData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     setError(null);
 
     try {
-      const [profileRes, historyRes] = await Promise.all([
-        portalFetch("/api/v1/customer-auth/me"),
-        portalFetch("/api/v1/customer-auth/history")
-      ]);
-
-      if (profileRes.status === 401 || historyRes.status === 401) {
+      const dashboardRes = await portalFetch("/api/v1/customer-auth/dashboard");
+      if (dashboardRes.status === 401 || dashboardRes.status === 403) {
         portalLogout();
         return;
       }
 
-      const profileData = await profileRes.json();
-      const historyData = await historyRes.json();
-
-      if (profileData.success) setProfile(profileData.data);
+      const dashboardData = await dashboardRes.json();
+      if (dashboardData.success) setProfile(dashboardData.data.profile);
       else throw new Error("Invalid token");
-
-      if (historyData.success) {
-        setSpks(historyData.data.activeWo || historyData.data.spk || []);
-        setBookings(historyData.data.bookings || []);
+      if (dashboardData.success) {
+        setSpks(dashboardData.data.activeWo || []);
+        setBookings(dashboardData.data.bookings || []);
       }
     } catch (err) {
       if (!profile) {
@@ -58,9 +52,14 @@ export default function PortalDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [profile]);
+  }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    // React Strict Mode can invoke effects twice in development; avoid duplicate auth/history requests.
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
+    fetchData();
+  }, [fetchData]);
 
   const handleLogout = () => {
     portalLogout();
@@ -78,6 +77,23 @@ export default function PortalDashboard() {
   const spkAktif = spks.filter(s => s.status === "dikerjakan" || s.status === "antri").length;
   const spkSelesai = spks.filter(s => s.status === "selesai").length;
   const spkBelumLunas = spks.filter(s => Number(s.sisaTagihan) > 0).length;
+  const statusLabel: Record<string, string> = {
+    antri: "Menunggu antrean", dikerjakan: "Sedang dikerjakan", selesai: "Selesai",
+    kendala: "Perlu perhatian", batal: "Dibatalkan", baru: "Baru",
+  };
+  const bookingStatusLabel: Record<string, string> = {
+    baru: "Menunggu konfirmasi", dikonfirmasi: "Dikonfirmasi", selesai: "Selesai",
+    ditolak: "Tidak tersedia", dibatalkan: "Dibatalkan",
+  };
+  const activeFirst = [...spks].sort((a, b) => {
+    const active = (s: PortalSPK) => s.status === "dikerjakan" || s.status === "antri" || s.status === "kendala";
+    return Number(active(b)) - Number(active(a));
+  });
+  const recentSpks = activeFirst.slice(0, 3);
+  const recentBookings = bookings.slice(0, 3);
+  const featuredWo = activeFirst.find((wo) => wo.status === "dikerjakan" || wo.status === "antri" || wo.status === "kendala");
+  const featuredBooking = recentBookings.find((booking) => booking.status === "baru" || booking.status === "dikonfirmasi");
+  const primaryVehicle = profile?.kendaraan?.[0];
 
   return (
     <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-6 animate-in fade-in duration-500">
@@ -105,6 +121,50 @@ export default function PortalDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Kendaraan aktif */}
+      <Link href="/portal/kendaraan" className="block glass-panel p-4 border border-surface-border hover:bg-surface-hover/70 transition-colors group">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><Bike size={22} /></div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Motor aktif</p>
+            {primaryVehicle ? <><p className="font-black truncate">{primaryVehicle.name}</p><p className="text-xs text-muted-foreground font-mono">{primaryVehicle.plat}</p></> : <p className="text-sm font-bold text-primary">Tambahkan motor Anda</p>}
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground group-hover:translate-x-1 transition-transform" />
+        </div>
+      </Link>
+
+      {/* Fokus aktivitas utama */}
+      {featuredWo ? (
+        <Link href={`/portal/work-order/${featuredWo.id}`} className="block glass-panel p-5 sm:p-6 border-l-4 border-l-primary hover:bg-surface-hover/70 transition-colors group">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary mb-2">Status Work Order Anda</p>
+              <h2 className="text-lg sm:text-xl font-black truncate">{featuredWo.noWo} · {statusLabel[featuredWo.status] || featuredWo.status}</h2>
+              <p className="text-xs text-muted-foreground mt-1">Pengerjaan terakhir diperbarui pada {new Date(featuredWo.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
+            </div>
+            <ChevronRight size={20} className="text-primary shrink-0 group-hover:translate-x-1 transition-transform" />
+          </div>
+          <div className="mt-5">
+            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+              <span>Progress pengerjaan</span><span>{featuredWo.progress}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-background overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${featuredWo.progress === 100 ? "bg-emerald-500" : "bg-primary"}`} style={{ width: `${Math.min(100, Math.max(0, featuredWo.progress || 0))}%` }} />
+            </div>
+          </div>
+          <p className="text-xs font-bold text-primary mt-4">Lihat detail Work Order →</p>
+        </Link>
+      ) : featuredBooking ? (
+        <Link href={`/track?bookingId=${featuredBooking.id}`} className="block glass-panel p-5 sm:p-6 border-l-4 border-l-primary hover:bg-surface-hover/70 transition-colors group">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary mb-2">Reservasi terdekat</p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0"><h2 className="text-lg font-black truncate">{featuredBooking.layanan}</h2><p className="text-xs text-muted-foreground mt-1">{featuredBooking.tanggal ? new Date(featuredBooking.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "long" }) : "Tanggal menunggu konfirmasi"}</p></div>
+            <ChevronRight size={20} className="text-primary shrink-0 group-hover:translate-x-1 transition-transform" />
+          </div>
+          <p className="text-xs font-bold text-primary mt-4">Lacak reservasi →</p>
+        </Link>
+      ) : null}
 
       {/* Tagihan Overdue Banner */}
       {spkBelumLunas > 0 && (
@@ -151,6 +211,22 @@ export default function PortalDashboard() {
         </div>
       </div>
 
+      {/* Menu cepat bergaya aplikasi mobile */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Menu cepat</h2>
+        <div className="grid grid-cols-4 gap-2 sm:gap-3">
+          {[
+            { href: "/portal/booking", label: "Booking", icon: Calendar, tone: "text-primary bg-primary/10" },
+            { href: "/portal/riwayat", label: "Work Order", icon: Wrench, tone: "text-blue-500 bg-blue-500/10" },
+            { href: "/portal/pembayaran", label: "Pembayaran", icon: ReceiptText, tone: "text-emerald-500 bg-emerald-500/10" },
+            { href: "/portal/loyalty", label: "Loyalty", icon: Trophy, tone: "text-amber-500 bg-amber-500/10" },
+          ].map((item) => {
+            const Icon = item.icon;
+            return <Link key={item.href} href={item.href} className="glass-panel min-h-[5.5rem] p-2.5 sm:p-3 flex flex-col items-center justify-center gap-2 rounded-2xl hover:bg-surface-hover transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"><span className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.tone}`}><Icon size={20} /></span><span className="text-[10px] sm:text-xs font-bold text-center leading-tight">{item.label}</span></Link>;
+          })}
+        </div>
+      </section>
+
       {/* Quick Action Links */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Loyalty Points Summary */}
@@ -178,12 +254,29 @@ export default function PortalDashboard() {
         </Link>
       </div>
 
+      {/* Aktivitas terbaru */}
+      {(recentSpks.length > 0 || recentBookings.length > 0) && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-black flex items-center gap-2 uppercase tracking-wider text-muted-foreground"><Clock size={16} className="text-primary" /> Aktivitas terbaru</h2>
+          <div className="glass-panel p-4 space-y-4">
+            {[...recentSpks.map((wo) => ({ id: `wo-${wo.id}`, date: wo.createdAt, title: `Work Order ${wo.noWo}`, detail: statusLabel[wo.status] || wo.status, href: `/portal/work-order/${wo.id}`, color: "bg-primary" })), ...recentBookings.map((booking) => ({ id: `booking-${booking.id}`, date: booking.createdAt, title: `Reservasi ${booking.layanan}`, detail: bookingStatusLabel[booking.status] || booking.status, href: `/track?bookingId=${booking.id}`, color: "bg-amber-500" }))].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 4).map((activity) => (
+              <Link href={activity.href} key={activity.id} className="flex items-start gap-3 group">
+                <span className={`w-2.5 h-2.5 rounded-full ${activity.color} mt-1.5 shrink-0`} />
+                <span className="min-w-0 flex-1"><span className="block text-sm font-bold truncate group-hover:text-primary transition-colors">{activity.title}</span><span className="block text-xs text-muted-foreground mt-0.5">{activity.detail} · {new Date(activity.date).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</span></span>
+                <ChevronRight size={15} className="text-muted-foreground group-hover:translate-x-1 transition-transform mt-1" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 gap-6">
         {/* SPK Aktif / Riwayat */}
         <div className="space-y-3">
           <h2 className="text-sm font-black flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
             <Wrench size={16} className="text-primary" /> Riwayat Servis
             <span className="text-[10px] bg-surface-hover px-1.5 py-0.5 rounded-full font-normal ml-auto">{spks.length}</span>
+            {spks.length > 3 && <Link href="/portal/riwayat" className="text-[10px] normal-case tracking-normal text-primary hover:underline">Lihat semua</Link>}
           </h2>
           {spks.length === 0 ? (
             <div className="p-8 text-center bg-surface-hover/30 border border-surface-border rounded-2xl">
@@ -196,7 +289,7 @@ export default function PortalDashboard() {
             </div>
           ) : (
             <div className="space-y-2.5">
-              {spks.map(spk => {
+              {recentSpks.map(spk => {
                 const isActive = spk.status === "dikerjakan" || spk.status === "antri";
                 const hasSisaTagihan = Number(spk.sisaTagihan) > 0;
                 return (
@@ -220,7 +313,7 @@ export default function PortalDashboard() {
                         </p>
                       </div>
                       <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${STATUS_COLORS[spk.status] || STATUS_COLORS.antri}`}>
-                        {spk.status}
+                        {statusLabel[spk.status] || spk.status}
                       </span>
                     </div>
 
@@ -257,6 +350,7 @@ export default function PortalDashboard() {
           <h2 className="text-sm font-black flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
             <Calendar size={16} className="text-primary" /> Reservasi
             <span className="text-[10px] bg-surface-hover px-1.5 py-0.5 rounded-full font-normal ml-auto">{bookings.length}</span>
+            {bookings.length > 3 && <Link href="/portal/booking" className="text-[10px] normal-case tracking-normal text-primary hover:underline">Lihat semua</Link>}
           </h2>
           {bookings.length === 0 ? (
             <div className="p-8 text-center bg-surface-hover/30 border border-surface-border rounded-2xl">
@@ -269,8 +363,8 @@ export default function PortalDashboard() {
             </div>
           ) : (
             <div className="space-y-2.5">
-              {bookings.map(b => (
-                <div key={b.id} className="p-4 bg-surface-hover/50 border border-surface-border rounded-xl">
+              {recentBookings.map(b => (
+                <Link key={b.id} href={`/track?bookingId=${b.id}`} className="block p-4 bg-surface-hover/50 border border-surface-border rounded-xl hover:bg-surface-hover transition-colors group">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold truncate">{b.layanan}</p>
@@ -284,10 +378,11 @@ export default function PortalDashboard() {
                       </div>
                     </div>
                     <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${STATUS_COLORS[b.status] || STATUS_COLORS.baru}`}>
-                      {b.status}
+                      {bookingStatusLabel[b.status] || b.status}
                     </span>
                   </div>
-                </div>
+                  <p className="text-[10px] text-primary font-semibold mt-3 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">Buka pelacakan reservasi →</p>
+                </Link>
               ))}
             </div>
           )}

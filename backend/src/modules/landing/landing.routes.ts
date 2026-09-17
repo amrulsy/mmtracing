@@ -3,7 +3,7 @@ import db from '../../config/db';
 import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
 import { sendSuccess } from '../../shared/utils';
 import { createRateLimiter } from '../../middleware/rateLimit';
-import { notifyBookingBaru } from '../whatsapp/whatsapp.notification';
+import { notifyBookingBaru, notifyBookingReceived } from '../whatsapp/whatsapp.notification';
 
 // Rate limiter: max 5 booking requests per IP per 10 minutes
 const bookingLimiter = createRateLimiter({
@@ -99,7 +99,8 @@ const LANDING_DEFAULTS: Record<string, string> = {
     description: "Bengkel servis, modifikasi, dan jasa bubut custom terpercaya di Yogyakarta. Berdiri sejak 2016.",
     hourWeekday: "Senin — Jumat: 08:00 — 17:00",
     hourSaturday: "Sabtu: 08:00 — 15:00",
-    hourSunday: "Minggu: Tutup"
+    hourSunday: "Minggu: Tutup",
+    services: ["Servis Rutin Motor", "Modifikasi & Performance", "Jasa Bubut Custom"]
   }),
   landing_gallery: JSON.stringify([
     { title: "Custom Bubut Velg", sub: "Yamaha NMAX dengan presisi 0.01mm", image: "" },
@@ -111,6 +112,28 @@ const LANDING_DEFAULTS: Record<string, string> = {
     { title: "Nano Ceramic Coating", sub: "Yamaha R15 protection 6 bulan", image: "" },
     { title: "CVT Upgrade", sub: "Honda Vario 160 dengan van belt racing", image: "" }
   ]),
+  landing_faq: JSON.stringify([
+    { q: "Bagaimana cara konsultasi layanan?", a: "Hubungi bengkel melalui WhatsApp atau isi formulir booking." },
+    { q: "Apa yang perlu disiapkan untuk jasa bubut?", a: "Siapkan foto atau contoh komponen, ukuran, dan kebutuhan fungsinya." }
+  ]),
+  landing_booking: JSON.stringify({
+    heading: "Booking Jadwal Servis",
+    description: "Ajukan kebutuhan dan jadwal pilihan Anda. Ketersediaan waktu menunggu konfirmasi bengkel.",
+    serviceOptions: [
+      { id: "Servis Rutin", desc: "Perawatan dan pemeriksaan motor", category: "motor" },
+      { id: "Modifikasi", desc: "Diskusikan kebutuhan modifikasi", category: "motor" },
+      { id: "Jasa Bubut Custom", desc: "Konsultasi komponen custom", category: "bubut" }
+    ],
+    vehicleTypes: ["Motor Matic", "Motor Sport", "Motor Bebek", "Tanpa Kendaraan (Bawa Part)"],
+    timeSlots: ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"],
+    closedDays: ["Minggu"],
+    slotCapacity: 1
+  }),
+  landing_navigation: JSON.stringify({
+    items: [{ label: "Layanan", id: "layanan" }, { label: "Harga", id: "harga" }, { label: "Antrian", id: "antrian" }, { label: "Galeri", id: "galeri" }, { label: "FAQ", id: "faq" }, { label: "Kontak", id: "kontak" }],
+    ctaLabel: "Booking Online", trackLabel: "Lacak SPK", portalLabel: "Login"
+  }),
+  landing_seo: JSON.stringify({ title: "MMT Racing | Bengkel Motor & Jasa Bubut", description: "Informasi layanan bengkel motor dan jasa bubut custom.", canonicalUrl: "https://mmtracing.com" }),
 };
 
 // GET /landing/content — PUBLIC (no auth)
@@ -223,7 +246,10 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction) =>
 // POST /landing/booking — PUBLIC (submit booking from landing page)
 router.post('/booking', bookingLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { nama, whatsapp, jenisKendaraan, merkTipe, platNomor, layanan, tanggal, jamPreferensi, keluhan, _hp } = req.body;
+    const { nama, whatsapp, jenisKendaraan, merkTipe, platNomor, layanan, tanggal, jamPreferensi, keluhan, kategori, _hp } = req.body;
+    const configRow = await db.queryOne<{ value: string }>("SELECT value FROM settings WHERE `key` = 'landing_booking' LIMIT 1");
+    let config: { serviceOptions?: { id: string }[]; vehicleTypes?: string[]; timeSlots?: string[]; closedDays?: string[]; slotCapacity?: number };
+    try { config = JSON.parse(configRow?.value || LANDING_DEFAULTS.landing_booking); } catch { config = JSON.parse(LANDING_DEFAULTS.landing_booking); }
 
     // Honeypot check — if _hp field is filled, it's a bot
     if (_hp) {
@@ -253,6 +279,13 @@ router.post('/booking', bookingLimiter, async (req: Request, res: Response, next
     }
 
     // Date validation — must not be in the past
+    if (config.serviceOptions?.length && !config.serviceOptions.some(item => item.id === String(layanan))) { res.status(400).json({ success: false, message: 'Layanan yang dipilih tidak tersedia.' }); return; }
+    const selectedService = config.serviceOptions?.find(item => item.id === String(layanan)) as { id: string; category?: string } | undefined;
+    const serviceCategory = selectedService?.category || (/bubut|cnc|shaft|spacer|adapter|bracket/i.test(String(layanan)) ? 'bubut' : 'motor');
+    if (kategori && kategori !== serviceCategory) { res.status(400).json({ success: false, message: 'Layanan tidak sesuai dengan jalur booking yang dipilih.' }); return; }
+    if (config.vehicleTypes?.length && !config.vehicleTypes.includes(String(jenisKendaraan))) { res.status(400).json({ success: false, message: 'Jenis kendaraan yang dipilih tidak tersedia.' }); return; }
+    if (jamPreferensi && !config.timeSlots?.includes(String(jamPreferensi))) { res.status(400).json({ success: false, message: 'Jam kedatangan yang dipilih tidak tersedia.' }); return; }
+
     if (tanggal) {
       const bookingDate = new Date(tanggal);
       const today = new Date();
@@ -265,10 +298,11 @@ router.post('/booking', bookingLimiter, async (req: Request, res: Response, next
         return;
       }
       // Check if booking date is Sunday (0 = Sunday)
-      if (bookingDate.getDay() === 0) {
+      const dayNames = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
+      if ((config.closedDays || []).map(day => day.trim().toLowerCase()).includes(dayNames[bookingDate.getDay()])) {
         res.status(400).json({
           success: false,
-          message: 'Booking hari Minggu tidak tersedia. Bengkel tutup setiap hari Minggu.',
+          message: `Booking hari ${dayNames[bookingDate.getDay()]} tidak tersedia.`,
         });
         return;
       }
@@ -279,16 +313,22 @@ router.post('/booking', bookingLimiter, async (req: Request, res: Response, next
 
     // Duplicate check — same WA + same tanggal within last 24 hours
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const duplicate = await db.queryOne<{ id: number }>(
-      "SELECT id FROM bookings WHERE whatsapp IN (?, ?, ?) AND createdAt >= ? AND status = 'baru' LIMIT 1",
-      [waClean, waClean.replace(/^62/, '0'), '0' + waClean.slice(2), twentyFourHoursAgo]
-    );
+    const phoneVariants = [waClean, waClean.replace(/^62/, '0'), '0' + waClean.slice(2)];
+    const duplicate = tanggal
+      ? await db.queryOne<{ id: number }>("SELECT id FROM bookings WHERE whatsapp IN (?, ?, ?) AND DATE(tanggal) = DATE(?) AND COALESCE(jamPreferensi, '') = ? AND status IN ('baru', 'dikonfirmasi') LIMIT 1", [...phoneVariants, tanggal, String(jamPreferensi || '')])
+      : await db.queryOne<{ id: number }>("SELECT id FROM bookings WHERE whatsapp IN (?, ?, ?) AND tanggal IS NULL AND createdAt >= ? AND status IN ('baru', 'dikonfirmasi') LIMIT 1", [...phoneVariants, twentyFourHoursAgo]);
     if (duplicate) {
       res.status(409).json({
         success: false,
         message: `Anda sudah memiliki booking aktif #${duplicate.id}. Silakan tunggu konfirmasi kami.`,
       });
       return;
+    }
+
+    if (tanggal && jamPreferensi) {
+      const occupied = await db.queryVal<number>("SELECT COUNT(*) FROM bookings WHERE DATE(tanggal) = DATE(?) AND jamPreferensi = ? AND status IN ('baru', 'dikonfirmasi')", [tanggal, jamPreferensi]);
+      const capacity = Math.max(1, Math.min(50, Number(config.slotCapacity) || 1));
+      if ((occupied || 0) >= capacity) { res.status(409).json({ success: false, message: 'Slot waktu ini sudah penuh. Silakan pilih jam lain atau waktu fleksibel.' }); return; }
     }
 
     const bookingId = await db.insert('bookings', {
@@ -301,13 +341,14 @@ router.post('/booking', bookingLimiter, async (req: Request, res: Response, next
       tanggal: tanggal ? new Date(tanggal) : null,
       jamPreferensi: jamPreferensi || null,
       keluhan: sanitize(keluhan),
-      sumber: 'landing',
+      sumber: serviceCategory === 'bubut' ? 'landing_bubut' : 'landing_motor',
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
     // Notify admin via WhatsApp
     notifyBookingBaru(bookingId).catch(() => {});
+    notifyBookingReceived(bookingId).catch(() => {});
 
     sendSuccess(res, {
       id: bookingId,
@@ -368,6 +409,18 @@ router.post('/track', trackingLimiter, async (req: Request, res: Response, next:
   } catch (e) {
     next(e);
   }
+});
+
+router.post('/booking-status', trackingLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bookingId = Number(req.body.bookingId);
+    const whatsapp = String(req.body.whatsapp || '').replace(/[^0-9]/g, '');
+    if (!Number.isInteger(bookingId) || bookingId < 1 || !whatsapp) { res.status(400).json({ success: false, message: 'Nomor booking dan WhatsApp wajib diisi.' }); return; }
+    const booking = await db.queryOne<any>('SELECT id, nama, layanan, tanggal, jamPreferensi, status, catatan, alasanPenolakan, woId, createdAt, updatedAt FROM bookings WHERE id = ? AND whatsapp IN (?, ?, ?)', [bookingId, whatsapp, whatsapp.replace(/^62/, '0'), '0' + whatsapp.slice(2)]);
+    if (!booking) { res.status(404).json({ success: false, message: 'Booking tidak ditemukan atau nomor WhatsApp tidak cocok.' }); return; }
+    const wo = booking.woId ? await db.queryOne<any>('SELECT id, noWo, status, progress, updatedAt FROM work_orders WHERE id = ?', [booking.woId]) : null;
+    res.json({ success: true, data: { booking, wo } });
+  } catch (e) { next(e); }
 });
 
 // GET /landing/reviews — PUBLIC (recent public reviews)

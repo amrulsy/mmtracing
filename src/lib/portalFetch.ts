@@ -13,6 +13,7 @@ const REFRESH_KEY = "mmt_refresh_token";
 
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
+let logoutInProgress = false;
 
 async function attemptRefresh(): Promise<boolean> {
   const refreshToken = localStorage.getItem(REFRESH_KEY);
@@ -57,6 +58,8 @@ export function clearPortalTokens() {
 }
 
 export function portalLogout() {
+  if (logoutInProgress) return;
+  logoutInProgress = true;
   clearPortalTokens();
   window.location.href = "/portal/login";
 }

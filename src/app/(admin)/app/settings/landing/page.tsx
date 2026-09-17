@@ -17,8 +17,12 @@ interface LandingContent {
  landing_pricing_bubut: { name: string; price: string; note: string; popular: boolean }[];
  landing_testimonials: { name: string; role: string; text: string; rating: number; avatar?: string }[];
  landing_contact: { address: string; addressDetail: string; hours: string; hoursClosed: string; phone: string; email: string; whatsapp: string; mapsEmbed?: string };
- landing_footer: { description: string; hourWeekday: string; hourSaturday: string; hourSunday: string };
+ landing_footer: { description: string; hourWeekday: string; hourSaturday: string; hourSunday: string; services?: string[] };
  landing_gallery: { title: string; sub: string; image?: string }[];
+ landing_faq: { q: string; a: string }[];
+ landing_booking: { heading: string; description: string; serviceOptions: { id: string; desc: string }[]; vehicleTypes: string[]; timeSlots: string[]; closedDays: string[]; slotCapacity: number };
+ landing_navigation: { items: { label: string; id: string }[]; ctaLabel: string; trackLabel: string; portalLabel: string };
+ landing_seo: { title: string; description: string; canonicalUrl: string };
 }
 
 const ICON_OPTIONS = ["Wrench", "Cog", "Hammer", "Shield", "Clock", "Users", "Star", "Eye", "Award", "Zap", "Target"];
@@ -124,6 +128,10 @@ export default function LandingSettingsPage() {
  { id: "pricing", label: "💰 Harga" },
  { id: "testimonials", label: "⭐ Testimoni" },
  { id: "gallery", label: "🖼️ Galeri" },
+ { id: "faq", label: "FAQ" },
+ { id: "booking", label: "Booking" },
+ { id: "navigation", label: "Navigasi" },
+ { id: "seo", label: "SEO" },
  { id: "contact", label: "📞 Kontak" },
  { id: "footer", label: "📋 Footer" },
  ];
@@ -336,6 +344,32 @@ export default function LandingSettingsPage() {
  )}
 
  {/* ========== CONTACT ========== */}
+ {activeSection === "faq" && (
+ <div className="glass-panel p-4 lg:p-6 space-y-4">
+ <div className="flex items-center justify-between"><h3 className="font-bold text-sm">FAQ</h3><button onClick={() => setData({ ...data, landing_faq: [...data.landing_faq, { q: "", a: "" }] })} className="flex items-center gap-1 text-xs text-primary font-medium"><Plus size={14} /> Tambah</button></div>
+ {data.landing_faq.map((faq, i) => <div key={i} className="grid gap-2 p-3 border border-surface-border rounded-xl"><div className="flex justify-between"><span className="text-xs font-bold text-muted-foreground">Pertanyaan {i + 1}</span><button onClick={() => setData({ ...data, landing_faq: data.landing_faq.filter((_, index) => index !== i) })} className="text-red-500"><Trash2 size={14}/></button></div><input className={inputClass} placeholder="Pertanyaan" value={faq.q} onChange={e => { const next = [...data.landing_faq]; next[i] = { ...faq, q: e.target.value }; setData({ ...data, landing_faq: next }); }} /><textarea className={inputClass} rows={3} placeholder="Jawaban" value={faq.a} onChange={e => { const next = [...data.landing_faq]; next[i] = { ...faq, a: e.target.value }; setData({ ...data, landing_faq: next }); }} /></div>)}
+ </div>
+ )}
+
+ {activeSection === "booking" && (
+ <div className="glass-panel p-4 lg:p-6 space-y-4">
+ <h3 className="font-bold text-sm">Pengaturan Booking</h3>
+ <div><label className={labelClass}>Kapasitas tiap slot</label><input type="number" min="1" max="50" className={inputClass} value={data.landing_booking.slotCapacity || 1} onChange={e => setData({ ...data, landing_booking: { ...data.landing_booking, slotCapacity: Math.max(1, Number(e.target.value) || 1) } })}/><p className="mt-1 text-[10px] text-muted-foreground">Jumlah booking aktif yang dapat masuk pada jam yang sama.</p></div>
+ <div><label className={labelClass}>Judul</label><input className={inputClass} value={data.landing_booking.heading} onChange={e => setData({ ...data, landing_booking: { ...data.landing_booking, heading: e.target.value } })}/></div>
+ <div><label className={labelClass}>Deskripsi</label><textarea className={inputClass} rows={3} value={data.landing_booking.description} onChange={e => setData({ ...data, landing_booking: { ...data.landing_booking, description: e.target.value } })}/></div>
+ <div><label className={labelClass}>Pilihan layanan</label>{data.landing_booking.serviceOptions.map((item, i) => <div key={i} className="flex gap-2 mt-2"><input className={inputClass} placeholder="Nama layanan" value={item.id} onChange={e => { const next = [...data.landing_booking.serviceOptions]; next[i] = { ...item, id: e.target.value }; setData({ ...data, landing_booking: { ...data.landing_booking, serviceOptions: next } }); }}/><input className={inputClass} placeholder="Deskripsi singkat" value={item.desc} onChange={e => { const next = [...data.landing_booking.serviceOptions]; next[i] = { ...item, desc: e.target.value }; setData({ ...data, landing_booking: { ...data.landing_booking, serviceOptions: next } }); }}/><button onClick={() => setData({ ...data, landing_booking: { ...data.landing_booking, serviceOptions: data.landing_booking.serviceOptions.filter((_, index) => index !== i) } })} className="text-red-500"><Trash2 size={14}/></button></div>)}<button onClick={() => setData({ ...data, landing_booking: { ...data.landing_booking, serviceOptions: [...data.landing_booking.serviceOptions, { id: "", desc: "" }] } })} className="mt-2 text-xs text-primary">+ Tambah layanan</button></div>
+ <div className="grid sm:grid-cols-3 gap-3"><div><label className={labelClass}>Tipe kendaraan (pisahkan koma)</label><textarea className={inputClass} rows={3} value={data.landing_booking.vehicleTypes.join(", ")} onChange={e => setData({ ...data, landing_booking: { ...data.landing_booking, vehicleTypes: e.target.value.split(",").map(x => x.trim()).filter(Boolean) } })}/></div><div><label className={labelClass}>Slot jam (pisahkan koma)</label><textarea className={inputClass} rows={3} value={data.landing_booking.timeSlots.join(", ")} onChange={e => setData({ ...data, landing_booking: { ...data.landing_booking, timeSlots: e.target.value.split(",").map(x => x.trim()).filter(Boolean) } })}/></div><div><label className={labelClass}>Hari tutup (pisahkan koma)</label><textarea className={inputClass} rows={3} value={data.landing_booking.closedDays.join(", ")} onChange={e => setData({ ...data, landing_booking: { ...data.landing_booking, closedDays: e.target.value.split(",").map(x => x.trim()).filter(Boolean) } })}/></div></div>
+ </div>
+ )}
+
+ {activeSection === "navigation" && (
+ <div className="glass-panel p-4 lg:p-6 space-y-4"><h3 className="font-bold text-sm">Navigasi</h3><div className="grid sm:grid-cols-3 gap-3"><div><label className={labelClass}>Tombol booking</label><input className={inputClass} value={data.landing_navigation.ctaLabel} onChange={e => setData({ ...data, landing_navigation: { ...data.landing_navigation, ctaLabel: e.target.value } })}/></div><div><label className={labelClass}>Pelacakan</label><input className={inputClass} value={data.landing_navigation.trackLabel} onChange={e => setData({ ...data, landing_navigation: { ...data.landing_navigation, trackLabel: e.target.value } })}/></div><div><label className={labelClass}>Portal</label><input className={inputClass} value={data.landing_navigation.portalLabel} onChange={e => setData({ ...data, landing_navigation: { ...data.landing_navigation, portalLabel: e.target.value } })}/></div></div>{data.landing_navigation.items.map((item, i) => <div key={item.id} className="flex gap-2"><input className={inputClass} value={item.label} onChange={e => { const next = [...data.landing_navigation.items]; next[i] = { ...item, label: e.target.value }; setData({ ...data, landing_navigation: { ...data.landing_navigation, items: next } }); }}/><input className={inputClass} readOnly value={`#${item.id}`}/></div>)}</div>
+ )}
+
+ {activeSection === "seo" && (
+ <div className="glass-panel p-4 lg:p-6 space-y-4"><h3 className="font-bold text-sm">SEO Halaman Depan</h3><div><label className={labelClass}>Judul halaman</label><input className={inputClass} value={data.landing_seo.title} onChange={e => setData({ ...data, landing_seo: { ...data.landing_seo, title: e.target.value } })}/></div><div><label className={labelClass}>Deskripsi</label><textarea className={inputClass} rows={3} value={data.landing_seo.description} onChange={e => setData({ ...data, landing_seo: { ...data.landing_seo, description: e.target.value } })}/></div><div><label className={labelClass}>URL kanonis</label><input type="url" className={inputClass} value={data.landing_seo.canonicalUrl} onChange={e => setData({ ...data, landing_seo: { ...data.landing_seo, canonicalUrl: e.target.value } })}/></div></div>
+ )}
+
  {activeSection === "contact" && (
  <div className="glass-panel p-4 lg:p-6 space-y-4">
  <h3 className="font-bold text-sm">Kontak & Lokasi</h3>
@@ -358,6 +392,7 @@ export default function LandingSettingsPage() {
  <h3 className="font-bold text-sm">Footer</h3>
  <div className="space-y-3">
  <div><label className={labelClass}>Deskripsi</label><textarea className={inputClass} rows={2} value={data.landing_footer.description} onChange={e => setData({ ...data, landing_footer: { ...data.landing_footer, description: e.target.value } })} /></div>
+ <div><label className={labelClass}>Daftar layanan footer (pisahkan koma)</label><textarea className={inputClass} rows={2} value={(data.landing_footer.services || []).join(", ")} onChange={e => setData({ ...data, landing_footer: { ...data.landing_footer, services: e.target.value.split(",").map(x => x.trim()).filter(Boolean) } })} /></div>
  <div className="grid sm:grid-cols-3 gap-2">
  <div><label className={labelClass}>Jam Senin-Jumat</label><input className={inputClass} value={data.landing_footer.hourWeekday} onChange={e => setData({ ...data, landing_footer: { ...data.landing_footer, hourWeekday: e.target.value } })} /></div>
  <div><label className={labelClass}>Jam Sabtu</label><input className={inputClass} value={data.landing_footer.hourSaturday} onChange={e => setData({ ...data, landing_footer: { ...data.landing_footer, hourSaturday: e.target.value } })} /></div>
