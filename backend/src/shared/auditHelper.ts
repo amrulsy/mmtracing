@@ -2,7 +2,7 @@ import db from '../config/db';
 import logger from '../config/logger';
 
 type AuditAction = 'create' | 'update' | 'delete' | 'login' | 'logout' | 'stok_masuk' | 'stok_keluar' | 'opname' | string;
-type AuditModule = 'spk' | 'pembayaran' | 'inventaris' | 'sparepart' | 'jasa' | 'pelanggan' | 'mekanik' | 'garansi' | 'auth' | 'booking' | 'settings' | string;
+type AuditModule = 'wo' | 'pembayaran' | 'inventaris' | 'sparepart' | 'jasa' | 'pelanggan' | 'mekanik' | 'garansi' | 'auth' | 'booking' | 'settings' | string;
 
 interface DiffEntry {
   from: unknown;

@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/loading-skeleton";
 import { PhotoUploader } from "@/components/ui/photo-uploader";
 
 const TIERS_CACHE_KEY = "mm_loyalty_tiers_v1";
-type SortKey = "recent" | "name" | "spk";
+type SortKey = "recent" | "name" | "WO";
 
 export default function KendaraanPage() {
  const { user } = useAuth();
@@ -140,7 +140,7 @@ export default function KendaraanPage() {
  // Sort client-side (simple)
  const sortedCustomers = [...customers].sort((a, b) => {
  if (sort === "name") return a.name.localeCompare(b.name);
- if (sort === "spk") return (b._count?.spk ?? 0) - (a._count?.spk ?? 0);
+ if (sort === "WO") return (b._count?.spk ?? 0) - (a._count?.spk ?? 0);
  // recent = urutan default dari backend (updatedAt desc) — kembalikan 0
  return 0;
  });
@@ -339,7 +339,7 @@ export default function KendaraanPage() {
  <Link href="/app/kendaraan/tambah" className="flex items-center gap-2 text-sm bg-surface border border-surface-border px-3 py-2 rounded-xl hover:bg-surface-hover font-medium">
  <Car size={16} /> + Pelanggan
  </Link>
- <Link href="/app/spk/create?mode=bubut" className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-xl font-medium hover: text-sm">
+ <Link href="/app/work-order/create?mode=bubut" className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-xl font-medium hover: text-sm">
  <Hammer size={16} /> + SPK Bubut
  </Link>
  </div>
@@ -368,7 +368,7 @@ export default function KendaraanPage() {
  className="bg-transparent text-[11px] text-muted-foreground focus:outline-none focus:text-foreground cursor-pointer">
  <option value="recent">Terbaru diperbarui</option>
  <option value="name">Nama A-Z</option>
- <option value="spk">Total SPK terbanyak</option>
+ <option value="WO">Total SPK terbanyak</option>
  </select>
  </div>
  </div>
@@ -419,7 +419,7 @@ export default function KendaraanPage() {
  {p.type === "bubut" ? <><Hammer size={10} /> Bubut Lepas</> :
  p.type === "both" ? <><CarFront size={10} /> Kendaraan + Bubut</> :
  <><CarFront size={10} /> {p.kendaraan?.[0]?.name || "Pelanggan"}</>}
- {(p._count?.spk ?? 0) > 0 && <span className="ml-1 text-muted-foreground">• {p._count?.spk} SPK</span>}
+ {(p._count?.spk ?? 0) > 0 && <span className="ml-1 text-muted-foreground">• {p._count?.spk} WO</span>}
  </p>
  </div>
  </div>
@@ -497,7 +497,7 @@ export default function KendaraanPage() {
  </div>
  <div className="mt-6 grid grid-cols-3 gap-4 pt-6 border-t border-surface-border">
  <div><p className="text-xs text-muted-foreground">Total Kendaraan</p><p className="text-lg font-semibold">{active.kendaraan?.length || 0}</p></div>
- <div><p className="text-xs text-muted-foreground">Total SPK</p><p className="text-lg font-semibold">{active._count?.spk || 0}</p></div>
+ <div><p className="text-xs text-muted-foreground">Total WO</p><p className="text-lg font-semibold">{active._count?.spk || 0}</p></div>
  <div><p className="text-xs text-muted-foreground">Status Loyalty</p><p className="text-lg font-semibold text-primary">{active.loyaltyTier?.name || "—"}</p></div>
  </div>
  <LoyaltyHistoryPreview pelangganId={active.id} />
@@ -524,7 +524,7 @@ export default function KendaraanPage() {
  {k.tahun ? `Tahun ${k.tahun}` : ""} {k.warna ? `• Warna ${k.warna}` : ""}
  </p>
  <div className="flex gap-2">
- <Link href={`/app/spk/create?pelangganId=${active.id}&kendaraanId=${k.id}`} className="flex-1 text-center text-xs bg-primary/10 text-primary hover:bg-primary/20 py-1.5 rounded-lg transition-colors border border-primary/20 font-medium">Buat SPK</Link>
+ <Link href={`/app/work-order/create?pelangganId=${active.id}&kendaraanId=${k.id}`} className="flex-1 text-center text-xs bg-primary/10 text-primary hover:bg-primary/20 py-1.5 rounded-lg transition-colors border border-primary/20 font-medium">Buat Work Order</Link>
  <Link href={`/app/kendaraan/${k.id}`} className="flex-1 text-xs bg-surface border border-surface-border hover:bg-surface-hover py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 font-medium">
  <History size={14} /> Detail
  </Link>
@@ -555,7 +555,7 @@ export default function KendaraanPage() {
  <div className="flex items-center justify-between">
  <div>
  <p className="text-sm font-bold text-red-600">Hapus Pelanggan</p>
- <p className="text-xs text-muted-foreground">Hanya dapat dilakukan jika tidak ada SPK aktif.</p>
+ <p className="text-xs text-muted-foreground">Hanya dapat dilakukan jika Tidak ada WO aktif.</p>
  </div>
  <button onClick={handleDeletePelanggan} disabled={deleteLoading || (active._count?.spk ?? 0) > 0} className="flex items-center gap-2 text-xs font-bold px-4 py-2 bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-colors disabled:opacity-40 disabled:pointer-events-none">
  <Trash2 size={14} /> {deleteLoading ? "Menghapus..." : "Hapus"}
@@ -772,7 +772,7 @@ export default function KendaraanPage() {
  <button key={c.id} type="button" onClick={() => { setMergeTargetId(c.id); setMergeTargetSearch(c.name); }}
  className={`w-full text-left p-3 hover:bg-surface-hover border-b border-surface-border last:border-0 transition-colors ${mergeTargetId === c.id ? "bg-primary/10" : ""}`}>
  <p className="text-sm font-medium">{c.name}</p>
- <p className="text-[10px] text-muted-foreground">{c.phone} • {c.kendaraan?.length || 0} kendaraan • {c._count?.spk || 0} SPK</p>
+ <p className="text-[10px] text-muted-foreground">{c.phone} • {c.kendaraan?.length || 0} kendaraan • {c._count?.spk || 0} WO</p>
  </button>
  ))}
  </div>

@@ -10,9 +10,12 @@ export interface SSEEventData {
 
 /** Map SSE event types to SWR cache prefixes for auto-revalidation */
 const SSE_REVALIDATION_MAP: Record<string, string[]> = {
-  "spk:updated": ["/spk", "/dashboard"],
-  "spk:selesai": ["/spk", "/dashboard", "/pembayaran"],
-  "spk:kendala": ["/spk", "/dashboard"],
+  "wo:updated": ["/wo", "/work-order", "/dashboard"],
+  "wo:selesai": ["/wo", "/work-order", "/dashboard", "/pembayaran"],
+  "wo:kendala": ["/wo", "/work-order", "/dashboard"],
+  "spk:updated": ["/wo", "/work-order", "/dashboard"],
+  "spk:selesai": ["/wo", "/work-order", "/dashboard", "/pembayaran"],
+  "spk:kendala": ["/wo", "/work-order", "/dashboard"],
   "pembayaran:lunas": ["/pembayaran", "/dashboard"],
   "pembayaran:bayar": ["/pembayaran", "/dashboard"],
   "inventaris:stok-update": ["/sparepart", "/inventaris", "/dashboard"],

@@ -15,7 +15,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
       const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
       const [
-        spkAntri, spkDikerjakan, spkSelesaiHariIni, spkKendala,
+        woAntri, woDikerjakan, woSelesaiHariIni, woKendala,
         pendapatanHariIniRow, pendapatanBulanRow,
         mekanikRows,
         stokMenipisRow, stokHabis,
@@ -24,10 +24,10 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
         spkDistribution,
         pengeluaranHariIniRow, pengeluaranBulanRow,
       ] = await Promise.all([
-        db.queryVal<number>("SELECT COUNT(*) FROM spk WHERE status = 'antri'"),
-        db.queryVal<number>("SELECT COUNT(*) FROM spk WHERE status = 'dikerjakan'"),
-        db.queryVal<number>("SELECT COUNT(*) FROM spk WHERE status = 'selesai' AND completedAt >= ?", [today]),
-        db.queryVal<number>("SELECT COUNT(*) FROM spk WHERE status = 'kendala'"),
+        db.queryVal<number>("SELECT COUNT(*) FROM work_orders WHERE status = 'antri'"),
+        db.queryVal<number>("SELECT COUNT(*) FROM work_orders WHERE status = 'dikerjakan'"),
+        db.queryVal<number>("SELECT COUNT(*) FROM work_orders WHERE status = 'selesai' AND completedAt >= ?", [today]),
+        db.queryVal<number>("SELECT COUNT(*) FROM work_orders WHERE status = 'kendala'"),
 
         db.queryOne<{ t: number }>('SELECT COALESCE(SUM(jumlah),0) AS t FROM pembayaran_detail WHERE tanggal >= ?', [today]),
         db.queryOne<{ t: number }>('SELECT COALESCE(SUM(jumlah),0) AS t FROM pembayaran_detail WHERE tanggal >= ?', [thisMonth]),
@@ -41,14 +41,14 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
 
         db.query(
           `SELECT s.*, p.name AS pName, k.name AS kName, k.plat AS kPlat, m.name AS mName
-           FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId
+           FROM work_orders s LEFT JOIN pelanggan p ON p.id = s.pelangganId
            LEFT JOIN kendaraan k ON k.id = s.kendaraanId LEFT JOIN mekanik m ON m.id = s.mekanikId
            ORDER BY s.createdAt DESC LIMIT 5`),
         db.query(
           `SELECT a.*, u.name AS userName FROM activity_logs a LEFT JOIN users u ON u.id = a.userId
            ORDER BY a.createdAt DESC LIMIT 10`),
         db.query(
-          "SELECT mode, COUNT(*) AS _count FROM spk WHERE status NOT IN ('selesai','dibatalkan') GROUP BY mode"),
+          "SELECT mode, COUNT(*) AS _count FROM work_orders WHERE status NOT IN ('selesai','dibatalkan') GROUP BY mode"),
 
         db.queryOne<{ t: number }>('SELECT COALESCE(SUM(jumlah),0) AS t FROM pengeluaran WHERE tanggal >= ?', [today]),
         db.queryOne<{ t: number }>('SELECT COALESCE(SUM(jumlah),0) AS t FROM pengeluaran WHERE tanggal >= ?', [thisMonth]),
@@ -59,9 +59,9 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
       if (mekanikRows.length) {
         const mIds = mekanikRows.map((m: any) => m.id);
         const activeSpks = await db.query(
-          "SELECT mekanikId, noSpk FROM spk WHERE mekanikId IN (?) AND status = 'dikerjakan'", [mIds]);
+          "SELECT mekanikId, noWo FROM work_orders WHERE mekanikId IN (?) AND status = 'dikerjakan'", [mIds]);
         const spkMap = new Map<number, any[]>();
-        for (const s of activeSpks) { if (!spkMap.has(s.mekanikId)) spkMap.set(s.mekanikId, []); spkMap.get(s.mekanikId)!.push({ noSpk: s.noSpk }); }
+        for (const s of activeSpks) { if (!spkMap.has(s.mekanikId)) spkMap.set(s.mekanikId, []); spkMap.get(s.mekanikId)!.push({ noWo: s.noWo }); }
         mekanikAktif = mekanikRows.map((m: any) => ({ ...m, spk: spkMap.get(m.id) || [] }));
       }
 
@@ -70,7 +70,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
         return acc;
       }, { rutin: 0, modifikasi: 0, bubut: 0 });
 
-      const recentSpk = recentSpkRows.map((s: any) => ({
+      const recentWo = recentSpkRows.map((s: any) => ({
         ...s,
         pelanggan: { name: s.pName },
         kendaraan: s.kName ? { name: s.kName, plat: s.kPlat } : null,
@@ -80,7 +80,8 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
 
       return {
         kpi: {
-          spkAntri, spkDikerjakan, spkSelesaiHariIni, spkKendala,
+          woAntri, woDikerjakan, woSelesaiHariIni, woKendala,
+          spkAntri: woAntri, spkDikerjakan: woDikerjakan, spkSelesaiHariIni: woSelesaiHariIni, spkKendala: woKendala,
           pendapatanHariIni: Number(pendapatanHariIniRow?.t || 0),
           pendapatanBulan: Number(pendapatanBulanRow?.t || 0),
           pengeluaranHariIni: Number(pengeluaranHariIniRow?.t || 0),
@@ -90,7 +91,8 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
           pelangganBaru,
         },
         mekanikAktif,
-        recentSpk,
+        recentWo,
+        recentSpk: recentWo,
         recentActivity,
         distribution: distributionMap,
       };

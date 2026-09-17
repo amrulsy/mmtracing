@@ -43,7 +43,7 @@ export default function PortalDashboard() {
       else throw new Error("Invalid token");
 
       if (historyData.success) {
-        setSpks(historyData.data.spk || []);
+        setSpks(historyData.data.activeWo || historyData.data.spk || []);
         setBookings(historyData.data.bookings || []);
       }
     } catch (err) {
@@ -80,7 +80,7 @@ export default function PortalDashboard() {
   const spkBelumLunas = spks.filter(s => Number(s.sisaTagihan) > 0).length;
 
   return (
-    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-20 animate-in fade-in duration-500">
+    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-6 animate-in fade-in duration-500">
       {/* Header Profile */}
       <div className="glass-panel p-5 sm:p-6 border-l-4 border-l-primary">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -145,7 +145,7 @@ export default function PortalDashboard() {
         <div className="glass-panel p-3">
           <div className="flex items-center gap-1.5 mb-1 text-blue-500">
             <ReceiptText size={14} />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total SPK</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total WO</span>
           </div>
           <div className="text-xl sm:text-2xl font-black">{spks.length}</div>
         </div>
@@ -202,7 +202,7 @@ export default function PortalDashboard() {
                 return (
                   <Link
                     key={spk.id}
-                    href={`/portal/spk/${spk.id}`}
+                    href={`/portal/work-order/${spk.id}`}
                     className={`block p-4 border rounded-xl hover:bg-surface-hover transition-all group relative overflow-hidden active:scale-[0.99] ${isActive ? "bg-primary/5 border-primary/20" : "bg-surface-hover/50 border-surface-border"}`}
                   >
                     {/* Active indicator pulse */}
@@ -211,7 +211,7 @@ export default function PortalDashboard() {
                     <div className="flex justify-between items-start mb-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider font-mono">{spk.noSpk}</p>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider font-mono">{spk.noWo}</p>
                           <ChevronRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                         </div>
                         <p className="text-[11px] text-muted-foreground mt-0.5">

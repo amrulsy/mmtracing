@@ -36,7 +36,7 @@ const LANDING_DEFAULTS: Record<string, string> = {
   landing_stats: JSON.stringify([
     { value: "10+", label: "Tahun Pengalaman" },
     { value: "5,200+", label: "Pelanggan Puas" },
-    { value: "15,800+", label: "SPK Selesai" },
+    { value: "15,800+", label: "WO Selesai" },
     { value: "4.9", label: "Rating Google" }
   ]),
   landing_services: JSON.stringify([
@@ -180,11 +180,11 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction) =>
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const activeSpk = await db.query(
-      `SELECT s.id, s.noSpk, s.status, s.mode, s.progress, s.prioritas, s.createdAt,
+      `SELECT s.id, s.noWo, s.status, s.mode, s.progress, s.prioritas, s.createdAt,
               p.name AS pelangganName,
               k.name AS kendaraanName, k.plat AS kendaraanPlat,
               m.name AS mekanikName
-       FROM spk s
+       FROM work_orders s
        LEFT JOIN pelanggan p ON p.id = s.pelangganId
        LEFT JOIN kendaraan k ON k.id = s.kendaraanId
        LEFT JOIN mekanik m ON m.id = s.mekanikId
@@ -196,7 +196,7 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction) =>
 
     // Anonymize names: "Budi Santoso" → "B***o"
     const queue = activeSpk.map((spk: any) => ({
-      noSpk: spk.noSpk,
+      noWo: spk.noWo,
       status: spk.status,
       mode: spk.mode,
       progress: spk.progress,
@@ -321,22 +321,22 @@ router.post('/booking', bookingLimiter, async (req: Request, res: Response, next
 // POST /landing/track — PUBLIC (Live Tracking SPK without login)
 router.post('/track', trackingLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const noSpk = String(req.body.noSpk || '').trim().toUpperCase();
+    const noWo = String(req.body.noWo || '').trim().toUpperCase();
     const accessPin = String(req.body.accessPin || '').trim();
-    if (!noSpk || !accessPin) {
+    if (!noWo || !accessPin) {
       res.status(400).json({ success: false, message: 'Nomor SPK dan PIN Akses wajib diisi' });
       return;
     }
 
-    // Cari SPK berdasarkan noSpk
-    const spk = await db.queryOne<any>("SELECT * FROM spk WHERE noSpk = ?", [noSpk]);
+    // Cari SPK berdasarkan noWo
+    const spk = await db.queryOne<any>("SELECT * FROM work_orders WHERE noWo = ?", [noWo]);
     if (!spk) {
-      res.status(404).json({ success: false, message: 'SPK tidak ditemukan' });
+      res.status(404).json({ success: false, message: 'Work Order tidak ditemukan' });
       return;
     }
 
     // Cari pembayaran untuk mencocokkan accessPin
-    const pembayaran = await db.queryOne<any>("SELECT * FROM pembayaran WHERE spkId = ? AND accessPin = ?", [spk.id, accessPin]);
+    const pembayaran = await db.queryOne<any>("SELECT * FROM pembayaran WHERE woId = ? AND accessPin = ?", [spk.id, accessPin]);
     if (!pembayaran) {
       res.status(401).json({ success: false, message: 'PIN Akses salah' });
       return;
@@ -346,9 +346,9 @@ router.post('/track', trackingLimiter, async (req: Request, res: Response, next:
     const [kendaraan, mekanik, items, stages, photos] = await Promise.all([
       spk.kendaraanId ? db.queryOne("SELECT * FROM kendaraan WHERE id = ?", [spk.kendaraanId]) : null,
       spk.mekanikId ? db.queryOne("SELECT * FROM mekanik WHERE id = ?", [spk.mekanikId]) : null,
-      db.query("SELECT i.*, sp.name AS spName, j.name AS jName FROM spk_items i LEFT JOIN sparepart sp ON sp.id = i.sparepartId LEFT JOIN jasa j ON j.id = i.jasaId WHERE i.spkId = ?", [spk.id]),
-      db.query("SELECT * FROM spk_stages WHERE spkId = ? ORDER BY urutan ASC", [spk.id]),
-      db.query("SELECT * FROM spk_photos WHERE spkId = ? ORDER BY createdAt DESC", [spk.id])
+      db.query("SELECT i.*, sp.name AS spName, j.name AS jName FROM wo_items i LEFT JOIN sparepart sp ON sp.id = i.sparepartId LEFT JOIN jasa j ON j.id = i.jasaId WHERE i.woId = ?", [spk.id]),
+      db.query("SELECT * FROM wo_stages WHERE woId = ? ORDER BY urutan ASC", [spk.id]),
+      db.query("SELECT * FROM wo_photos WHERE woId = ? ORDER BY createdAt DESC", [spk.id])
     ]);
 
     const enrichedItems = items.map((i: any) => ({

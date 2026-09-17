@@ -6,6 +6,7 @@ import { ArrowLeft, Printer, CheckCircle, Clock, Banknote, CreditCard, Tag, User
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatRupiah } from "@/lib/utils";
+import { PaymentModal } from "@/components/ui/payment-modal";
 import type { Pembayaran, PembayaranDetail } from "@/lib/types";
 
 interface PembayaranWithDetail extends Pembayaran {
@@ -19,6 +20,7 @@ export default function PembayaranDetailPage({ params }: { params: Promise<{ id:
  const [error, setError] = useState("");
  const [processing, setProcessing] = useState(false);
  const [waLoading, setWaLoading] = useState(false);
+ const [showPayModal, setShowPayModal] = useState(false);
 
  const isLunas = data?.status === "lunas";
 
@@ -60,7 +62,7 @@ export default function PembayaranDetailPage({ params }: { params: Promise<{ id:
  
  const message = `Halo ${data.spk?.pelanggan?.name || 'Pelanggan'},
  
-Berikut adalah link E-Kwitansi / Invoice digital dari Moro Motor Tracing untuk SPK *${data.spk?.noSpk}*:
+Berikut adalah link E-Kwitansi / Invoice digital dari Moro Motor Tracing untuk SPK *${data.spk?.noWo}*:
 ${pubUrl}
 
 *🔐 PIN Akses:* ${pin}
@@ -126,9 +128,9 @@ Terima kasih atas kepercayaannya. Harap simpan e-kwitansi ini sebagai bukti pemb
  </div>
  <div className="flex gap-2">
  {!isLunas && (
- <Link href={`/app/pembayaran/kasir?id=${data.id}`} className="flex items-center gap-2 px-4 py-2 font-bold rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors text-sm shadow-sm">
+ <button onClick={() => setShowPayModal(true)} className="flex items-center gap-2 px-4 py-2 font-bold rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors text-sm shadow-sm">
  Bayar Sekarang
- </Link>
+ </button>
  )}
  <Link href={`/app/pembayaran/${data.id}/kwitansi`} className="flex items-center gap-2 px-4 py-2 font-bold rounded-xl border border-surface-border hover:bg-surface-hover transition-colors text-sm">
  <Printer size={16} /> Cetak Kwitansi
@@ -167,9 +169,9 @@ Terima kasih atas kepercayaannya. Harap simpan e-kwitansi ini sebagai bukti pemb
  </div>
  </div>
  <div className="space-y-3 sm:border-l sm:border-surface-border/50 sm:pl-4">
- <h3 className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5"><Tag size={14} /> Referensi SPK</h3>
+ <h3 className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5"><Tag size={14} /> Referensi WO</h3>
  <div>
- <Link href={`/app/spk/${data.spkId}`} className="font-bold text-base text-primary hover:underline font-mono">{data.spk?.noSpk || "—"}</Link>
+ <Link href={`/app/work-order/${data.woId}`} className="font-bold text-base text-primary hover:underline font-mono">{data.spk?.noWo || "—"}</Link>
  {data.spk?.kendaraan && <p className="text-sm flex items-center gap-1.5 text-muted-foreground mt-1"><Car size={12} /> {data.spk.kendaraan.name} ({data.spk.kendaraan.plat})</p>}
  </div>
  </div>
@@ -228,6 +230,16 @@ Terima kasih atas kepercayaannya. Harap simpan e-kwitansi ini sebagai bukti pemb
  </div>
  </div>
  </div>
+
+ {/* Quick-Pay Modal */}
+ {!isLunas && (
+ <PaymentModal
+ pembayaran={data}
+ open={showPayModal}
+ onClose={() => setShowPayModal(false)}
+ onSuccess={() => fetchDetail()}
+ />
+ )}
  </div>
  );
 }

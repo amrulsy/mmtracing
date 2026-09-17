@@ -58,7 +58,7 @@ export default function LogAktivitasPage() {
 
  const getModuleIcon = (moduleName: string) => {
  switch (moduleName) {
- case "spk": return FileText;
+ case "WO": return FileText;
  case "pelanggan": return UserPlus;
  case "pembayaran": return CreditCard;
  case "monitoring": return Wrench;
@@ -94,7 +94,7 @@ export default function LogAktivitasPage() {
  <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari aktivitas..." className="bg-transparent border-none focus:outline-none text-sm w-full" />
  </div>
  <div className="flex gap-2 flex-wrap">
- {["semua", "spk", "pembayaran", "inventaris", "pelanggan", "master", "auth"].map(f => (
+ {["semua", "WO", "pembayaran", "inventaris", "pelanggan", "master", "auth"].map(f => (
  <button key={f} onClick={() => setFilterModule(f)} className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded-full border transition-colors ${filterModule === f ? "bg-primary/10 text-primary border-primary/20" : "text-muted-foreground border-surface-border hover:bg-surface-hover"}`}>{f}</button>
  ))}
  </div>

@@ -20,7 +20,7 @@ interface Inspeksi {
  noPolisi: string;
  pelanggan?: { name: string };
  };
- spk?: { noSpk: string };
+ spk?: { noWo: string };
 }
 
 export default function InspeksiListPage() {

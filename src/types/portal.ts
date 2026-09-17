@@ -15,28 +15,31 @@ export interface PortalProfile {
   createdAt: string;
 }
 
-// ============ SPK ============
-export interface PortalSPK {
+// ============ Work Order (WO) ============
+export interface PortalWO {
   id: number;
-  noSpk: string;
-  status: SPKStatus;
+  noWo: string;
+  status: WOStatus;
   progress: number;
   totalTagihan: string;
   sisaTagihan: string;
   mode: string;
   createdAt: string;
 }
+export type PortalSPK = PortalWO;
 
-export type SPKStatus = "selesai" | "batal" | "dikerjakan" | "kendala" | "antri" | "baru";
+export type WOStatus = "selesai" | "batal" | "dikerjakan" | "kendala" | "antri" | "baru";
+export type SPKStatus = WOStatus;
 
-export interface SPKStage {
+export interface WOStage {
   id: number;
   nama: string;
   status: "selesai" | "dikerjakan" | "pending";
   catatanMekanik: string | null;
 }
+export type SPKStage = WOStage;
 
-export interface SPKItem {
+export interface WOItem {
   id: number;
   nama: string;
   type: "jasa" | "sparepart";
@@ -44,51 +47,58 @@ export interface SPKItem {
   hargaSatuan: string;
   subtotal: string;
 }
+export type SPKItem = WOItem;
 
-export interface SPKPhoto {
+export interface WOPhoto {
   id: number;
   url: string;
   keterangan: string | null;
 }
+export type SPKPhoto = WOPhoto;
 
-export interface SPKKendaraan {
+export interface WOKendaraan {
   name: string;
   plat: string;
 }
+export type SPKKendaraan = WOKendaraan;
 
-export interface SPKMekanik {
+export interface WOMekanik {
   name: string;
 }
+export type SPKMekanik = WOMekanik;
 
-export interface SPKPembayaran {
+export interface WOPembayaran {
   publicId: string;
 }
+export type SPKPembayaran = WOPembayaran;
 
-export interface SPKDetail {
+export interface WODetail {
   id: number;
-  noSpk: string;
-  status: SPKStatus;
+  noWo: string;
+  status: WOStatus;
   progress: number;
   totalHarga: string;
   diskon: string;
   keluhan: string | null;
   createdAt: string;
   updatedAt: string;
-  kendaraan: SPKKendaraan | null;
-  mekanik: SPKMekanik | null;
-  stages: SPKStage[];
-  items: SPKItem[];
-  photos: SPKPhoto[];
-  pembayaran: SPKPembayaran | null;
+  kendaraan: WOKendaraan | null;
+  mekanik: WOMekanik | null;
+  stages: WOStage[];
+  items: WOItem[];
+  photos: WOPhoto[];
+  pembayaran: WOPembayaran | null;
 }
+export type SPKDetail = WODetail;
 
-export interface SPKReview {
+export interface WOReview {
   id: number;
   rating: number;
   comment: string | null;
   tags: string[];
   createdAt: string;
 }
+export type SPKReview = WOReview;
 
 // ============ Booking ============
 export interface PortalBooking {
@@ -113,7 +123,7 @@ export interface PembayaranDetail {
 
 export interface Pembayaran {
   id: number;
-  spkId: number;
+  woId?: number;
   noInvoice: string | null;
   publicId: string;
   total: string;
@@ -121,8 +131,8 @@ export interface Pembayaran {
   sisaTagihan: string;
   status: string;
   createdAt: string;
-  noSpk: string;
-  spkStatus: string;
+  noWo?: string;
+  woStatus?: string;
   details: PembayaranDetail[];
 }
 
@@ -161,7 +171,7 @@ export interface GaransiClaim {
 export interface Garansi {
   id: number;
   itemName: string;
-  noSpk: string;
+  noWo?: string;
   type: string;
   startDate: string;
   endDate: string;

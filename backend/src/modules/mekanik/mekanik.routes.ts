@@ -34,7 +34,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     if (status) { conds.push('m.status = ?'); params.push(status); }
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
     const mekaniks = await db.query(
-      `SELECT m.*, (SELECT COUNT(*) FROM spk WHERE mekanikId = m.id) AS _countSpk
+      `SELECT m.*, (SELECT COUNT(*) FROM work_orders WHERE mekanikId = m.id) AS _countSpk
        FROM mekanik m ${where} ORDER BY m.name ASC`,
       params,
     );
@@ -42,7 +42,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     if (mekaniks.length) {
       const ids = mekaniks.map((m: any) => m.id);
       const activeSpk = await db.query(
-        'SELECT id, noSpk, status, mekanikId FROM spk WHERE mekanikId IN (?) AND status = ?',
+        'SELECT id, noWo, status, mekanikId FROM work_orders WHERE mekanikId IN (?) AND status = ?',
         [ids, 'dikerjakan'],
       );
       const map = new Map<number, any[]>();
@@ -62,7 +62,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       db.query(
         `SELECT s.*, p.id AS pelangganId, p.name AS pelangganName, p.phone AS pelangganPhone,
                 k.id AS kendaraanId, k.name AS kendaraanName, k.plat AS kendaraanPlat
-         FROM spk s
+         FROM work_orders s
          LEFT JOIN pelanggan p ON p.id = s.pelangganId
          LEFT JOIN kendaraan k ON k.id = s.kendaraanId
          WHERE s.mekanikId = ? ORDER BY s.createdAt DESC LIMIT 20`, [id]),
@@ -109,7 +109,7 @@ router.delete('/:id', requirePermission('master', 'full'), async (req: Request, 
   try {
     const id = Number(req.params.id);
     const mekanik = await db.queryOne<{ name: string }>('SELECT name FROM mekanik WHERE id = ?', [id]);
-    const spkCount = await db.queryVal<number>('SELECT COUNT(*) FROM spk WHERE mekanikId = ?', [id]);
+    const spkCount = await db.queryVal<number>('SELECT COUNT(*) FROM work_orders WHERE mekanikId = ?', [id]);
     if (spkCount > 0) {
       throw new BadRequestError(`Mekanik ini masih terhubung dengan ${spkCount} SPK dan tidak dapat dihapus.`);
     }

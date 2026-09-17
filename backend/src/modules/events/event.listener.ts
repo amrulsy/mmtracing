@@ -4,43 +4,43 @@ import db from '../../config/db';
 import crypto from 'crypto';
 import logger from '../../config/logger';
 import { 
-  notifySpkCreated, 
-  notifySpkSelesai, 
+  notifyWoCreated, 
+  notifyWoSelesai, 
   notifyProgressUpdate, 
-  notifySpkKendala, 
-  notifySpkBatal, 
+  notifyWoKendala, 
+  notifyWoBatal, 
   notifyGatePassReleased 
 } from '../whatsapp/whatsapp.notification';
 
 export function initializeEventListeners() {
-  // SPK Created
-  appEventEmitter.on('spk:created', (payload: { spkId: number, noSpk: string }) => {
-    notifySpkCreated(payload.spkId);
+  // WO Created
+  appEventEmitter.on('wo:created', (payload: { woId: number, noWo: string }) => {
+    notifyWoCreated(payload.woId);
   });
 
-  // SPK Selesai
-  appEventEmitter.on('spk:selesai', async (payload: { spkId: number, noSpk: string, status: string, isLunas?: boolean, noInvoice?: string }) => {
-    sseManager.broadcast('spk:selesai', payload);
-    notifySpkSelesai(payload.spkId);
+  // WO Selesai
+  appEventEmitter.on('wo:selesai', async (payload: { woId: number, noWo: string, status: string, isLunas?: boolean, noInvoice?: string }) => {
+    sseManager.broadcast('wo:selesai', payload);
+    notifyWoSelesai(payload.woId);
 
     // Sync booking status to 'selesai' jika ada booking yang terhubung
     try {
       await db.execute(
-        "UPDATE bookings SET status = 'selesai', updatedAt = NOW() WHERE spkId = ? AND status != 'selesai'",
-        [payload.spkId]
+        "UPDATE bookings SET status = 'selesai', updatedAt = NOW() WHERE woId = ? AND status != 'selesai'",
+        [payload.woId]
       );
     } catch (err) {
       logger.error('[Event] Gagal sync booking status:', err);
     }
 
     if (payload.isLunas && payload.noInvoice) {
-      notifyGatePassReleased(payload.spkId, payload.noInvoice);
+      notifyGatePassReleased(payload.woId, payload.noInvoice);
     }
   });
 
-  // SPK Kendala
-  appEventEmitter.on('spk:kendala', async (payload: { spkId: number, noSpk: string, status: string }) => {
-    sseManager.broadcast('spk:kendala', payload);
+  // WO Kendala
+  appEventEmitter.on('wo:kendala', async (payload: { woId: number, noWo: string, status: string }) => {
+    sseManager.broadcast('wo:kendala', payload);
     
     const token = crypto.randomBytes(16).toString('hex');
     const expiresAt = new Date();
@@ -48,28 +48,28 @@ export function initializeEventListeners() {
 
     await db.insert('approval_tokens', {
       token,
-      spkId: payload.spkId,
+      woId: payload.woId,
       expiresAt,
     });
 
     const approvalLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/approval/${token}`;
-    notifySpkKendala(payload.spkId, approvalLink);
+    notifyWoKendala(payload.woId, approvalLink);
   });
 
-  // SPK Batal
-  appEventEmitter.on('spk:dibatalkan', (payload: { spkId: number, noSpk: string, status: string }) => {
-    sseManager.broadcast('spk:updated', payload);
-    notifySpkBatal(payload.spkId);
+  // WO Batal
+  appEventEmitter.on('wo:dibatalkan', (payload: { woId: number, noWo: string, status: string }) => {
+    sseManager.broadcast('wo:updated', payload);
+    notifyWoBatal(payload.woId);
   });
 
-  // SPK Progress Update
-  appEventEmitter.on('spk:progress', (payload: { spkId: number, progress: number }) => {
-    notifyProgressUpdate(payload.spkId);
+  // WO Progress Update
+  appEventEmitter.on('wo:progress', (payload: { woId: number, progress: number }) => {
+    notifyProgressUpdate(payload.woId);
   });
 
-  // SPK Generic Update (dikerjakan)
-  appEventEmitter.on('spk:updated', (payload: { spkId: number, noSpk: string, status: string }) => {
-    sseManager.broadcast('spk:updated', payload);
+  // WO Generic Update (dikerjakan)
+  appEventEmitter.on('wo:updated', (payload: { woId: number, noWo: string, status: string }) => {
+    sseManager.broadcast('wo:updated', payload);
   });
 
   // Inventaris: stok berubah (masuk/keluar/opname)

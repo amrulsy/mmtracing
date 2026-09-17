@@ -1,0 +1,30 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PERMISSION_LEVELS = exports.PERMISSION_MODULE_KEYS = exports.PERMISSION_MODULES = void 0;
+/**
+ * Single source of truth for all permission modules in the system.
+ * Used by both backend middleware and frontend role management UI.
+ */
+exports.PERMISSION_MODULES = [
+    { key: 'dashboard', label: 'Dashboard', description: 'Halaman utama & KPI' },
+    { key: 'master', label: 'Master Data', description: 'Pelanggan, Kendaraan, Mekanik, Jasa, Sparepart, Supplier' },
+    { key: 'wo', label: 'Work Order', description: 'Manajemen Work Order bengkel' },
+    { key: 'monitoring', label: 'Monitoring', description: 'Monitoring pekerjaan bengkel' },
+    { key: 'inventaris', label: 'Inventaris', description: 'Stok masuk/keluar, opname, retur' },
+    { key: 'pembayaran', label: 'Pembayaran', description: 'Invoice, pembayaran, refund' },
+    { key: 'pengeluaran', label: 'Pengeluaran', description: 'Pencatatan pengeluaran operasional' },
+    { key: 'booking', label: 'Booking', description: 'Manajemen booking servis' },
+    { key: 'garansi', label: 'Garansi', description: 'Garansi pekerjaan & sparepart' },
+    { key: 'jadwal', label: 'Jadwal', description: 'Penjadwalan mekanik' },
+    { key: 'loyalty', label: 'Loyalty', description: 'Program loyalitas pelanggan' },
+    { key: 'laporan', label: 'Laporan', description: 'Laporan keuangan & operasional' },
+    { key: 'settings', label: 'Pengaturan', description: 'User, role, konfigurasi sistem' },
+];
+exports.PERMISSION_MODULE_KEYS = exports.PERMISSION_MODULES.map(m => m.key);
+exports.PERMISSION_LEVELS = {
+    none: 0,
+    view: 1,
+    edit: 2,
+    full: 3,
+};
+//# sourceMappingURL=permissions.js.map

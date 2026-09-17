@@ -28,7 +28,7 @@ export default function MonitoringPage() {
  const fetchData = useCallback(async () => {
  try {
  const [spkRes, mekRes] = await Promise.all([
- api.getPaginated<Spk>("/spk", { limit: 100 }),
+ api.getPaginated<Spk>("/work-order", { limit: 100 }),
  api.getPaginated<Mekanik>("/mekanik", { limit: 50 }),
  ]);
  setSpkList(spkRes.data);
@@ -120,12 +120,12 @@ export default function MonitoringPage() {
  }
 
  const renderCard = (card: Spk) => (
- <Link key={card.id} href={`/app/spk/${card.id}`} className={`glass p-4 rounded-xl cursor-pointer hover:-translate-y-1 hover:shadow-glossy transition-all block ${card.prioritas === "urgent" || card.prioritas === "tinggi" ? "border-l-4 border-l-amber-500" : ""}`}>
+ <Link key={card.id} href={`/app/work-order/${card.id}`} className={`glass p-4 rounded-xl cursor-pointer hover:-translate-y-1 hover:shadow-glossy transition-all block ${card.prioritas === "urgent" || card.prioritas === "tinggi" ? "border-l-4 border-l-amber-500" : ""}`}>
  <div className="flex justify-between items-start mb-2">
- <span className="text-xs font-mono px-2 py-0.5 rounded bg-background border border-surface-border">{card.noSpk}</span>
+ <span className="text-xs font-mono px-2 py-0.5 rounded bg-background border border-surface-border">{card.noWo}</span>
  <span className={`text-[10px] font-bold uppercase ${modeColor(card.mode)}`}>{modeLabel(card.mode)}</span>
  </div>
- <h4 className="font-semibold text-sm mb-1">{card.judulProyek || card.keluhan || card.noSpk}</h4>
+ <h4 className="font-semibold text-sm mb-1">{card.judulProyek || card.keluhan || card.noWo}</h4>
  <p className="text-xs text-muted-foreground mb-3">{card.pelanggan?.name ?? "—"} {card.kendaraan ? `• ${card.kendaraan.name}` : ""}</p>
  {card.progress > 0 && card.progress < 100 && (
  <div className="mb-3 space-y-1.5">
@@ -213,7 +213,7 @@ export default function MonitoringPage() {
  <div className="lg:hidden space-y-2">
  {columns[activeCol].cards.length === 0 ? (
  <div className={`rounded-xl border border-surface-border p-8 text-center text-sm text-muted-foreground ${columns[activeCol].bgMobile}`}>
- Tidak ada SPK di kolom ini
+ Tidak ada WO di kolom ini
  </div>
  ) : columns[activeCol].cards.map(card => renderCard(card))}
  </div>
@@ -228,7 +228,7 @@ export default function MonitoringPage() {
  </div>
  <div className={`flex-1 rounded-2xl border border-surface-border/50 p-2 space-y-3 overflow-y-auto ${col.bgMobile || "bg-surface-hover/30"}`}>
  {col.cards.length === 0 ? (
- <div className="h-full flex items-center justify-center"><p className="text-sm text-muted-foreground/50 font-medium">Tidak ada SPK</p></div>
+ <div className="h-full flex items-center justify-center"><p className="text-sm text-muted-foreground/50 font-medium">Tidak ada WO</p></div>
  ) : col.cards.map(card => renderCard(card))}
  </div>
  </div>

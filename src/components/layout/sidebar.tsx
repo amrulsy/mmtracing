@@ -46,7 +46,7 @@ const navGroups: NavGroup[] = [
     items: [
       { name: "Dashboard", href: "/app", icon: LayoutDashboard, module: "dashboard" },
       { name: "Kendaraan", href: "/app/kendaraan", icon: CarFront, module: "master" },
-      { name: "SPK", href: "/app/spk", icon: FileText, module: "spk" },
+      { name: "Work Order", href: "/app/work-order", icon: FileText, module: "wo" },
       { name: "Monitoring", href: "/app/monitoring", icon: Wrench, module: "monitoring" },
       { name: "Pembayaran", href: "/app/pembayaran", icon: Wallet, module: "pembayaran" },
       { name: "Booking", href: "/app/booking", icon: CalendarCheck, badgeKey: "booking", module: "booking" },

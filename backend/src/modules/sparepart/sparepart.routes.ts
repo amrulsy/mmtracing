@@ -177,7 +177,7 @@ router.delete('/:id', requirePermission('master', 'full'), async (req: Request, 
     const id = Number(req.params.id);
 
     // Cek apakah sparepart masih dipakai di SPK
-    const usedInSpk = await db.queryVal<number>('SELECT COUNT(*) FROM spk_items WHERE sparepartId = ?', [id]);
+    const usedInSpk = await db.queryVal<number>('SELECT COUNT(*) FROM wo_items WHERE sparepartId = ?', [id]);
     if (usedInSpk > 0) {
       throw new BadRequestError(
         `Sparepart ini masih digunakan di ${usedInSpk} item SPK dan tidak dapat dihapus.`

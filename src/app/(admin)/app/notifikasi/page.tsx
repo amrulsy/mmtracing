@@ -59,7 +59,7 @@ export default function NotifikasiPage() {
 
  const typeIcon = (type: string) => {
  switch (type) {
- case "spk": return <FileText size={16} />;
+ case "WO": return <FileText size={16} />;
  case "pembayaran": return <CreditCard size={16} />;
  case "monitoring": return <Wrench size={16} />;
  case "stok": return <AlertTriangle size={16} />;
@@ -69,7 +69,7 @@ export default function NotifikasiPage() {
 
  const typeColor = (type: string) => {
  switch (type) {
- case "spk": return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+ case "WO": return "bg-blue-500/10 text-blue-600 border-blue-500/20";
  case "pembayaran": return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
  case "monitoring": return "bg-amber-500/10 text-amber-600 border-amber-500/20";
  case "stok": return "bg-red-500/10 text-red-500 border-red-500/20";
@@ -105,7 +105,7 @@ export default function NotifikasiPage() {
  <div className="flex gap-1 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0">
  {[
  { key: "semua", label: "Semua" },
- { key: "spk", label: "SPK" },
+ { key: "WO", label: "WO" },
  { key: "pembayaran", label: "Pembayaran" },
  { key: "monitoring", label: "Monitoring" },
  { key: "stok", label: "Stok" },

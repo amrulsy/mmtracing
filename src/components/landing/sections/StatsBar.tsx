@@ -25,7 +25,7 @@ export default function StatsBar({ stats }: StatsBarProps) {
   const counters = [
     { value: `${c0}${stat0.suffix}`, label: stats?.[0]?.label || "Tahun Pengalaman", icon: Award },
     { value: `${c1.toLocaleString()}${stat1.suffix}`, label: stats?.[1]?.label || "Pelanggan Puas", icon: Users },
-    { value: `${c2.toLocaleString()}${stat2.suffix}`, label: stats?.[2]?.label || "SPK Selesai", icon: Target },
+    { value: `${c2.toLocaleString()}${stat2.suffix}`, label: stats?.[2]?.label || "WO Selesai", icon: Target },
     { value: `${(c3 / 10).toFixed(1)}${stat3.suffix}`, label: stats?.[3]?.label || "Rating Google", icon: Star },
   ];
 

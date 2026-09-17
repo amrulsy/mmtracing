@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 interface SearchResults {
   pelanggan: { id: number; name: string; phone: string }[];
   kendaraan: { id: number; name: string; plat: string; pelanggan: { name: string } }[];
-  spk: { id: number; noSpk: string; status: string; pelanggan: { name: string }; kendaraan: { plat: string } | null }[];
+  spk: { id: number; noWo: string; status: string; pelanggan: { name: string }; kendaraan: { plat: string } | null }[];
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -91,7 +91,7 @@ export function GlobalSearch({ className = "", isMobile = false }: { className?:
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       {/* Input */}
-      <div className={`flex items-center gap-2 bg-surface-hover border border-surface-border focus-within:ring-1 focus-within:ring-primary transition-all ${isMobile ? "px-3 py-2 rounded-xl w-full" : "px-3 py-1.5 rounded-full"}`}>
+      <div className={`flex items-center gap-2 bg-surface-hover border border-surface-border focus-within:ring-1 focus-within:ring-primary transition-all ${isMobile ? "px-3 py-1.5 rounded-xl w-full" : "px-3 py-1.5 rounded-full"}`}>
         {loading ? (
           <Loader2 size={isMobile ? 16 : 18} className="text-muted-foreground animate-spin" />
         ) : (
@@ -177,17 +177,17 @@ export function GlobalSearch({ className = "", isMobile = false }: { className?:
               </div>
             )}
 
-            {/* SPK */}
-            {results.spk.length > 0 && (
+            {/* Work Order */}
+            {((results.spk && results.spk.length > 0) || (results as any).workOrder?.length > 0) && (
               <div>
                 <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-surface-hover/50 flex items-center gap-1.5">
-                  <span>📋</span> SPK
-                  <span className="ml-auto text-[10px] bg-surface-border rounded-full px-1.5 py-0.5">{results.spk.length}</span>
+                  <span>📋</span> Work Order
+                  <span className="ml-auto text-[10px] bg-surface-border rounded-full px-1.5 py-0.5">{(results.spk || (results as any).workOrder).length}</span>
                 </div>
-                {results.spk.map((s) => (
+                {(results.spk || (results as any).workOrder).map((s: any) => (
                   <button
                     key={`s-${s.id}`}
-                    onClick={() => navigate(`/app/spk/${s.id}`)}
+                    onClick={() => navigate(`/app/work-order/${s.id}`)}
                     className="w-full text-left px-4 py-2.5 hover:bg-surface-hover transition-colors flex items-center gap-3 border-b border-surface-border/50 last:border-0"
                   >
                     <div className="w-8 h-8 rounded-full bg-violet-500/15 flex items-center justify-center text-violet-400 text-sm shrink-0">
@@ -195,13 +195,13 @@ export function GlobalSearch({ className = "", isMobile = false }: { className?:
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium font-mono">{s.noSpk}</span>
+                        <span className="text-sm font-medium font-mono">{s.noWo || s.noSpk}</span>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[s.status] || "bg-neutral-500/20 text-neutral-400"}`}>
                           {s.status}
                         </span>
                       </div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span>{s.pelanggan.name}</span>
+                        <span>{s.pelanggan?.name}</span>
                         {s.kendaraan && (
                           <>
                             <span className="text-surface-border">•</span>

@@ -8,7 +8,7 @@ import { toast } from "@/lib/toast";
 const EXPORT_ENTITIES = [
  { key: "pelanggan", label: "Pelanggan" },
  { key: "kendaraan", label: "Kendaraan" },
- { key: "spk", label: "SPK" },
+ { key: "WO", label: "WO" },
  { key: "pembayaran", label: "Pembayaran" },
  { key: "sparepart", label: "Sparepart" },
  { key: "mekanik", label: "Mekanik" },

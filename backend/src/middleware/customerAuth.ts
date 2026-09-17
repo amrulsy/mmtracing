@@ -4,7 +4,11 @@ import { env } from '../config/env';
 import { UnauthorizedError } from '../shared/errors';
 import db from '../config/db';
 
-export async function customerAuthMiddleware(req: Request, _res: Response, next: NextFunction) {
+export interface CustomerAuthRequest extends Request {
+  customerId?: number;
+}
+
+export async function customerAuthMiddleware(req: CustomerAuthRequest, _res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -18,13 +22,12 @@ export async function customerAuthMiddleware(req: Request, _res: Response, next:
        throw new UnauthorizedError('Akses ditolak: Hanya untuk Pelanggan');
     }
 
-    const customer = await db.queryOne("SELECT id FROM pelanggan WHERE id = ?", [decoded.userId]);
+    const customer = await db.queryOne<{ id: number }>("SELECT id FROM pelanggan WHERE id = ?", [decoded.userId]);
 
     if (!customer) {
       throw new UnauthorizedError('Akun pelanggan tidak ditemukan');
     }
 
-    // @ts-ignore
     req.customerId = customer.id;
     next();
   } catch (error) {

@@ -9,9 +9,9 @@ import { toast } from "@/lib/toast";
 
 const REPORT_TYPES = [
  { id: "pendapatan", name: "Laporan Pendapatan", desc: "Breakdown pendapatan harian per tipe layanan (Servis Rutin, Modifikasi)", icon: "💰", available: true, defaultOn: true },
- { id: "mekanik", name: "Laporan Performa Mekanik", desc: "Jumlah SPK selesai dan pendapatan yang dihasilkan per mekanik", icon: "🔧", available: true, defaultOn: true },
+ { id: "mekanik", name: "Laporan Performa Mekanik", desc: "Jumlah WO selesai dan pendapatan yang dihasilkan per mekanik", icon: "🔧", available: true, defaultOn: true },
  { id: "pelanggan", name: "Laporan Pelanggan", desc: "Top spender dan frekuensi kunjungan pelanggan", icon: "👥", available: true, defaultOn: false },
- { id: "spk", name: "Laporan SPK", desc: "Daftar SPK dalam periode yang dipilih beserta status dan nominal", icon: "📝", available: true, defaultOn: false },
+ { id: "WO", name: "Laporan SPK", desc: "Daftar Work Order dalam periode yang dipilih beserta status dan nominal", icon: "📝", available: true, defaultOn: false },
  { id: "dp", name: "Laporan Outstanding DP", desc: "DP yang belum lunas — akan hadir segera", icon: "⏰", available: false, defaultOn: false },
  { id: "kendaraan", name: "Laporan Kendaraan", desc: "Kendaraan terdaftar dan frekuensi servis — akan hadir segera", icon: "🚗", available: false, defaultOn: false },
 ];
@@ -80,7 +80,7 @@ export default function ExportLaporanPage() {
  case "pendapatan": { const res = await api.get<any>("/laporan/pendapatan", params); return { ...r, raw: res.data }; }
  case "mekanik": { const res = await api.get<any>("/laporan/mekanik"); return { ...r, raw: Array.isArray(res.data) ? res.data : [] }; }
  case "pelanggan": { const res = await api.get<any>("/laporan/pelanggan"); return { ...r, raw: res.data }; }
- case "spk": { const res = await api.getPaginated<any>("/spk", { limit: 500 }); return { ...r, raw: res.data }; }
+ case "WO": { const res = await api.getPaginated<any>("/work-order", { limit: 500 }); return { ...r, raw: res.data }; }
  default: return { ...r, raw: null };
  }
  })
@@ -108,7 +108,7 @@ export default function ExportLaporanPage() {
  } else if (r.id === "mekanik") {
  const data: any[] = r.raw || [];
  lines.push(buildCSV([
- ["#", "Nama Mekanik", "Spesialisasi", "SPK Selesai", "Total Pendapatan (Rp)"],
+ ["#", "Nama Mekanik", "Spesialisasi", "WO Selesai", "Total Pendapatan (Rp)"],
  ...data.map((m, i) => [i + 1, m.name, m.spesialisasi || "-", m.spkSelesai || 0, m.totalPendapatan || 0]),
  ]));
  } else if (r.id === "pelanggan") {
@@ -117,11 +117,11 @@ export default function ExportLaporanPage() {
  ["#", "Nama Pelanggan", "Kunjungan", "Total Transaksi (Rp)"],
  ...spenders.map((c, i) => [i + 1, c.name, c._count?.spk || 0, Number(c.totalTrx) || 0]),
  ]));
- } else if (r.id === "spk") {
+ } else if (r.id === "WO") {
  const spks: any[] = r.raw || [];
  lines.push(buildCSV([
- ["No. SPK", "Pelanggan", "Kendaraan", "Tipe", "Mekanik", "Status", "Total (Rp)"],
- ...spks.map(s => [s.noSpk, s.pelanggan?.name || "-", s.kendaraan?.name || "-", s.mode, s.mekanik?.name || "-", s.status, Number(s.totalHarga) || 0]),
+ ["No. WO", "Pelanggan", "Kendaraan", "Tipe", "Mekanik", "Status", "Total (Rp)"],
+ ...spks.map(s => [s.noWo, s.pelanggan?.name || "-", s.kendaraan?.name || "-", s.mode, s.mekanik?.name || "-", s.status, Number(s.totalHarga) || 0]),
  ]));
  }
  lines.push("");
@@ -145,7 +145,7 @@ export default function ExportLaporanPage() {
  const data: any[] = r.raw || [];
  sections += `
  <h2>🔧 ${he(r.name)}</h2>
- <table><thead><tr><th>#</th><th>Nama Mekanik</th><th>Spesialisasi</th><th>SPK Selesai</th><th>Total Pendapatan</th></tr></thead>
+ <table><thead><tr><th>#</th><th>Nama Mekanik</th><th>Spesialisasi</th><th>WO Selesai</th><th>Total Pendapatan</th></tr></thead>
  <tbody>${data.map((m: any, i: number) => `<tr><td>${i+1}</td><td>${he(m.name)}</td><td>${he(m.spesialisasi)}</td><td>${m.spkSelesai||0}</td><td>${fmtRp(m.totalPendapatan||0)}</td></tr>`).join("")}</tbody></table>`;
  } else if (r.id === "pelanggan") {
  const spenders: any[] = r.raw?.topSpenders || [];
@@ -153,12 +153,12 @@ export default function ExportLaporanPage() {
  <h2>👥 ${he(r.name)}</h2>
  <table><thead><tr><th>#</th><th>Nama Pelanggan</th><th>Kunjungan</th><th>Total Transaksi</th></tr></thead>
  <tbody>${spenders.map((c: any, i: number) => `<tr><td>${i+1}</td><td>${he(c.name)}</td><td>${c._count?.spk||0}x</td><td>${fmtRp(Number(c.totalTrx)||0)}</td></tr>`).join("")}</tbody></table>`;
- } else if (r.id === "spk") {
+ } else if (r.id === "WO") {
  const spks: any[] = r.raw || [];
  sections += `
  <h2>📝 ${he(r.name)}</h2>
- <table><thead><tr><th>No. SPK</th><th>Pelanggan</th><th>Kendaraan</th><th>Tipe</th><th>Mekanik</th><th>Status</th><th>Total</th></tr></thead>
- <tbody>${spks.map((s: any) => `<tr><td>${he(s.noSpk)}</td><td>${he(s.pelanggan?.name)}</td><td>${he(s.kendaraan?.name)}</td><td>${he(s.mode)}</td><td>${he(s.mekanik?.name)}</td><td>${he(s.status)}</td><td>${fmtRp(Number(s.totalHarga)||0)}</td></tr>`).join("")}</tbody></table>`;
+ <table><thead><tr><th>No. WO</th><th>Pelanggan</th><th>Kendaraan</th><th>Tipe</th><th>Mekanik</th><th>Status</th><th>Total</th></tr></thead>
+ <tbody>${spks.map((s: any) => `<tr><td>${he(s.noWo)}</td><td>${he(s.pelanggan?.name)}</td><td>${he(s.kendaraan?.name)}</td><td>${he(s.mode)}</td><td>${he(s.mekanik?.name)}</td><td>${he(s.status)}</td><td>${fmtRp(Number(s.totalHarga)||0)}</td></tr>`).join("")}</tbody></table>`;
  }
  }
 

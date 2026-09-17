@@ -65,7 +65,7 @@ function SpkDetailView({ spk, onBack }: { spk: any; onBack: () => void }) {
   const handleShare = async () => {
     const url = window.location.href;
     if (navigator.share) {
-      try { await navigator.share({ title: `Lacak SPK ${liveSpk.noSpk}`, url }); } catch { /* cancelled */ }
+      try { await navigator.share({ title: `Lacak SPK ${liveSpk.noWo}`, url }); } catch { /* cancelled */ }
     } else {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -85,7 +85,7 @@ function SpkDetailView({ spk, onBack }: { spk: any; onBack: () => void }) {
           <ArrowLeft size={18} />
         </button>
         <div className="flex items-center gap-2">
-          <p className="text-xs text-muted-foreground font-mono">{liveSpk.noSpk}</p>
+          <p className="text-xs text-muted-foreground font-mono">{liveSpk.noWo}</p>
           <button onClick={handleShare} className="p-2 bg-surface-hover/50 border border-surface-border hover:bg-surface-hover rounded-xl transition-colors text-muted-foreground" title="Bagikan">
             {copied ? <Check size={14} className="text-emerald-500" /> : <Share2 size={14} />}
           </button>
@@ -211,7 +211,7 @@ function SpkDetailView({ spk, onBack }: { spk: any; onBack: () => void }) {
       {/* Footer */}
       <div className="text-center pt-4 pb-8">
         <p className="text-xs text-muted-foreground mb-2">Ada pertanyaan?</p>
-        <a href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "62274123456"}?text=${encodeURIComponent(`Halo MMT Racing, saya ingin bertanya tentang SPK ${liveSpk.noSpk}`)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-[#25D366] hover:text-[#25D366]/80 transition-colors">
+        <a href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "62274123456"}?text=${encodeURIComponent(`Halo MMT Racing, saya ingin bertanya tentang SPK ${liveSpk.noWo}`)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-[#25D366] hover:text-[#25D366]/80 transition-colors">
           <MessageCircle size={16} /> Tanya via WhatsApp
         </a>
       </div>
@@ -221,7 +221,7 @@ function SpkDetailView({ spk, onBack }: { spk: any; onBack: () => void }) {
 
 // ============ Main Track Page ============
 export default function TrackPage() {
-  const [noSpk, setNoSpk] = useState("");
+  const [noWo, setNoSpk] = useState("");
   const [accessPin, setAccessPin] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [msg, setMsg] = useState("");
@@ -233,7 +233,7 @@ export default function TrackPage() {
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!noSpk || !accessPin) return;
+    if (!noWo || !accessPin) return;
 
     setStatus("loading");
     setMsg("");
@@ -243,7 +243,7 @@ export default function TrackPage() {
       const res = await fetch("/api/v1/landing/track", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noSpk: noSpk.trim(), accessPin })
+        body: JSON.stringify({ noWo: noWo.trim(), accessPin })
       });
       const data = await res.json();
 
@@ -306,7 +306,7 @@ export default function TrackPage() {
               </div>
               <h1 className="text-3xl sm:text-4xl font-black mb-3 tracking-tight">Lacak Kendaraan</h1>
               <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                Masukkan Nomor SPK dan PIN Akses yang tertera di nota servis atau yang dikirimkan via WhatsApp.
+                Masukkan Nomor WO dan PIN Akses yang tertera di nota servis atau yang dikirimkan via WhatsApp.
               </p>
             </div>
 
@@ -320,11 +320,11 @@ export default function TrackPage() {
               )}
 
               <div>
-                <label className={labelCls}>Nomor SPK <span className="text-red-500">*</span></label>
+                <label className={labelCls}>Nomor WO <span className="text-red-500">*</span></label>
                 <input
                   required
                   type="text"
-                  value={noSpk}
+                  value={noWo}
                   onChange={e => setNoSpk(e.target.value.toUpperCase())}
                   className={`${inputCls} font-mono uppercase`}
                   placeholder="Cth: SPK-20260601-ABCD"
@@ -351,7 +351,7 @@ export default function TrackPage() {
               </div>
 
               <button
-                disabled={status === "loading" || !noSpk.trim() || accessPin.length !== 6}
+                disabled={status === "loading" || !noWo.trim() || accessPin.length !== 6}
                 type="submit"
                 className="w-full btn-glossy bg-primary text-white py-3.5 rounded-xl font-bold text-sm shadow-glossy-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2 active:scale-[0.98] transition-transform"
               >

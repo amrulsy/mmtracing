@@ -7,9 +7,9 @@ import { toast } from "@/lib/toast";
 
 const DEFAULT_TEMPLATES = [
  // 1. SPK Dibuat
- { event: "SPK Dibuat", mode: "repair", template: "Halo Kak *{nama}*, terima kasih telah mempercayakan servis *{kendaraan}* di MMT Racing! 🔧\n\nSPK Anda (*{no_spk}*) telah diterbitkan. Mekanik kami akan melakukan perbaikan agar kendaraan Anda kembali prima. Estimasi selesai: *{estimasi}*.", active: true },
- { event: "SPK Dibuat", mode: "modifikasi", template: "Welcome to the custom lab, Kak *{nama}*! 🏎️✨\n\nProyek *{judul_proyek}* untuk *{kendaraan}* (*{no_spk}*) telah resmi dimulai. \nSesuai kesepakatan, *Minimum DP* untuk proyek ini adalah *{minimum_dp}* dengan total estimasi tagihan *{total}*.\n\nTim kami sedang meracik rancangan terbaik. Estimasi selesai: *{estimasi}*.", active: true },
- { event: "SPK Dibuat", mode: "bubut", template: "Halo Kak *{nama}*, pesanan jasa Bubut/Milling (*{judul_proyek}*) Anda (*{no_spk}*) telah diterbitkan! 🔩📐\n\nSpesialis mesin kami akan memproses komponen/parts Anda dengan presisi tinggi sesuai spesifikasi yang diminta. Kami akan kabari jika sudah siap.\nEstimasi selesai: *{estimasi}*.", active: true },
+ { event: "WO Dibuat", mode: "repair", template: "Halo Kak *{nama}*, terima kasih telah mempercayakan servis *{kendaraan}* di MMT Racing! 🔧\n\nWork Order Anda (*{no_wo}*) telah diterbitkan. Mekanik kami akan melakukan perbaikan agar kendaraan Anda kembali prima. Estimasi selesai: *{estimasi}*.", active: true },
+ { event: "WO Dibuat", mode: "modifikasi", template: "Welcome to the custom lab, Kak *{nama}*! 🏎️✨\n\nProyek *{judul_proyek}* untuk *{kendaraan}* (*{no_wo}*) telah resmi dimulai. \nSesuai kesepakatan, *Minimum DP* untuk proyek ini adalah *{minimum_dp}* dengan total estimasi tagihan *{total}*.\n\nTim kami sedang meracik rancangan terbaik. Estimasi selesai: *{estimasi}*.", active: true },
+ { event: "WO Dibuat", mode: "bubut", template: "Halo Kak *{nama}*, pesanan jasa Bubut/Milling (*{judul_proyek}*) Anda (*{no_wo}*) telah diterbitkan! 🔩📐\n\nSpesialis mesin kami akan memproses komponen/parts Anda dengan presisi tinggi sesuai spesifikasi yang diminta. Kami akan kabari jika sudah siap.\nEstimasi selesai: *{estimasi}*.", active: true },
  
  // 2. Progress Update
  { event: "Progress Update", mode: "repair", template: "Update servis *{kendaraan}* Kakak! 🛠️ Progress pengerjaan saat ini sudah mencapai *{progress}%*. Kami sedang fokus pada tahap _{stage}_. Sabar sebentar lagi ya! 🚀", active: true },
@@ -17,20 +17,20 @@ const DEFAULT_TEMPLATES = [
  { event: "Progress Update", mode: "bubut", template: "Update jasa Bubut/Milling *{judul_proyek}*! ⚙️ Progress pengerjaan part untuk *{kendaraan}* saat ini sudah mencapai *{progress}%* di tahap _{stage}_. Stay tuned! 📐", active: true },
 
  // 3. Selesai & Siap Ambil / Tagihan
- { event: "Selesai & Siap Ambil", mode: "all", template: "Beep beep! 🚘💨 Kabar gembira Kak *{nama}*!\n\nPengerjaan proyek *{judul_proyek}* untuk *{kendaraan}* Anda (*{no_spk}*) *SUDAH SELESAI*! 💯✨\n\n💰 *Total Tagihan:* {total}\n\nSilakan datang ke bengkel. Kami tunggu kedatangannya ya! 🤝", active: true },
+ { event: "Selesai & Siap Ambil", mode: "all", template: "Beep beep! 🚘💨 Kabar gembira Kak *{nama}*!\n\nPengerjaan proyek *{judul_proyek}* untuk *{kendaraan}* Anda (*{no_wo}*) *SUDAH SELESAI*! 💯✨\n\n💰 *Total Tagihan:* {total}\n\nSilakan datang ke bengkel. Kami tunggu kedatangannya ya! 🤝", active: true },
 
  // 4. Reminder Pembayaran 
  { event: "Reminder Pembayaran", mode: "repair", template: "Halo Kak *{nama}*, mengingatkan kembali terkait pengerjaan *{kendaraan}*. Terdapat sisa tagihan *{sisa}* (Inv: {invoice}). Mohon segera dilakukan pelunasan. Terima kasih! 🙏", active: true },
- { event: "Reminder Pembayaran", mode: "modifikasi", template: "Halo Kak *{nama}* 👋\n\nUntuk melanjutkan proyek *{judul_proyek}* *{kendaraan}* (*{no_spk}*), mohon bantuannya membayarkan sisa dana termin/pelunasan (atau DP) sebesar *{sisa}*.\n\nDana cair amat menentukan *lead-time* pengerjaan! Ditunggu konfirmasinya Kak! 🤝", active: true },
+ { event: "Reminder Pembayaran", mode: "modifikasi", template: "Halo Kak *{nama}* 👋\n\nUntuk melanjutkan proyek *{judul_proyek}* *{kendaraan}* (*{no_wo}*), mohon bantuannya membayarkan sisa dana termin/pelunasan (atau DP) sebesar *{sisa}*.\n\nDana cair amat menentukan *lead-time* pengerjaan! Ditunggu konfirmasinya Kak! 🤝", active: true },
 
  // 5. Kendala
- { event: "SPK Kendala", mode: "all", template: "Mohon maaf Kak *{nama}*, proses pengerjaan proyek *{judul_proyek}* *{kendaraan}* (*{no_spk}*) sedang mengalami kendala teknis (cth: ketersediaan sparepart / kendala mesin). \nTim kami akan segera menghubungi Anda untuk mendiskusikan langkah selanjutnya. Mohon kesediaannya menunggu 🙏", active: true },
+ { event: "WO Kendala", mode: "all", template: "Mohon maaf Kak *{nama}*, proses pengerjaan proyek *{judul_proyek}* *{kendaraan}* (*{no_wo}*) sedang mengalami kendala teknis (cth: ketersediaan sparepart / kendala mesin). \nTim kami akan segera menghubungi Anda untuk mendiskusikan langkah selanjutnya. Mohon kesediaannya menunggu 🙏", active: true },
 
  // 6. Gate Pass
  { event: "Lunas & Gate Pass", mode: "all", template: "Terima kasih Kak *{nama}*! 🙏 Pembayaran atas invoice *{invoice}* telah LUNAS.\n\nKunci *{kendaraan}* sudah siap diserahterimakan (Gate-Pass) 🔑.\nSebagai apresiasi, Anda mendapat *{poin} Poin Loyalty* 🪙 yang bisa ditukar nanti!\n\n(Catatan: Masa Garansi perbaikan ini aktif s/d: *{batas_garansi}*)", active: true },
 
  // 7. Dibatalkan
- { event: "SPK Dibatalkan", mode: "all", template: "Halo Kak *{nama}*, Pengerjaan proyek *{judul_proyek}* SPK *{no_spk}* Anda resmi DIBATALKAN. \nJika Anda memiliki pertanyaan lebih lanjut, silakan balas pesan ini. Terima kasih! 🛠️", active: true },
+ { event: "WO Dibatalkan", mode: "all", template: "Halo Kak *{nama}*, Pengerjaan proyek *{judul_proyek}* WO *{no_wo}* Anda resmi DIBATALKAN. \nJika Anda memiliki pertanyaan lebih lanjut, silakan balas pesan ini. Terima kasih! 🛠️", active: true },
 ];
 
 export default function WhatsAppSettingsPage() {
@@ -276,7 +276,7 @@ export default function WhatsAppSettingsPage() {
  <div className="glass-panel p-5">
  <h3 className="text-sm font-bold mb-3">📌 Variabel Template</h3>
  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
- {["{nama}", "{kendaraan}", "{no_spk}", "{judul_proyek}", "{estimasi}", "{progress}", "{stage}", "{total}", "{sisa}", "{invoice}", "{minimum_dp}", "{poin}", "{batas_garansi}"].map(v => (
+ {["{nama}", "{kendaraan}", "{no_wo}", "{judul_proyek}", "{estimasi}", "{progress}", "{stage}", "{total}", "{sisa}", "{invoice}", "{minimum_dp}", "{poin}", "{batas_garansi}"].map(v => (
  <code key={v} className="text-xs bg-surface-hover border border-surface-border rounded-lg px-2 py-1 font-mono text-primary text-center">{v}</code>
  ))}
  </div>

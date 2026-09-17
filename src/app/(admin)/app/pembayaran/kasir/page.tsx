@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, CreditCard, Banknote, QrCode, Wallet, Printer, CheckCircle, Search, Loader2, User, Car, Phone, Tag, X, Receipt, FileText } from "lucide-react";
+import { ArrowLeft, CreditCard, Banknote, QrCode, Wallet, Printer, CheckCircle, Search, Loader2, User, Car, Phone, Tag, X, Receipt, FileText, AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useSSE } from "@/hooks/useSSE";
 import { formatRupiah, formatCurrencyDisplay, parseCurrencyInput } from "@/lib/utils";
+import { setPrintFormat } from "@/hooks/usePrintSettings";
 import type { Pembayaran, SpkItem, SpkStage } from "@/lib/types";
+import { QrisPaymentDialog } from "@/components/ui/qris-payment";
 
 const QUICK_AMOUNTS = [50_000, 100_000, 200_000, 500_000, 1_000_000];
 const METODE_LIST = [
@@ -36,6 +38,7 @@ export default function KasirPage() {
  } | null>(null);
 
  const [showQrisModal, setShowQrisModal] = useState<{ jumlah: number, invoiceId: number } | null>(null);
+ const [showConfirmModal, setShowConfirmModal] = useState(false);
 
  const inputRef = useRef<HTMLInputElement>(null);
  const executeBayarRef = useRef<() => void>(() => {});
@@ -96,12 +99,13 @@ export default function KasirPage() {
 
  const filteredInvoices = invoices.filter(inv =>
  inv.noInvoice.toLowerCase().includes(search.toLowerCase()) ||
- (inv.spk?.noSpk ?? "").toLowerCase().includes(search.toLowerCase()) ||
+ (inv.spk?.noWo ?? "").toLowerCase().includes(search.toLowerCase()) ||
  (inv.spk?.pelanggan?.name ?? "").toLowerCase().includes(search.toLowerCase())
  );
 
  // Keyboard shortcuts
  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+ if (showQrisModal) return;
  if (showSuccessModal) {
  if (e.key === "Escape") setShowSuccessModal(null);
  return;
@@ -133,7 +137,7 @@ export default function KasirPage() {
  if (e.key === "Escape") {
  setJumlahBayar(selected?.sisaBayar?.toString() || "");
  }
- }, [selected, selectedId, numBayar, processing, filteredInvoices, showSuccessModal]);
+ }, [selected, selectedId, numBayar, processing, filteredInvoices, showSuccessModal, showQrisModal, metode]);
 
  useEffect(() => {
  window.addEventListener("keydown", handleKeyDown);
@@ -153,16 +157,22 @@ export default function KasirPage() {
  return;
  }
 
- executeBayar(bayarPokok);
+ // Show confirmation modal instead of directly executing
+ setShowConfirmModal(true);
  };
 
  const executeBayar = async (bayarPokokAmount: number = Math.min(numBayar, Number(sisa))) => {
  if (!selected) return;
+ if (metode === "QRIS") {
+ setShowQrisModal({ jumlah: bayarPokokAmount, invoiceId: selected.id });
+ return;
+ }
  const isLunasAfter = bayarPokokAmount >= sisa;
  const changeAmount = numBayar > sisa ? numBayar - sisa : 0;
 
  setProcessing(true);
- setShowQrisModal(null); // Tutup QRIS jika ada
+ setShowQrisModal(null);
+ setShowConfirmModal(false);
  try {
  await api.post(`/pembayaran/${selected.id}/bayar`, {
  jumlah: bayarPokokAmount,
@@ -179,19 +189,8 @@ export default function KasirPage() {
  noInvoice: selected.noInvoice,
  });
 
- // Refresh antrian
- const res = await api.getPaginated<Pembayaran>("/pembayaran", { limit: 50 });
- const active = res.data.filter(inv =>
- inv.status !== "lunas" && inv.spk?.status !== "dibatalkan"
- );
- setInvoices(active);
-
- const stillActive = active.find(inv => inv.id === selected.id);
- setSelectedId(stillActive ? stillActive.id : (active[0]?.id ?? null));
-
- if (!stillActive && isLunasAfter) {
- setMobileTab('antrian');
- }
+ // SSE listener (L46-49) will auto-refresh the queue via fetchQueue()
+ // No need for manual re-fetch here — avoids duplicate API call
  } catch (err: unknown) {
  toast.error("Pembayaran Gagal", err instanceof Error ? err.message : "Gagal memproses pembayaran");
  } finally {
@@ -239,7 +238,7 @@ export default function KasirPage() {
  <div className="p-4 border-b border-surface-border">
  <div className="flex items-center gap-2 bg-surface-hover px-3 py-2 rounded-lg border border-surface-border focus-within:ring-1 focus-within:ring-primary transition-all">
  <Search size={18} className="text-muted-foreground" />
- <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari No SPK atau Pelanggan..." className="bg-transparent border-none focus:outline-none text-sm w-full" />
+ <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari No WO atau Pelanggan..." className="bg-transparent border-none focus:outline-none text-sm w-full" />
  </div>
  </div>
  <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -266,7 +265,7 @@ export default function KasirPage() {
  ) : filteredInvoices.map((item) => (
  <div key={item.id} onClick={() => { setSelectedId(item.id); setMobileTab('bayar'); }} className={`p-4 rounded-xl cursor-pointer transition-all ${item.id === selectedId ? "bg-primary/10 border-2 border-primary/30 scale-[1.01]" : "glass border border-surface-border hover:bg-surface-hover"}`}>
  <div className="flex justify-between items-start mb-1">
- <span className="font-mono text-xs font-bold text-primary">{item.spk?.noSpk}</span>
+ <span className="font-mono text-xs font-bold text-primary">{item.spk?.noWo}</span>
  <div className="flex items-center gap-1.5">
  {item.spk?.status === "selesai" && (
  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 flex items-center gap-0.5">
@@ -316,11 +315,11 @@ export default function KasirPage() {
  <div className="glass-panel overflow-hidden">
  <div className="p-5 border-b border-surface-border bg-surface-hover/20">
  <div className="flex items-center justify-between mb-3">
- <h3 className="text-base font-bold">{selected.spk?.noSpk} — {selected.noInvoice}</h3>
+ <h3 className="text-base font-bold">{selected.spk?.noWo} — {selected.noInvoice}</h3>
  </div>
  <div className="flex justify-between items-end">
  <div>
- <p className="text-xs text-muted-foreground mb-1">Total Biaya SPK</p>
+ <p className="text-xs text-muted-foreground mb-1">Total Biaya WO</p>
  <p className="text-xl font-bold font-mono text-foreground">{formatRupiah(selected.totalTagihan)}</p>
  </div>
  <div className="text-right">
@@ -355,7 +354,7 @@ export default function KasirPage() {
  </tr>
  ))}
  {(!selected.spk?.items?.length && !selected.spk?.stages?.length) && (
- <tr><td colSpan={3} className="px-6 py-6 text-center text-muted-foreground text-xs">SPK ini tidak memiliki rincian Jasa/Tahapan</td></tr>
+ <tr><td colSpan={3} className="px-6 py-6 text-center text-muted-foreground text-xs">WO ini tidak memiliki rincian Jasa/Tahapan</td></tr>
  )}
  </tbody>
  </table>
@@ -412,7 +411,7 @@ export default function KasirPage() {
  <div>
  <p className="text-xs font-semibold text-amber-700">Minimum DP {selected.spk.mode} (40%)</p>
  <p className="text-sm font-bold text-amber-600 font-mono">{formatRupiah(selected.spk.minimumDp)}</p>
- <p className="text-[10px] text-amber-600/80 mt-0.5">SPK baru bisa dikerjakan setelah DP terpenuhi.</p>
+ <p className="text-[10px] text-amber-600/80 mt-0.5">WO baru bisa dikerjakan setelah DP terpenuhi.</p>
  </div>
  </div>
  )}
@@ -448,22 +447,13 @@ export default function KasirPage() {
 
  {/* Shortcut ke print jika sisa Rp 0 */}
  {sisa <= 0 && (
- <div className="grid grid-cols-2 gap-2 mt-4">
  <Link
  href={`/app/pembayaran/${selected.id}/kwitansi`}
- onClick={() => localStorage.setItem('mm_print_format', 'thermal-80')}
- className="flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-amber-500/30 text-amber-600 bg-amber-50 font-bold hover:bg-amber-100 transition-all text-xs"
+ onClick={() => setPrintFormat('thermal-80')}
+ className="flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-amber-500/30 text-amber-600 bg-amber-50 font-bold hover:bg-amber-100 transition-all text-xs mt-4"
  >
- <Receipt size={16} /> Struk Thermal
+ <Receipt size={16} /> Cetak Struk Thermal
  </Link>
- <Link
- href={`/app/pembayaran/${selected.id}/kwitansi`}
- onClick={() => localStorage.setItem('mm_print_format', 'a4')}
- className="flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-primary/30 text-primary bg-primary/5 font-bold hover:bg-primary/10 transition-all text-xs"
- >
- <FileText size={16} /> Kwitansi A4
- </Link>
- </div>
  )}
  </div>
  </div>
@@ -478,6 +468,79 @@ export default function KasirPage() {
  )}
  </div>
  </div>
+
+ {/* #6: Confirmation Modal */}
+ {showConfirmModal && selected && (
+ <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+ <div className="bg-background border border-surface-border rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+ <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-5">
+ <AlertTriangle size={18} className="text-amber-500 shrink-0" />
+ <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+ Pastikan nominal dan metode pembayaran sudah benar.
+ </p>
+ </div>
+
+ <div className="space-y-2 text-sm bg-surface rounded-xl p-4 mb-5 border border-surface-border">
+ <div className="flex justify-between">
+ <span className="text-muted-foreground">Invoice</span>
+ <span className="font-mono font-bold text-primary text-xs">{selected.noInvoice}</span>
+ </div>
+ <div className="flex justify-between">
+ <span className="text-muted-foreground">Pelanggan</span>
+ <span className="font-semibold text-xs">{selected.spk?.pelanggan?.name || "—"}</span>
+ </div>
+ <div className="border-t border-surface-border" />
+ <div className="flex justify-between">
+ <span className="text-muted-foreground">Sisa Tagihan</span>
+ <span className="font-mono font-bold">{formatRupiah(sisa)}</span>
+ </div>
+ <div className="flex justify-between">
+ <span className="text-muted-foreground">Nominal Bayar</span>
+ <span className="font-mono font-bold text-lg text-primary">{formatRupiah(Math.min(numBayar, sisa))}</span>
+ </div>
+ <div className="flex justify-between">
+ <span className="text-muted-foreground">Metode</span>
+ <span className="font-semibold">{metode}</span>
+ </div>
+ {kembalian > 0 && (
+ <>
+ <div className="border-t border-surface-border" />
+ <div className="flex justify-between">
+ <span className="font-bold text-emerald-600">Kembalian</span>
+ <span className="font-mono font-bold text-lg text-emerald-600">{formatRupiah(kembalian)}</span>
+ </div>
+ </>
+ )}
+ <div className="border-t border-surface-border" />
+ <div className="flex justify-between">
+ <span className="text-muted-foreground">Status Setelah</span>
+ <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+ Math.min(numBayar, sisa) >= sisa ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
+ }`}>
+ {Math.min(numBayar, sisa) >= sisa ? "LUNAS" : "PARSIAL"}
+ </span>
+ </div>
+ </div>
+
+ <div className="flex gap-3">
+ <button
+ onClick={() => setShowConfirmModal(false)}
+ disabled={processing}
+ className="flex-1 py-3 rounded-xl border border-surface-border font-medium text-sm hover:bg-surface-hover transition-colors disabled:opacity-50"
+ >
+ Kembali
+ </button>
+ <button
+ onClick={() => executeBayar(Math.min(numBayar, sisa))}
+ disabled={processing}
+ className="flex-[2] bg-primary text-primary-foreground py-3 rounded-xl font-bold text-sm hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+ >
+ {processing ? <Loader2 className="animate-spin" size={18} /> : <><CheckCircle size={18} /> Konfirmasi & Bayar</>}
+ </button>
+ </div>
+ </div>
+ </div>
+ )}
 
  {/* #7: Success Modal */}
  {showSuccessModal && (
@@ -510,29 +573,18 @@ export default function KasirPage() {
 
  <div className="flex flex-col gap-2">
  {showSuccessModal.isLunas && (
- <>
- <div className="grid grid-cols-2 gap-2">
  <Link
  href={`/app/pembayaran/${showSuccessModal.invoiceId}/kwitansi`}
- onClick={() => localStorage.setItem('mm_print_format', 'thermal-80')}
- className="flex items-center justify-center gap-1.5 py-3 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 transition-colors text-sm"
+ onClick={() => setPrintFormat('thermal-80')}
+ className="w-full flex items-center justify-center gap-1.5 py-3 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 transition-colors text-sm"
  >
- <Receipt size={16} /> Struk Thermal
+ <Receipt size={16} /> Cetak Struk Thermal
  </Link>
- <Link
- href={`/app/pembayaran/${showSuccessModal.invoiceId}/kwitansi`}
- onClick={() => localStorage.setItem('mm_print_format', 'a4')}
- className="flex items-center justify-center gap-1.5 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-colors text-sm"
- >
- <FileText size={16} /> Kwitansi A4
- </Link>
- </div>
- </>
  )}
  {!showSuccessModal.isLunas && (
  <Link
  href={`/app/pembayaran/${showSuccessModal.invoiceId}/kwitansi`}
- onClick={() => localStorage.setItem('mm_print_format', 'thermal-80')}
+ onClick={() => setPrintFormat('thermal-80')}
  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 transition-colors text-sm"
  >
  <Receipt size={16} /> Cetak Struk Pembayaran
@@ -549,42 +601,16 @@ export default function KasirPage() {
  </div>
  )}
 
- {/* #8: Modal QRIS Simulasi */}
- {showQrisModal && (
- <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
- <div className="bg-background border border-surface-border rounded-2xl p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
- <div className="text-center mb-6">
- <h3 className="text-xl font-bold">Scan QRIS</h3>
- <p className="text-sm text-muted-foreground mt-1">Arahkan scan dari bank/e-wallet Anda</p>
- </div>
- 
- <div className="bg-white p-4 rounded-xl shadow-inner mb-6 mx-auto w-48 h-48 border-2 border-dashed border-gray-300 flex items-center justify-center relative overflow-hidden group">
- <QrCode size={120} className="text-black" />
- <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-400/20 to-transparent translate-y-[-100%] animate-[scan_2s_ease-in-out_infinite]" />
- </div>
-
- <div className="bg-surface rounded-xl p-4 mb-6 text-center">
- <p className="text-sm text-muted-foreground mb-1">Total Bayar</p>
- <p className="text-2xl font-bold font-mono text-primary">{formatRupiah(showQrisModal.jumlah)}</p>
- </div>
-
- <button 
- onClick={() => executeBayar(showQrisModal.jumlah)}
- disabled={processing}
- className="w-full py-4 rounded-xl font-bold bg-[#E84E1B] text-white hover:bg-[#E84E1B]/90 transition-colors shadow-lg flex items-center justify-center gap-2"
- >
- {processing ? <Loader2 className="animate-spin" /> : "Simulasikan Pembayaran Sukses"}
- </button>
- <button
- onClick={() => setShowQrisModal(null)}
- disabled={processing}
- className="w-full mt-3 py-3 rounded-xl border border-surface-border text-sm font-medium hover:bg-surface-hover transition-colors"
- >
- Batalkan
- </button>
- </div>
- </div>
- )}
+ {showQrisModal && <QrisPaymentDialog
+   invoiceId={showQrisModal.invoiceId}
+   amount={showQrisModal.jumlah}
+   onClose={() => setShowQrisModal(null)}
+   onSuccess={(updated, amount) => {
+     setShowQrisModal(null);
+     setShowSuccessModal({ jumlah: amount, metode: "QRIS", kembalian: 0, isLunas: updated.status === "lunas", invoiceId: updated.id, noInvoice: updated.noInvoice });
+     fetchQueue();
+   }}
+ />}
  </div>
  );
 }

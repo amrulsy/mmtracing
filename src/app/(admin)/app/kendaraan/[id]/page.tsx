@@ -185,10 +185,10 @@ export default function DetailKendaraanPage({ params }: { params: Promise<{ id: 
  <Edit size={14} /> Edit
  </button>
  <Link
- href={`/app/spk/create?pelangganId=${data.pelangganId}&kendaraanId=${data.id}`}
+ href={`/app/work-order/create?pelangganId=${data.pelangganId}&kendaraanId=${data.id}`}
  className="flex items-center gap-1.5 text-sm font-bold bg-primary text-primary-foreground px-3 py-2 rounded-xl hover: "
  >
- <Wrench size={14} /> Buat SPK
+ <Wrench size={14} /> Buat Work Order
  </Link>
  </div>
  </div>
@@ -264,19 +264,19 @@ export default function DetailKendaraanPage({ params }: { params: Promise<{ id: 
  </h3>
  {spkList.length === 0 ? (
  <div className="text-center py-8 border border-dashed border-surface-border rounded-xl">
- <p className="text-sm text-muted-foreground">Belum ada riwayat SPK</p>
+ <p className="text-sm text-muted-foreground">Belum ada riwayat Work Order</p>
  </div>
  ) : (
  <div className="space-y-2">
  {spkList.map((spk) => (
  <Link
  key={spk.id}
- href={`/app/spk/${spk.id}`}
+ href={`/app/work-order/${spk.id}`}
  className="flex items-center justify-between p-3 border border-surface-border rounded-xl hover:bg-surface-hover transition-colors gap-3"
  >
  <div className="min-w-0 flex-1">
  <div className="flex items-center gap-2 flex-wrap">
- <span className="font-mono text-sm font-semibold">{spk.noSpk}</span>
+ <span className="font-mono text-sm font-semibold">{spk.noWo}</span>
  <StatusBadge status={spk.status} />
  </div>
  <p className="text-xs text-muted-foreground mt-0.5 truncate">
@@ -318,7 +318,7 @@ export default function DetailKendaraanPage({ params }: { params: Promise<{ id: 
  <div className="flex items-center justify-between gap-4">
  <div className="min-w-0">
  <p className="text-sm font-bold text-red-600">Hapus Kendaraan</p>
- <p className="text-xs text-muted-foreground">Hanya dapat dilakukan jika tidak ada SPK terkait.</p>
+ <p className="text-xs text-muted-foreground">Hanya dapat dilakukan jika Tidak ada WO terkait.</p>
  </div>
  <button
  onClick={handleDelete}

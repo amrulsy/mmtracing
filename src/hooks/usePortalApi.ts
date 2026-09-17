@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { portalFetch, portalLogout } from "@/lib/portalFetch";
+import { portalFetch, portalLogout, getPortalToken } from "@/lib/portalFetch";
 
 /**
  * Centralized hook for portal API calls.
@@ -122,7 +122,7 @@ let isPolling = false;
 
 async function pollUnread() {
   try {
-    const token = typeof window !== "undefined" ? localStorage.getItem("portal_token") : null;
+    const token = getPortalToken();
     if (!token) return;
 
     const res = await portalFetch("/api/v1/customer-auth/notifikasi?limit=1");

@@ -60,8 +60,8 @@ async function checkGaransiAndPayments() {
     threeDaysAhead.setDate(today.getDate() + 3);
 
     const dueSoon = await db.query(
-      `SELECT pb.*, s.noSpk FROM pembayaran pb
-       JOIN spk s ON s.id = pb.spkId
+      `SELECT pb.*, s.noWo FROM pembayaran pb
+       JOIN work_orders s ON s.id = pb.woId
        WHERE pb.status IN ('belum_bayar','parsial') AND s.status != 'dibatalkan'
          AND pb.jatuhTempo <= ?`,
       [threeDaysAhead]);
@@ -99,11 +99,11 @@ async function checkGaransiAndPayments() {
 
     // 3. Overdue SPK Check
     const overdueSpks = await db.query(
-      "SELECT noSpk, estimasiSelesai FROM spk WHERE status IN ('antri','dikerjakan') AND estimasiSelesai <= ?",
+      "SELECT noWo, estimasiSelesai FROM work_orders WHERE status IN ('antri','dikerjakan') AND estimasiSelesai <= ?",
       [today]);
 
     for (const spk of overdueSpks) {
-      logger.info(`[Cron] Overdue SPK Detected: ${spk.noSpk} was supposed to be done by ${spk.estimasiSelesai}`);
+      logger.info(`[Cron] Overdue SPK Detected: ${spk.noWo} was supposed to be done by ${spk.estimasiSelesai}`);
     }
 
     // 4. Auto-cancel expired bookings

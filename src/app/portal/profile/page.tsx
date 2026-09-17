@@ -127,7 +127,7 @@ export default function ProfilePage() {
   if (!profile) return null;
 
   return (
-    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-28 animate-in fade-in duration-500">
+    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-6 animate-in fade-in duration-500">
       <div className="flex items-center gap-3">
         <Link href="/portal/dashboard" className="p-2.5 bg-surface-hover/50 border border-surface-border hover:bg-surface-hover rounded-xl transition-colors md:hidden">
           <ArrowLeft size={18} />
@@ -236,7 +236,7 @@ export default function ProfilePage() {
           <div className="text-center py-8">
             <CarFront size={40} className="mx-auto mb-3 text-muted-foreground/30" />
             <p className="text-sm font-bold text-muted-foreground mb-1">Belum Ada Kendaraan Terdaftar</p>
-            <p className="text-xs text-muted-foreground">Kendaraan Anda akan muncul setelah membuat SPK</p>
+            <p className="text-xs text-muted-foreground">Kendaraan Anda akan muncul setelah memBuat Work Order</p>
           </div>
         ) : (
           <div className="space-y-3">

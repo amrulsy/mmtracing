@@ -9,7 +9,7 @@ const router = Router();
 router.use(authMiddleware);
 
 const createSchema = z.object({
-  spkId: z.number().int().positive().optional(),
+  woId: z.number().int().positive().optional(),
   mekanikId: z.number().int().positive().optional(),
   tanggal: z.string().transform(v => new Date(v)),
   jamMulai: z.string().min(1),
@@ -33,17 +33,17 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     if (mekanikId) { conds.push('j.mekanikId = ?'); params.push(Number(mekanikId)); }
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
     const data = await db.query(
-      `SELECT j.*, s.noSpk, s.status AS spkStatus,
+      `SELECT j.*, s.noWo, s.status AS woStatus,
               m.name AS mekanikName, m.initial AS mekanikInitial
        FROM jadwal j
-       LEFT JOIN spk s ON s.id = j.spkId
+       LEFT JOIN work_orders s ON s.id = j.woId
        LEFT JOIN mekanik m ON m.id = j.mekanikId
        ${where} ORDER BY j.tanggal ASC`,
       params,
     );
     const result = data.map((r: any) => ({
       ...r,
-      spk: r.noSpk ? { noSpk: r.noSpk, status: r.spkStatus } : null,
+      spk: r.noWo ? { noWo: r.noWo, status: r.woStatus } : null,
       mekanik: r.mekanikName ? { name: r.mekanikName, initial: r.mekanikInitial } : null,
     }));
     sendSuccess(res, result);

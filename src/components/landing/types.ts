@@ -72,7 +72,7 @@ export interface QueueData {
 }
 
 export interface QueueItem {
-  noSpk: string;
+  noWo: string;
   status: string;
   mode: string;
   progress: number;

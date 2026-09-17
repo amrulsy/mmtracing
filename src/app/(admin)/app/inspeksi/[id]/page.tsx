@@ -29,7 +29,7 @@ interface InspeksiDetail {
  noPolisi: string;
  pelanggan?: { name: string };
  };
- spk?: { id: number; noSpk: string };
+ spk?: { id: number; noWo: string };
 }
 
 // Default checklist template (used for new inspeksi or if keys missing)

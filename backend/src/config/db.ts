@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import mysql, { Pool, PoolConnection, ResultSetHeader } from 'mysql2/promise';
 
 // ═══════════════════════════════════════════════════════════════

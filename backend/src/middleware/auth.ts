@@ -26,7 +26,11 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, env.jwt.secret) as { userId: number };
+    const decoded = jwt.verify(token, env.jwt.secret) as { userId: number; isCustomer?: boolean };
+
+    if (decoded.isCustomer) {
+      throw new UnauthorizedError('Token pelanggan tidak dapat digunakan untuk akses staf');
+    }
 
     const user = await appCache.getOrSet(`auth_user_${decoded.userId}`, async () => {
       return await db.queryOne<{

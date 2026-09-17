@@ -41,8 +41,12 @@ export class WhatsappService {
 
     try {
       const baileys = await loadBaileys();
-      const pino = (await import('pino')).default;
-      
+      const dummyLogger = {
+        level: 'silent',
+        child: () => dummyLogger,
+        trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, fatal: () => {}
+      };
+
       if (!fs.existsSync(authDir)) {
         fs.mkdirSync(authDir, { recursive: true });
       }
@@ -52,7 +56,7 @@ export class WhatsappService {
 
       this.sock = baileys.default({
         version,
-        logger: pino({ level: 'silent' }) as any,
+        logger: dummyLogger as any,
         printQRInTerminal: false,
         auth: state,
         syncFullHistory: false,

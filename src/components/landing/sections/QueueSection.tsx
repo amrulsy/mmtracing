@@ -80,7 +80,7 @@ export default function QueueSection({ queueData }: QueueSectionProps) {
                         <div className={`w-2 h-2 rounded-full shrink-0 ${q.status === "dikerjakan" ? "bg-blue-500 animate-pulse" : "bg-amber-500"}`} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 text-sm">
-                            <span className="font-mono font-bold text-xs">{q.noSpk}</span>
+                            <span className="font-mono font-bold text-xs">{q.noWo}</span>
                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${q.status === "dikerjakan" ? "bg-blue-500/15 text-blue-500" : "bg-amber-500/15 text-amber-500"}`}>
                               {q.status === "dikerjakan" ? "🔧 Dikerjakan" : "⏳ Antri"}
                             </span>

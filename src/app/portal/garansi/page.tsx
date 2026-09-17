@@ -81,7 +81,7 @@ export default function GaransiPage() {
   const activeCount = data.filter(g => g.computedStatus === "aktif" || g.computedStatus === "hampir").length;
 
   return (
-    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-28 animate-in fade-in duration-500">
+    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-6 animate-in fade-in duration-500">
       <div className="flex items-center gap-3">
         <Link href="/portal/dashboard" className="p-2.5 bg-surface-hover/50 border border-surface-border hover:bg-surface-hover rounded-xl transition-colors md:hidden">
           <ArrowLeft size={18} />
@@ -152,7 +152,7 @@ export default function GaransiPage() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1 mb-2">
-                      <span className="font-mono bg-surface-hover px-1.5 py-0.5 rounded">{item.noSpk}</span>
+                      <span className="font-mono bg-surface-hover px-1.5 py-0.5 rounded">{item.noWo}</span>
                       <span className="mx-2">•</span>
                       <span>Tipe: <strong className="uppercase">{item.type}</strong></span>
                     </p>

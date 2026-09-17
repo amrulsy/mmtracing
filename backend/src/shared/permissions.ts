@@ -5,7 +5,7 @@
 export const PERMISSION_MODULES = [
   { key: 'dashboard',   label: 'Dashboard',       description: 'Halaman utama & KPI' },
   { key: 'master',      label: 'Master Data',      description: 'Pelanggan, Kendaraan, Mekanik, Jasa, Sparepart, Supplier' },
-  { key: 'spk',         label: 'SPK',              description: 'Surat Perintah Kerja' },
+  { key: 'wo',         label: 'Work Order',       description: 'Manajemen Work Order bengkel' },
   { key: 'monitoring',  label: 'Monitoring',       description: 'Monitoring pekerjaan bengkel' },
   { key: 'inventaris',  label: 'Inventaris',       description: 'Stok masuk/keluar, opname, retur' },
   { key: 'pembayaran',  label: 'Pembayaran',       description: 'Invoice, pembayaran, refund' },

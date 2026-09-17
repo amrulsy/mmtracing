@@ -15,7 +15,7 @@ interface Jadwal {
  kategori: string;
  warna?: string;
  mekanik?: { name: string; initial: string };
- spk?: { noSpk: string; status: string };
+ spk?: { noWo: string; status: string };
 }
 
 interface Mekanik {

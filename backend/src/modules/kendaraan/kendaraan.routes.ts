@@ -102,7 +102,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const [pelanggan, spks, inspeksis] = await Promise.all([
       db.queryOne('SELECT * FROM pelanggan WHERE id = ?', [data.pelangganId]),
       db.query(
-        `SELECT s.*, m.name AS mekanikName FROM spk s LEFT JOIN mekanik m ON m.id = s.mekanikId
+        `SELECT s.*, m.name AS mekanikName FROM work_orders s LEFT JOIN mekanik m ON m.id = s.mekanikId
          WHERE s.kendaraanId = ? ORDER BY s.createdAt DESC LIMIT 10`, [id]),
       db.query('SELECT * FROM inspeksi WHERE kendaraanId = ? ORDER BY tanggal DESC LIMIT 5', [id]),
     ]);

@@ -23,6 +23,30 @@ const AuthContext = createContext<AuthContextType | null>(null);
 // Provider
 // ==========================================
 
+/** Shape returned by GET /auth/me and the login response user object */
+interface AuthUserPayload {
+  id: number;
+  name: string;
+  username: string;
+  email?: string | null;
+  roleId?: number;
+  roleName?: string;
+  role?: string;
+  permissions?: Record<string, string>;
+}
+
+function mapPayloadToUser(d: AuthUserPayload): User {
+  return {
+    id: d.id,
+    name: d.name,
+    username: d.username,
+    email: d.email ?? null,
+    roleId: d.roleId ?? 0,
+    roleName: d.roleName ?? d.role ?? "",
+    permissions: d.permissions ?? {},
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setTokenState] = useState<string | null>(null);
@@ -38,18 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setTokenState(existingToken);
 
-    api.get<any>("/auth/me")
+    api.get<AuthUserPayload>("/auth/me")
       .then((res) => {
-        const d = res.data;
-        setUser({
-          id: d.id,
-          name: d.name,
-          username: d.username,
-          email: d.email ?? null,
-          roleId: d.roleId ?? 0,
-          roleName: d.roleName ?? d.role ?? "",
-          permissions: d.permissions ?? {},
-        });
+        setUser(mapPayloadToUser(res.data));
       })
       .catch(() => {
         // Token invalid — clear it
@@ -67,17 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setToken(newToken);
     setTokenState(newToken);
-    // Map response to User interface (backend may return roleId/roleName/permissions)
-    setUser({
-      id: userData.id,
-      name: userData.name,
-      username: userData.username,
-      email: userData.email ?? null,
-      roleId: (userData as any).roleId ?? 0,
-      roleName: (userData as any).roleName ?? (userData as any).role ?? "",
-      permissions: (userData as any).permissions ?? {},
-    });
+    setUser(mapPayloadToUser(userData as unknown as AuthUserPayload));
   }, []);
+
 
   const logout = useCallback(() => {
     removeToken();

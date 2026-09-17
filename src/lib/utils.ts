@@ -10,8 +10,11 @@ export function cn(...inputs: ClassValue[]) {
  * - mode "compact": Rp 1.5M, Rp 500rb (untuk list/card)
  * - mode "full": Rp 1.500.000 (untuk detail/invoice)
  */
-export function formatRupiah(n: number | null | undefined, mode: "compact" | "full" = "full"): string {
-  const num = Number(n ?? 0);
+export function formatRupiah(n: number | string | null | undefined, mode: "compact" | "full" = "full"): string {
+  if (n === null || n === undefined) return "Rp 0";
+  const num = typeof n === "number" ? n : Number(n);
+  if (isNaN(num)) return "Rp 0";
+
   if (mode === "compact") {
     if (num >= 1_000_000_000) return `Rp ${(num / 1_000_000_000).toFixed(1)}B`;
     if (num >= 1_000_000) return `Rp ${(num / 1_000_000).toFixed(1)}M`;

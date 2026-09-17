@@ -11,7 +11,7 @@ export default function BantuanPage() {
 
  <div className="flex items-center gap-2 bg-surface border border-surface-border rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-primary/50 shadow-sm">
  <Search size={20} className="text-muted-foreground" />
- <input type="text" placeholder="Cari bantuan... (cth: cara buat SPK, reset password)" className="bg-transparent border-none focus:outline-none text-sm w-full" />
+ <input type="text" placeholder="Cari bantuan... (cth: cara Buat Work Order, reset password)" className="bg-transparent border-none focus:outline-none text-sm w-full" />
  </div>
 
  {/* Quick Links */}
@@ -37,9 +37,9 @@ export default function BantuanPage() {
  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2"><HelpCircle size={16} /> Pertanyaan Umum (FAQ)</h3>
  <div className="space-y-2">
  {[
- { q: "Bagaimana cara membuat SPK baru?", a: "Buka halaman SPK → Klik 'Buat SPK Baru' → Pilih tipe (Servis Rutin / Modifikasi) → Isi data pelanggan & kendaraan → Submit." },
+ { q: "Bagaimana cara memBuat Work Order baru?", a: "Buka halaman SPK → Klik 'Buat Work Order Baru' → Pilih tipe (Servis Rutin / Modifikasi) → Isi data pelanggan & kendaraan → Submit." },
  { q: "Bagaimana cara menerima pembayaran DP?", a: "Buka SPK terkait → Klik 'Proses Pembayaran' → Input jumlah DP → Pilih metode (Cash/Transfer/QRIS) → Konfirmasi." },
- { q: "Bagaimana cara assign mekanik ke SPK?", a: "Saat membuat SPK, pilih mekanik dari dropdown. Atau di halaman Monitoring, drag card ke kolom 'Dikerjakan' dan pilih mekanik." },
+ { q: "Bagaimana cara assign mekanik ke SPK?", a: "Saat memBuat Work Order, pilih mekanik dari dropdown. Atau di halaman Monitoring, drag card ke kolom 'Dikerjakan' dan pilih mekanik." },
  { q: "Bagaimana mekanik update progress?", a: "Buka halaman Monitoring → Klik card SPK → Update checklist dan foto progress → Submit update." },
  { q: "Bagaimana cara cetak kwitansi thermal?", a: "Buka detail Pembayaran → Klik 'Cetak Kwitansi' → Pilih format thermal 58mm → Klik 'Cetak'." },
  { q: "Apakah pelanggan bisa melihat progress?", a: "Ya! Kirim link approval/tracking via WhatsApp. Pelanggan bisa lihat status tanpa login." },

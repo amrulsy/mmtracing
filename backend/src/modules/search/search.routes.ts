@@ -27,19 +27,19 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
          WHERE (k.name LIKE ? OR k.plat LIKE ?) AND k.deletedAt IS NULL ORDER BY k.updatedAt DESC LIMIT 5`,
         [like, like]),
       db.query(
-        `SELECT s.id, s.noSpk, s.status, p.name AS pelangganName, k.plat AS kendaraanPlat
-         FROM spk s
+        `SELECT s.id, s.noWo, s.status, p.name AS pelangganName, k.plat AS kendaraanPlat
+         FROM work_orders s
          LEFT JOIN pelanggan p ON p.id = s.pelangganId
          LEFT JOIN kendaraan k ON k.id = s.kendaraanId
-         WHERE (s.noSpk LIKE ? OR p.name LIKE ? OR k.plat LIKE ?)
+         WHERE (s.noWo LIKE ? OR p.name LIKE ? OR k.plat LIKE ?)
          ORDER BY s.updatedAt DESC LIMIT 5`,
         [like, like, like]),
     ]);
 
     const kendaraan = kendaraanRows.map((r: any) => ({ id: r.id, name: r.name, plat: r.plat, pelanggan: { name: r.pelangganName } }));
-    const spk = spkRows.map((r: any) => ({ id: r.id, noSpk: r.noSpk, status: r.status, pelanggan: { name: r.pelangganName }, kendaraan: r.kendaraanPlat ? { plat: r.kendaraanPlat } : null }));
+    const spk = spkRows.map((r: any) => ({ id: r.id, noWo: r.noWo, status: r.status, pelanggan: { name: r.pelangganName }, kendaraan: r.kendaraanPlat ? { plat: r.kendaraanPlat } : null }));
 
-    sendSuccess(res, { pelanggan, kendaraan, spk });
+    sendSuccess(res, { pelanggan, kendaraan, spk, workOrder: spk });
   } catch (e) {
     next(e);
   }

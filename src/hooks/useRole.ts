@@ -35,13 +35,13 @@ export function useRole() {
     // Dynamic permission checks
     isKasir: hasAccess("pembayaran", "edit"),
     isMekanik: hasAccess("monitoring", "edit"),
-    isFrontdesk: hasAccess("spk", "edit"),
+    isFrontdesk: hasAccess("wo", "edit"),
     
-    canManageSpk: hasAccess("spk", "edit"),
+    canManageSpk: hasAccess("wo", "edit"),
     canProcessPayment: hasAccess("pembayaran", "edit"),
     
-    // Destructive actions usually require "full" access to master or spk
-    canDestructive: isSuperAdmin || hasAccess("master", "full") || hasAccess("spk", "full"),
+    // Destructive actions usually require "full" access to master or wo
+    canDestructive: isSuperAdmin || hasAccess("master", "full") || hasAccess("wo", "full"),
     
     // Expose hasAccess for component-level checks
     hasAccess,

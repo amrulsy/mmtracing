@@ -49,12 +49,12 @@ export function generateInvoiceNo(): string {
   return `INV-${y}${m}${d}-${ms}${rand}`;
 }
 
-export function generateSpkNo(): string {
+export function generateWoNo(): string {
   const now = new Date();
   const y = String(now.getFullYear()).slice(-2);
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
   const ms = String(now.getMilliseconds()).padStart(3, '0');
   const rand = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
-  return `SPK-${y}${m}${d}-${ms}${rand}`;
+  return `WO-${y}${m}${d}-${ms}${rand}`;
 }

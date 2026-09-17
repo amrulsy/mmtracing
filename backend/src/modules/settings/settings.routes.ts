@@ -9,10 +9,45 @@ import path from 'path';
 import multer from 'multer';
 import { invalidateSetting } from '../../shared/settingsCache';
 import { appCache } from '../../shared/cache';
+import { z } from 'zod';
+import { validate } from '../../middleware/validate';
+import { BadRequestError } from '../../shared/errors';
+import { decodeQrisImage, getQrisSettings, saveQrisSettings } from '../pembayaran/qris.service';
 
 const upload = multer({ dest: 'uploads/' });
 
 const router = Router();
+
+const qrisUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0 } });
+router.get('/qris', authMiddleware, requirePermission('settings', 'full'), async (_req, res, next) => {
+  try { sendSuccess(res, await getQrisSettings()); } catch (e) { next(e); }
+});
+router.post('/qris/preview', authMiddleware, requirePermission('settings', 'full'), (req, res, next) => {
+  qrisUpload.single('file')(req, res, e => {
+    if (e) return next(new BadRequestError('Unggah satu gambar QRIS, maksimal 5 MB.'));
+    next();
+  });
+}, async (req, res, next) => {
+  try {
+    if (!req.file) throw new BadRequestError('Pilih gambar QRIS terlebih dahulu.');
+    sendSuccess(res, await decodeQrisImage(req.file.buffer));
+  } catch (e) { next(e); }
+});
+router.put('/qris', authMiddleware, requirePermission('settings', 'full'), validate(z.object({
+  payload: z.string().max(4096).default(''), enabled: z.boolean(), mode: z.enum(['static', 'midtrans', 'legacy']).default('legacy'),
+  midtransServerKey: z.string().optional(), midtransEnvironment: z.enum(['sandbox', 'production']).optional(),
+})), async (req: AuthRequest, res, next) => {
+  try { sendSuccess(res, await saveQrisSettings(req.body.payload, req.body.enabled, req.user!.id, req.body.mode, req.body.midtransServerKey, req.body.midtransEnvironment), 'Pengaturan QRIS disimpan'); }
+  catch (e) { next(e); }
+});
+
+// Keep QRIS configuration behind the validated, audited endpoint above.
+router.use((req, _res, next) => {
+  if (['PUT', 'POST', 'PATCH'].includes(req.method) && req.body && Object.keys(req.body).some(key => key.trim().toLowerCase() === 'qris_config')) {
+    return next(new BadRequestError('Gunakan menu Pengaturan QRIS untuk mengubah QRIS.'));
+  }
+  next();
+});
 
 // GET /pub/profile — Public Bengkel Profile (Tanpa Auth)
 router.get('/pub/profile', async (_req: Request, res: Response, next: NextFunction) => {

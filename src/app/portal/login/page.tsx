@@ -1,13 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Phone, KeyRound, ArrowRight, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { setPortalTokens } from "@/lib/portalFetch";
+import { setPortalTokens, getPortalToken } from "@/lib/portalFetch";
 
 export default function PortalLogin() {
   const router = useRouter();
+
+  useEffect(() => {
+    if (getPortalToken()) {
+      router.replace("/portal/dashboard");
+    }
+  }, [router]);
   const [step, setStep] = useState<1 | 2>(1);
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");

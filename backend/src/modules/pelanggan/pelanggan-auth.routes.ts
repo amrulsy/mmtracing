@@ -40,6 +40,8 @@ router.put('/profile', customerAuthMiddleware, pelangganAuthController.updatePro
 router.post('/avatar', customerAuthMiddleware, upload.single('image'), pelangganAuthController.uploadAvatar);
 router.get('/history', customerAuthMiddleware, pelangganAuthController.history);
 router.get('/spk/:id', customerAuthMiddleware, pelangganAuthController.spkDetail);
+router.get('/wo/:id', customerAuthMiddleware, pelangganAuthController.spkDetail);
+router.get('/work-order/:id', customerAuthMiddleware, pelangganAuthController.spkDetail);
 router.get('/pembayaran', customerAuthMiddleware, pelangganAuthController.getPembayaran);
 
 // Loyalty endpoints
@@ -58,6 +60,6 @@ router.put('/notifikasi/read-all', customerAuthMiddleware, pelangganAuthControll
 
 // Review endpoints
 router.post('/review', customerAuthMiddleware, pelangganAuthController.submitReview);
-router.get('/review/:spkId', customerAuthMiddleware, pelangganAuthController.checkReview);
+router.get('/review/:woId', customerAuthMiddleware, pelangganAuthController.checkReview);
 
 export default router;

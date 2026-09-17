@@ -8,7 +8,7 @@ import { GlobalSearch } from "@/components/layout/global-search";
 export function Topbar() {
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-30 h-14 lg:h-16 border-b border-surface-border bg-background px-4 lg:px-8 flex items-center justify-between lg:sticky lg:left-auto lg:right-auto select-none">
+      <header className="fixed top-0 left-0 right-0 z-30 h-[calc(3.5rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] lg:pt-0 lg:h-16 border-b border-surface-border bg-background px-4 lg:px-8 flex items-center justify-between lg:sticky lg:left-auto lg:right-auto select-none">
         <div className="flex items-center gap-3">
           {/* Mobile branding */}
           <Link href="/app" className="lg:hidden flex items-center gap-2">
@@ -24,7 +24,7 @@ export function Topbar() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Link href="/app/notifikasi" className="relative p-2 rounded-full hover:bg-surface-hover transition-colors">
+          <Link href="/app/notifikasi" aria-label="Notifikasi" className="relative p-2 rounded-full hover:bg-surface-hover transition-colors">
             <Bell size={20} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full ring-2 ring-background animate-pulse" />
           </Link>
@@ -35,7 +35,7 @@ export function Topbar() {
       </header>
 
       {/* Mobile search bar */}
-      <div className="fixed top-14 left-0 right-0 z-20 lg:hidden px-4 py-2 bg-background border-b border-surface-border select-none">
+      <div className="fixed top-[calc(3.5rem+env(safe-area-inset-top))] left-0 right-0 z-20 lg:hidden px-4 py-1.5 bg-background border-b border-surface-border select-none">
         <GlobalSearch isMobile />
       </div>
     </>

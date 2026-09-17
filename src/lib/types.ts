@@ -71,8 +71,9 @@ export interface Pelanggan {
   loyaltyBalance?: number;
   loyaltyTier?: LoyaltyTier | null;
   kendaraan?: Kendaraan[];
-  spk?: Spk[];
-  _count?: { spk: number };
+  workOrders?: WorkOrder[];
+  spk?: WorkOrder[];
+  _count?: { workOrders?: number; spk?: number };
   deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -112,18 +113,19 @@ export interface Mekanik {
   phone?: string | null;
   spesialisasi?: string | null;
   status: string;
-  spk?: { noSpk: string }[];
+  workOrders?: { noWo: string }[];
+  spk?: { noWo: string }[];
   createdAt: string;
   updatedAt: string;
 }
 
 // ==========================================
-// SPK
+// Work Order (WO)
 // ==========================================
 
-export interface SpkStage {
+export interface WoStage {
   id: number;
-  spkId: number;
+  woId: number;
   urutan: number;
   nama: string;
   estimasiBiaya: number;
@@ -132,19 +134,21 @@ export interface SpkStage {
   startedAt?: string | null;
   completedAt?: string | null;
 }
+export type SpkStage = WoStage;
 
-export interface SpkPhoto {
+export interface WoPhoto {
   id: number;
-  spkId: number;
+  woId: number;
   url: string;
   caption?: string | null;
   type: 'before' | 'progress' | 'after' | 'lampiran';
   createdAt: string;
 }
+export type SpkPhoto = WoPhoto;
 
-export interface Spk {
+export interface WorkOrder {
   id: number;
-  noSpk: string;
+  noWo: string;
   tanggal: string;
   pelangganId: number;
   kendaraanId?: number | null;
@@ -175,17 +179,18 @@ export interface Spk {
   kendaraan?: Kendaraan | null;
   mekanik?: Mekanik | null;
   createdBy?: { id: number; name: string };
-  items?: SpkItem[];
-  stages?: SpkStage[];
-  photos?: SpkPhoto[];
+  items?: WoItem[];
+  stages?: WoStage[];
+  photos?: WoPhoto[];
   pembayaran?: Pembayaran[];
   garansi?: Garansi[];
   _count?: { items: number; photos: number };
 }
+export type Spk = WorkOrder;
 
 export interface Garansi {
   id: number;
-  spkId: number;
+  woId: number;
   itemName: string;
   type: 'jasa' | 'part' | 'modif';
   startDate: string;
@@ -194,9 +199,9 @@ export interface Garansi {
   createdAt: string;
 }
 
-export interface SpkItem {
+export interface WoItem {
   id: number;
-  spkId: number;
+  woId: number;
   type: 'jasa' | 'sparepart';
   jasaId?: number | null;
   sparepartId?: number | null;
@@ -206,6 +211,7 @@ export interface SpkItem {
   subtotal: number;
   status?: 'pending' | 'done';
 }
+export type SpkItem = WoItem;
 
 // ==========================================
 // Sparepart
@@ -297,14 +303,15 @@ export interface InventarisSummary {
 export interface Pembayaran {
   id: number;
   publicId: string;
-  spkId: number;
+  woId: number;
   noInvoice: string;
   totalTagihan: number;
   totalBayar: number;
   sisaBayar: number;
   status: string;
   jatuhTempo?: string | null;
-  spk?: Spk;
+  workOrder?: WorkOrder;
+  spk?: WorkOrder;
   detail?: PembayaranDetail[];
   createdAt: string;
   updatedAt: string;
@@ -346,10 +353,10 @@ export interface LoyaltyPoint {
 // ==========================================
 
 export interface DashboardKPI {
-  spkAntri: number;
-  spkDikerjakan: number;
-  spkSelesaiHariIni: number;
-  spkKendala: number;
+  woAntri: number;
+  woDikerjakan: number;
+  woSelesaiHariIni: number;
+  woKendala: number;
   pendapatanHariIni: number;
   pendapatanBulan: number;
   pengeluaranHariIni: number;
@@ -362,7 +369,7 @@ export interface DashboardKPI {
 export interface DashboardData {
   kpi: DashboardKPI;
   mekanikAktif: Mekanik[];
-  recentSpk: Spk[];
+  recentWo: WorkOrder[];
   recentActivity: ActivityLog[];
   distribution?: Record<string, number>;
 }
@@ -378,3 +385,4 @@ export interface ActivityLog {
   user?: { name: string; username: string };
   createdAt: string;
 }
+

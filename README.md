@@ -2,6 +2,18 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Run the backend in a separate terminal (MySQL must be running and configured in `backend/.env`):
+
+```bash
+cd backend
+npm run dev
+```
+
+The frontend forwards `/api/v1` requests to `http://127.0.0.1:5000` by default.
+Running only the frontend will cause API requests to fail with HTTP 500.
+Check `http://localhost:3000/api/v1/health`: a healthy response includes
+`"success": true` and `"database": "connected"`.
+
 First, run the development server:
 
 ```bash

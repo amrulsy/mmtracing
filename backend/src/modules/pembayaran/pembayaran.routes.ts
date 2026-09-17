@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validate';
 import { sendSuccess, sendPaginated } from '../../shared/utils';
 import { createRateLimiter } from '../../middleware/rateLimit';
 import { pembayaranService } from './pembayaran.service';
+import { createQrisAttempt } from './qris.service';
 
 const publicReceiptLimiter = createRateLimiter({
   windowMs: 30 * 60 * 1000, 
@@ -28,6 +29,16 @@ const bayarSchema = z.object({
   jumlah: z.number().positive('Jumlah harus lebih dari 0'),
   metode: z.string().min(1),
   keterangan: z.string().optional(),
+  qrisAttemptId: z.string().uuid().optional(),
+  qrisReference: z.string().trim().min(4).max(100).optional(),
+  qrisVerified: z.boolean().optional(),
+});
+
+router.post('/:id/qris', authMiddleware, requirePermission('pembayaran', 'edit'), validate(z.object({
+  jumlah: z.number().int().min(1).max(10_000_000),
+})), async (req, res, next) => {
+  try { sendSuccess(res, await createQrisAttempt(Number(req.params.id), req.body.jumlah, (req as any).user.id)); }
+  catch (e) { next(e); }
 });
 
 // GET /pembayaran

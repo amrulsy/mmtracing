@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Wrench, Trophy, Bell, UserCircle } from "lucide-react";
+import { LayoutDashboard, Wallet, Trophy, Bell, UserCircle } from "lucide-react";
 import { useUnreadCount } from "@/hooks/usePortalApi";
 
 const NAV_ITEMS = [
-  { href: "/portal/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/portal/pembayaran", icon: Wrench, label: "Tagihan" },
-  { href: "/portal/loyalty", icon: Trophy, label: "Loyalty" },
+  { href: "/portal/dashboard", icon: LayoutDashboard, label: "Beranda" },
+  { href: "/portal/pembayaran", icon: Wallet, label: "Transaksi" },
+  { href: "/portal/loyalty", icon: Trophy, label: "Poin" },
   { href: "/portal/notifikasi", icon: Bell, label: "Notifikasi", hasBadge: true },
   { href: "/portal/profile", icon: UserCircle, label: "Profil" },
 ];
@@ -18,7 +18,7 @@ export function PortalBottomNav() {
   const { unreadCount } = useUnreadCount();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-surface-border safe-bottom md:hidden">
+    <nav aria-label="Navigasi pelanggan" className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-surface-border safe-bottom md:hidden">
       <div className="grid grid-cols-5 h-16 max-w-lg mx-auto">
         {NAV_ITEMS.map((item) => {
           const isActive =
@@ -30,6 +30,7 @@ export function PortalBottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={`flex flex-col items-center justify-center gap-0.5 relative transition-colors ${
                 isActive
                   ? "text-primary"
@@ -51,7 +52,7 @@ export function PortalBottomNav() {
                 )}
               </div>
 
-              <span className={`text-[9px] font-semibold leading-none ${isActive ? "font-bold" : ""}`}>
+              <span className={`text-xs font-semibold leading-none ${isActive ? "font-bold" : ""}`}>
                 {item.label}
               </span>
             </Link>

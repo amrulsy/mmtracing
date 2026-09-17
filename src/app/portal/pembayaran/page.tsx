@@ -50,20 +50,24 @@ export default function PembayaranPage() {
   }
 
   const filteredData = data.filter(item => filter === "semua" || item.status === filter);
-  const totalTagihan = data.reduce((acc, curr) => acc + Number(curr.total), 0);
-  const totalDibayar = data.reduce((acc, curr) => acc + Number(curr.sudahDibayar), 0);
-  const totalSisa = data.reduce((acc, curr) => acc + Number(curr.sisaTagihan), 0);
-  const overdueCount = data.filter(d => d.status === "belum_lunas").length;
+  const getTotal = (curr: any) => Number(curr.total ?? curr.totalTagihan ?? 0);
+  const getSisa = (curr: any) => Number(curr.sisaTagihan ?? curr.sisaBayar ?? 0);
+  const getDibayar = (curr: any) => Number(curr.sudahDibayar ?? (getTotal(curr) - getSisa(curr)));
+
+  const totalTagihan = data.reduce((acc, curr) => acc + getTotal(curr), 0);
+  const totalDibayar = data.reduce((acc, curr) => acc + getDibayar(curr), 0);
+  const totalSisa = data.reduce((acc, curr) => acc + getSisa(curr), 0);
+  const overdueCount = data.filter(d => d.status !== "lunas").length;
 
   return (
-    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-28 animate-in fade-in duration-500">
+    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href="/portal/dashboard" className="p-2.5 bg-surface-hover/50 border border-surface-border hover:bg-surface-hover rounded-xl transition-colors md:hidden">
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-xl sm:text-2xl font-black flex items-center gap-2">
-            <Receipt className="text-primary" size={24} /> Riwayat Tagihan
+            <Receipt className="text-primary" size={24} /> Riwayat Transaksi
           </h1>
         </div>
         
@@ -76,8 +80,8 @@ export default function PembayaranPage() {
           >
             <option value="semua">Semua Status</option>
             <option value="lunas">Lunas</option>
-            <option value="belum_lunas">Belum Lunas</option>
-            <option value="cicilan">Cicilan</option>
+            <option value="belum_bayar">Belum Bayar</option>
+            <option value="parsial">Cicilan / Parsial</option>
           </select>
         </div>
       </div>
@@ -88,7 +92,7 @@ export default function PembayaranPage() {
           <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-bold text-red-600 dark:text-red-400">
-              Anda memiliki {overdueCount} tagihan yang belum diselesaikan
+              Anda memiliki {overdueCount} transaksi yang belum diselesaikan
             </p>
             <p className="text-xs text-red-500/70 mt-0.5">
               Total sisa: <strong className="font-mono">Rp {totalSisa.toLocaleString("id-ID")}</strong>
@@ -126,14 +130,14 @@ export default function PembayaranPage() {
         {filteredData.length === 0 ? (
           <div className="text-center py-12 glass-panel">
             <Receipt size={56} className="mx-auto text-muted-foreground mb-4" />
-            <p className="text-lg font-bold">Belum Ada Tagihan</p>
-            <p className="text-sm text-muted-foreground">Tidak ada riwayat tagihan</p>
+            <p className="text-lg font-bold">Belum Ada Transaksi</p>
+            <p className="text-sm text-muted-foreground">Tidak ada riwayat transaksi</p>
           </div>
         ) : (
           filteredData.map(item => {
-            const isLunas = item.status === "lunas";
-            const isCicilan = item.status === "cicilan";
-            return (
+                    const isLunas = item.status === "lunas";
+                    const isParsial = item.status === "parsial";
+                    return (
               <div key={item.id} className="glass-panel overflow-hidden border border-surface-border/50 transition-all hover:border-surface-border">
                 <div className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between items-start">
                   <div className="min-w-0">
@@ -141,22 +145,22 @@ export default function PembayaranPage() {
                       <h3 className="text-sm font-black tracking-tight">{item.noInvoice || "Menunggu Invoice"}</h3>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
                         isLunas ? "bg-emerald-500/10 text-emerald-500" : 
-                        isCicilan ? "bg-amber-500/10 text-amber-500" : 
+                        isParsial ? "bg-amber-500/10 text-amber-500" : 
                         "bg-red-500/10 text-red-500"
                       }`}>
-                        {item.status.replace("_", " ")}
+                        {item.status === "belum_bayar" ? "belum bayar" : item.status.replace("_", " ")}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="font-mono bg-surface-hover px-1.5 py-0.5 rounded text-[10px]">{item.noSpk}</span>
+                      <span className="font-mono bg-surface-hover px-1.5 py-0.5 rounded text-[10px]">{item.noWo}</span>
                       <span>•</span>
                       <span>{new Date(item.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
                     </div>
                   </div>
                   
                   <div className="text-left sm:text-right shrink-0 w-full sm:w-auto flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start">
-                    <p className="text-lg font-black font-mono">Rp {Number(item.total).toLocaleString("id-ID")}</p>
-                    <Link href={`/pub/pembayaran/${item.publicId}`} className="text-xs font-bold text-primary hover:underline flex items-center gap-1 mt-1">
+                    <p className="text-lg font-black font-mono">Rp {getTotal(item).toLocaleString("id-ID")}</p>
+                    <Link href={`/pub/pembayaran/${item.publicId}/kwitansi`} className="text-xs font-bold text-primary hover:underline flex items-center gap-1 mt-1">
                       Lihat Kwitansi <ExternalLink size={12} />
                     </Link>
                   </div>
@@ -177,10 +181,10 @@ export default function PembayaranPage() {
                         </div>
                       ))}
                     </div>
-                    {Number(item.sisaTagihan) > 0 && (
+                    {getSisa(item) > 0 && (
                       <div className="flex justify-between items-center text-xs font-bold mt-2 pt-2 border-t border-surface-border/50">
-                        <span className="text-red-500">Sisa Tagihan</span>
-                        <span className="font-mono text-red-500">Rp {Number(item.sisaTagihan).toLocaleString("id-ID")}</span>
+                        <span className="text-red-500">Sisa Hutang</span>
+                        <span className="font-mono text-red-500">Rp {getSisa(item).toLocaleString("id-ID")}</span>
                       </div>
                     )}
                   </div>

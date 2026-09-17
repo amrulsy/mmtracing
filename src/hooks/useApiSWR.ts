@@ -27,7 +27,7 @@ async function paginatedFetcher<T>(endpoint: string): Promise<PaginatedResponse<
  * Hook for fetching API data with SWR. Automatically handles caching,
  * revalidation, and error retries.
  *
- * @param endpoint - API endpoint (e.g. "/spk", "/jasa")
+ * @param endpoint - API endpoint (e.g. "/work-order", "/jasa")
  * @param params - Optional query params
  * @param config - Optional SWR configuration overrides
  */
@@ -82,8 +82,8 @@ export function useApiPaginated<T>(
  * Call after a successful POST/PUT/DELETE to auto-refresh related views.
  *
  * Usage:
- *   await api.post('/spk', body);
- *   revalidateKeys('/spk');      // refreshes /spk list and any /spk/... detail
+ *   await api.post('/work-order', body);
+ *   revalidateKeys('/work-order');      // refreshes /spk list and any /spk/... detail
  *   revalidateKeys('/dashboard'); // refreshes dashboard after data change
  */
 export function revalidateKeys(...prefixes: string[]) {

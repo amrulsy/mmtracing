@@ -238,7 +238,7 @@ export default function LaporanPage() {
  </div>
  <div className="flex flex-wrap gap-2 relative">
  {/* Basis toggle */}
- <div className="flex rounded-xl border border-surface-border overflow-hidden shadow-sm" title="Cash: pendapatan diakui saat uang diterima. Accrual: diakui saat SPK selesai.">
+ <div className="flex rounded-xl border border-surface-border overflow-hidden shadow-sm" title="Cash: pendapatan diakui saat uang diterima. Accrual: diakui saat WO selesai.">
  {(["cash", "accrual"] as const).map(b => (
  <button
  key={b}
@@ -392,7 +392,7 @@ export default function LaporanPage() {
  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
  <div className="glass-panel p-4 flex flex-col gap-1">
  <div className="flex items-center justify-between">
- <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SPK Selesai</span>
+ <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">WO Selesai</span>
  <Receipt size={14} className="text-blue-500" />
  </div>
  <div className="text-xl font-bold font-mono">{loading ? <Skeleton className="h-6 w-12" /> : (kpi?.current.spkSelesai ?? 0)}</div>
@@ -605,7 +605,7 @@ export default function LaporanPage() {
  {basis === "cash" ? (
  <p className="text-muted-foreground leading-relaxed">Pendapatan diakui saat <b>uang masuk</b> (pembayaran). Cocok untuk monitoring arus kas harian.</p>
  ) : (
- <p className="text-muted-foreground leading-relaxed">Pendapatan diakui saat <b>SPK selesai</b> (tagihan jatuh). Cocok untuk evaluasi kinerja operasional.</p>
+ <p className="text-muted-foreground leading-relaxed">Pendapatan diakui saat <b>WO Selesai</b> (tagihan jatuh). Cocok untuk evaluasi kinerja operasional.</p>
  )}
  <div className="border-t border-surface-border pt-2 mt-2 space-y-1">
  <p className="text-[11px] text-muted-foreground">HPP Jasa akan meningkat bila tiap jasa memiliki <b>harga modal</b> (mis. komisi mekanik). Kosongkan untuk menjadikan seluruh jasa murni margin.</p>
@@ -622,13 +622,13 @@ export default function LaporanPage() {
  <h2 className="text-lg font-bold">Top Mekanik</h2>
  <Users className="text-primary" size={20} />
  </div>
- <p className="text-xs text-muted-foreground mb-4">Berdasarkan pendapatan yang dihasilkan (SPK selesai).</p>
+ <p className="text-xs text-muted-foreground mb-4">Berdasarkan pendapatan yang dihasilkan (WO selesai).</p>
 
  <div className="space-y-4 flex-1">
  {loading ? (
  <div className="space-y-3"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
  ) : mekanik.length === 0 ? (
- <div className="text-center text-sm text-muted-foreground py-8">Belum ada penyelesaian SPK</div>
+ <div className="text-center text-sm text-muted-foreground py-8">Belum ada penyelesaian WO</div>
  ) : mekanik.slice(0, 3).map((m, i) => (
  <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-surface-border bg-surface-hover/30 hover:bg-surface-hover transition-colors">
  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex justify-center items-center font-bold text-sm shrink-0">
@@ -636,7 +636,7 @@ export default function LaporanPage() {
  </div>
  <div className="flex-1 min-w-0">
  <p className="text-sm font-semibold truncate">{m.name}</p>
- <p className="text-xs text-muted-foreground truncate">{m.spkSelesai} SPK Selesai</p>
+ <p className="text-xs text-muted-foreground truncate">{m.spkSelesai} WO selesai</p>
  </div>
  <div className="text-right shrink-0">
  <p className="text-sm font-bold text-emerald-500 font-mono">{formatRp(Number(m.totalPendapatan))}</p>

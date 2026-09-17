@@ -6,12 +6,13 @@ import morgan from 'morgan';
 import compression from 'compression';
 import path from 'path';
 import { env } from './config/env';
+import db from './config/db';
 import { errorHandler } from './middleware/errorHandler';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
 import pelangganAuthRoutes from './modules/pelanggan/pelanggan-auth.routes';
-import spkRoutes from './modules/spk/spk.routes';
+import woRoutes from './modules/work-order/wo.routes';
 import pelangganRoutes from './modules/pelanggan/pelanggan.routes';
 import kendaraanRoutes from './modules/kendaraan/kendaraan.routes';
 import pembayaranRoutes from './modules/pembayaran/pembayaran.routes';
@@ -86,7 +87,7 @@ app.use(cors({
     if (
       env.nodeEnv === 'development' && 
       (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
-       /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin))
+       /^https?:\/\/(192\.168|10|172\.(1[6-9]|2\d|3[01]))\.\d+\.\d+(:\d+)?$/.test(origin))
     ) {
       return callback(null, true);
     }
@@ -108,16 +109,23 @@ app.use('/uploads', express.static(path.resolve(env.upload.dir)));
 // ==========================================
 const API = '/api/v1';
 
-app.get(`${API}/health`, (_req, res) => {
-  logger.info("Health check pinged!");
-  res.json({ success: true, message: 'MMT Racing API is running [V3]', timestamp: new Date().toISOString() });
+app.get(`${API}/health`, async (_req, res) => {
+  const database = await db.checkHealth();
+  res.status(database ? 200 : 503).json({
+    success: database,
+    message: database ? 'MMT Racing API is running [V3]' : 'Koneksi database tidak tersedia',
+    database: database ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.use(`${API}`, exportRoutes);
 app.use(`${API}/auth`, authRoutes);
 app.use(`${API}/customer-auth`, pelangganAuthRoutes);
 app.use(`${API}/dashboard`, dashboardRoutes);
-app.use(`${API}/spk`, spkRoutes);
+app.use(`${API}/wo`, woRoutes);
+app.use(`${API}/work-order`, woRoutes);
+app.use(`${API}/spk`, woRoutes);
 app.use(`${API}/pelanggan`, pelangganRoutes);
 app.use(`${API}/kendaraan`, kendaraanRoutes);
 app.use(`${API}/pembayaran`, pembayaranRoutes);
@@ -154,4 +162,3 @@ app.use(`${API}/admin/queues`, serverAdapter.getRouter());
 app.use(errorHandler);
 
 export default app;
-// trigger restart

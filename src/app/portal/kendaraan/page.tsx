@@ -59,7 +59,7 @@ export default function KendaraanPage() {
   }
 
   return (
-    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-28 animate-in fade-in duration-500">
+    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-6 animate-in fade-in duration-500">
       <div className="flex items-center gap-3">
         <Link href="/portal/dashboard" className="p-2.5 bg-surface-hover/50 border border-surface-border hover:bg-surface-hover rounded-xl transition-colors md:hidden">
           <ArrowLeft size={18} />
@@ -92,7 +92,7 @@ export default function KendaraanPage() {
             <CarFront size={56} className="mx-auto text-muted-foreground mb-4" />
             <p className="text-lg font-black mb-1">Belum Ada Kendaraan</p>
             <p className="text-sm text-muted-foreground max-w-xs mx-auto mb-6">
-              Kendaraan Anda akan terdaftar secara otomatis saat membuat SPK di bengkel.
+              Kendaraan Anda akan terdaftar secara otomatis saat memBuat Work Order di bengkel.
             </p>
             <Link href="/portal/booking" className="px-5 py-2.5 bg-red-600 text-white font-bold text-sm rounded-xl hover:bg-red-700 transition-colors inline-flex items-center gap-1.5">
               Buat Booking Baru

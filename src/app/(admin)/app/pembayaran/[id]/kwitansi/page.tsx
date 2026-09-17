@@ -63,12 +63,6 @@ export default function KwitansiPage({ params }: { params: Promise<{ id: string 
  .finally(() => setLoading(false));
  }, [id]);
 
- useEffect(() => {
- if (!data || printTriggered.current || format !== "a4") return;
- printTriggered.current = true;
- setTimeout(() => window.print(), 500);
- }, [data, format]);
-
  if (loading) return <div className="p-10 text-center font-mono">Menyiapkan dokumen kwitansi...</div>;
  if (error || !data) return <div className="p-10 text-center font-mono text-red-500">Error: {error}</div>;
 
@@ -77,7 +71,7 @@ export default function KwitansiPage({ params }: { params: Promise<{ id: string 
  const handleShareWhatsApp = () => {
  if (!data) return;
 
- const items = data.spk?.items?.map((item, i) => `${i + 1}. ${item.nama} x${item.qty} = ${formatRupiah(item.subtotal)}`).join("\n") || "";
+ const items = data.spk?.items?.map((item, i) => `${i + 1}. ${item.nama}\n   ${item.qty} x ${formatRupiah(Number(item.subtotal)/Number(item.qty))} = ${formatRupiah(item.subtotal)}`).join("\n") || "";
  const stages = data.spk?.stages?.map((s, i) => `${(data.spk?.items?.length || 0) + i + 1}. ${s.nama} = ${formatRupiah(s.estimasiBiaya)}`).join("\n") || "";
 
  const text = `*${getBengkelField(bengkel, "nama")}*\n` +
@@ -86,7 +80,7 @@ export default function KwitansiPage({ params }: { params: Promise<{ id: string 
  `*KWITANSI / INVOICE ${data.status === "lunas" ? "LUNAS" : "PARSIAL"}*\n` +
  `No: ${data.noInvoice}\n` +
  `Tgl: ${new Date(data.createdAt).toLocaleDateString("id-ID")}\n` +
- `Ref SPK: ${data.spk?.noSpk || "-"}\n\n` +
+ `Ref SPK: ${data.spk?.noWo || "-"}\n\n` +
  `*Pelanggan:* ${data.spk?.pelanggan?.name || "-"}\n` +
  `*Kendaraan:* ${data.spk?.kendaraan?.name || "-"} (${data.spk?.kendaraan?.plat || "-"})\n\n` +
  `*RINCIAN:* \n` +
@@ -134,15 +128,16 @@ export default function KwitansiPage({ params }: { params: Promise<{ id: string 
  encoder.feed(1).align(1).line("KWITANSI / INVOICE").feed(1).align(0)
  .row("No. Invoice", data.noInvoice, width)
  .row("Tanggal", new Date(data.createdAt).toLocaleDateString("id-ID"), width)
- .row("Ref. SPK", data.spk?.noSpk || "-", width)
+ .row("Ref. WO", data.spk?.noWo || "-", width)
  .row("Pelanggan", data.spk?.pelanggan?.name || "-", width)
  .row("Kendaraan", data.spk?.kendaraan ? `${data.spk.kendaraan.name} (${data.spk.kendaraan.plat})` : "-", width)
  .separator(width)
  .bold(1).line("RINCIAN:").bold(0);
 
  data.spk?.items?.forEach((item, i) => {
- encoder.line(`${i + 1}. ${item.nama} x${item.qty}`);
- encoder.align(2).line(formatRupiah(item.subtotal)).align(0);
+ encoder.line(`${i + 1}. ${item.nama}`);
+ const unitPrice = Number(item.subtotal) / Number(item.qty);
+ encoder.align(2).line(`${item.qty} x ${formatRupiah(unitPrice)} = ${formatRupiah(item.subtotal)}`).align(0);
  });
 
  data.spk?.stages?.forEach((stage, i) => {
@@ -193,147 +188,6 @@ export default function KwitansiPage({ params }: { params: Promise<{ id: string 
  />
 
  {/* ═══════════════════════════════════
- A4 FORMAT
- ═══════════════════════════════════ */}
- <div className="a4-only">
- <div className="max-w-3xl mx-auto bg-white p-8 sm:p-12 print:p-0 print:m-0">
- {/* Kop Surat */}
- <div className="border-b-2 border-black pb-4 mb-6 text-center">
- <h1 className="text-2xl font-black uppercase tracking-widest text-black">{getBengkelField(bengkel, "nama")}</h1>
- {getBengkelField(bengkel, "tagline") && <p className="text-sm uppercase font-semibold text-gray-700 tracking-wider">{getBengkelField(bengkel, "tagline")}</p>}
- <div className="text-xs text-gray-500 mt-2 space-y-0.5">
- {getBengkelField(bengkel, "alamat") && <p>{getBengkelField(bengkel, "alamat")}</p>}
- {getBengkelField(bengkel, "telepon") && <p>Telp: {getBengkelField(bengkel, "telepon")}</p>}
- </div>
- </div>
-
- <div className="text-center mb-8">
- <h2 className="text-lg font-bold uppercase underline underline-offset-4 mb-1 border-t border-b py-1">INVOICE / KWITANSI</h2>
- <p className="text-sm font-mono">{data.noInvoice}</p>
- </div>
-
- {/* Info Header */}
- <div className="grid grid-cols-2 gap-8 text-sm mb-8">
- <div>
- <table className="w-full">
- <tbody>
- <tr><td className="w-24 text-gray-500 pb-1">Tanggal</td><td className="font-medium pb-1">: {new Date(data.createdAt).toLocaleDateString("id-ID")}</td></tr>
- <tr><td className="text-gray-500 pb-1">Status</td><td className="font-bold uppercase pb-1">: <span className={data.status === "lunas" ? "text-emerald-600" : "text-amber-600"}>{statusLabel}</span></td></tr>
- <tr><td className="text-gray-500 pb-1">Ref. SPK</td><td className="font-mono font-bold pb-1">: {data.spk?.noSpk || "—"}</td></tr>
- </tbody>
- </table>
- </div>
- <div>
- <table className="w-full">
- <tbody>
- <tr><td className="w-24 text-gray-500 pb-1">Pelanggan</td><td className="font-bold pb-1">: {data.spk?.pelanggan?.name || "—"}</td></tr>
- <tr><td className="text-gray-500 pb-1">Telepon</td><td className="font-medium pb-1">: {data.spk?.pelanggan?.phone || "—"}</td></tr>
- <tr><td className="text-gray-500 pb-1">Kendaraan</td><td className="font-medium pb-1">: {data.spk?.kendaraan ? `${data.spk.kendaraan.name} (${data.spk.kendaraan.plat})` : "—"}</td></tr>
- </tbody>
- </table>
- </div>
- </div>
-
- {/* Rincian Tagihan */}
- <div className="mb-8">
- <h3 className="font-bold text-sm uppercase mb-3 text-gray-700">Rincian Pekerjaan / Item</h3>
- <table className="w-full text-sm">
- <thead className="border-y border-black font-semibold">
- <tr>
- <th className="py-2 text-left">Deskripsi</th>
- <th className="py-2 text-center w-16">Qty</th>
- <th className="py-2 text-right w-32">Subtotal</th>
- </tr>
- </thead>
- <tbody className="divide-y divide-gray-200">
- {data.spk?.items && data.spk.items.map((item: SpkItem, i: number) => (
- <tr key={`item-${i}`}>
- <td className="py-2">{item.nama}</td>
- <td className="py-2 text-center">{item.qty}</td>
- <td className="py-2 text-right font-mono">{formatRupiah(item.subtotal)}</td>
- </tr>
- ))}
- {data.spk?.stages && data.spk.stages.map((stage: SpkStage, i: number) => (
- <tr key={`stage-${i}`}>
- <td className="py-2 font-medium">Tahap {stage.urutan}: {stage.nama}</td>
- <td className="py-2 text-center">1</td>
- <td className="py-2 text-right font-mono">{formatRupiah(stage.estimasiBiaya)}</td>
- </tr>
- ))}
- {(!data.spk?.items?.length && !data.spk?.stages?.length) && (
- <tr><td colSpan={3} className="py-4 text-center text-gray-400 italic">Tidak ada rincian spesifik</td></tr>
- )}
- </tbody>
- <tfoot className="border-t-2 border-black font-bold">
- {Number(data.spk?.diskon) > 0 && (
- <tr>
- <td colSpan={2} className="py-1 text-right pr-4 uppercase text-gray-700">Diskon</td>
- <td className="py-1 text-right font-mono text-red-600">-{formatRupiah(data.spk?.diskon)}</td>
- </tr>
- )}
- <tr>
- <td colSpan={2} className="py-3 text-right pr-4 uppercase text-gray-700">Total Tagihan</td>
- <td className="py-3 text-right font-mono text-base">{formatRupiah(data.totalTagihan)}</td>
- </tr>
- <tr>
- <td colSpan={2} className="py-1 text-right pr-4 uppercase text-gray-700">Total Dibayar</td>
- <td className="py-1 text-right font-mono text-base text-emerald-700">{formatRupiah(data.totalBayar)}</td>
- </tr>
- <tr>
- <td colSpan={2} className="py-1 text-right pr-4 uppercase text-gray-700">Sisa Tagihan</td>
- <td className={`py-1 text-right font-mono text-base ${Number(data.sisaBayar) > 0 ? "text-red-600" : "text-emerald-600"}`}>{formatRupiah(data.sisaBayar)}</td>
- </tr>
- </tfoot>
- </table>
- </div>
-
- {/* Riwayat Pembayaran */}
- {data.detail && data.detail.length > 0 && (
- <div className="mb-12">
- <h3 className="font-bold text-sm uppercase mb-3 text-gray-700">Riwayat Transaksi</h3>
- <table className="w-full text-sm">
- <thead className="border-y border-gray-300">
- <tr>
- <th className="py-2 text-left">Tanggal</th>
- <th className="py-2 text-left">Metode</th>
- <th className="py-2 text-left">Keterangan</th>
- <th className="py-2 text-right">Jumlah</th>
- </tr>
- </thead>
- <tbody className="divide-y divide-gray-100">
- {data.detail.map((trx) => (
- <tr key={trx.id}>
- <td className="py-1.5">{new Date(trx.tanggal).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}</td>
- <td className="py-1.5 uppercase font-medium">{trx.metode}</td>
- <td className="py-1.5 text-gray-500">{trx.keterangan || "—"}</td>
- <td className="py-1.5 text-right font-mono font-bold">{formatRupiah(trx.jumlah)}</td>
- </tr>
- ))}
- </tbody>
- </table>
- </div>
- )}
-
- {/* Footer / Signature */}
- <div className="grid grid-cols-2 gap-8 text-sm text-center pt-8 mt-12">
- <div>
- <p className="mb-16 text-gray-500">Hormat Kami,</p>
- <p className="font-bold uppercase underline underline-offset-4">Kasir / Admin</p>
- </div>
- <div>
- <p className="mb-16 text-gray-500">Pelanggan,</p>
- <p className="font-bold uppercase underline underline-offset-4">{data.spk?.pelanggan?.name || "Nama Pelanggan"}</p>
- </div>
- </div>
-
- <div className="mt-12 text-center text-xs text-gray-400 italic print:text-[10px]">
- <p>Terima kasih atas kepercayaan Anda pada {getBengkelField(bengkel, "nama")}.</p>
- <p>Kwitansi ini adalah bukti pembayaran yang sah. Harap disimpan dengan baik.</p>
- </div>
- </div>
- </div>
-
- {/* ═══════════════════════════════════
  THERMAL FORMAT
  ═══════════════════════════════════ */}
  <div className="thermal-only">
@@ -365,7 +219,7 @@ export default function KwitansiPage({ params }: { params: Promise<{ id: string 
  <div className="space-y-0.5 text-[10px]">
  <ThermalRow label="No. Invoice" value={data.noInvoice} bold />
  <ThermalRow label="Tanggal" value={new Date(data.createdAt).toLocaleDateString("id-ID")} />
- <ThermalRow label="Ref. SPK" value={data.spk?.noSpk || "—"} />
+ <ThermalRow label="Ref. WO" value={data.spk?.noWo || "—"} />
  <ThermalRow label="Pelanggan" value={data.spk?.pelanggan?.name || "—"} />
  {data.spk?.pelanggan?.phone && <ThermalRow label="Telp" value={data.spk.pelanggan.phone} />}
  {data.spk?.kendaraan && (
@@ -380,8 +234,11 @@ export default function KwitansiPage({ params }: { params: Promise<{ id: string 
  <div className="space-y-0.5">
  {data.spk?.items && data.spk.items.map((item: SpkItem, i: number) => (
  <div key={`t-item-${i}`}>
- <p className="text-[10px] truncate">{i + 1}. {item.nama} x{item.qty}</p>
- <p className="text-[10px] text-right font-mono">{formatRupiah(item.subtotal)}</p>
+ <p className="text-[10px] truncate">{i + 1}. {item.nama}</p>
+ <div className="flex justify-between items-center">
+ <p className="text-[9px] text-gray-500">{item.qty} x {formatRupiah(Number(item.subtotal) / Number(item.qty))}</p>
+ <p className="text-[10px] text-right font-mono font-medium">{formatRupiah(item.subtotal)}</p>
+ </div>
  </div>
  ))}
  {data.spk?.stages && data.spk.stages.map((stage: SpkStage, i: number) => (

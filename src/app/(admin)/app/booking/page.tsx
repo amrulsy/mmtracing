@@ -27,10 +27,10 @@ interface Booking {
  alasanPenolakan: string | null;
  sumber: string;
  pelangganId: number | null;
- spkId: number | null;
+ woId: number | null;
  createdAt: string;
  pelanggan?: { id: number; name: string; phone: string } | null;
- spk?: { id: number; noSpk: string; status: string } | null;
+ spk?: { id: number; noWo: string; status: string } | null;
 }
 
 interface Stats {
@@ -136,11 +136,11 @@ export default function BookingPage() {
  const convertToSpk = async (id: number) => {
  setConvertingId(id);
  try {
- const res = await api.post<{ spkId: number; noSpk: string }>(`/booking/${id}/convert-to-spk`);
- toast.success(`Booking dikonversi ke ${res.data.noSpk}`);
+ const res = await api.post<{ woId: number; noWo: string }>(`/booking/${id}/convert-to-spk`);
+ toast.success(`Booking dikonversi ke ${res.data.noWo}`);
  fetchData();
  setSelectedBooking(null);
- router.push(`/app/spk/${res.data.spkId}`);
+ router.push(`/app/work-order/${res.data.woId}`);
  } catch (err: any) {
  toast.error(err?.message || "Gagal mengkonversi booking");
  } finally {
@@ -191,7 +191,7 @@ export default function BookingPage() {
  <div className="flex items-center justify-between">
  <div>
  <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Booking Online</h1>
- <p className="text-muted-foreground text-sm">Kelola reservasi dari landing page dan konversi ke SPK.</p>
+ <p className="text-muted-foreground text-sm">Kelola reservasi dari landing page dan Konversi ke WO.</p>
  </div>
  </div>
 
@@ -304,7 +304,7 @@ export default function BookingPage() {
  <span className="text-[10px] text-muted-foreground">#{b.id}</span>
  {b.spk && (
  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-500 border border-purple-500/30 font-medium">
- SPK: {b.spk.noSpk}
+ SPK: {b.spk.noWo}
  </span>
  )}
  </div>
@@ -327,8 +327,8 @@ export default function BookingPage() {
  {b.status === "baru" && (
  <button onClick={() => updateStatus(b.id, "dikonfirmasi")} title="Konfirmasi" className="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-600 transition-colors"><Check size={16} /></button>
  )}
- {!b.spkId && (b.status === "baru" || b.status === "dikonfirmasi") && (
- <button onClick={() => convertToSpk(b.id)} disabled={convertingId === b.id} title="Konversi ke SPK"
+ {!b.woId && (b.status === "baru" || b.status === "dikonfirmasi") && (
+ <button onClick={() => convertToSpk(b.id)} disabled={convertingId === b.id} title="Konversi ke WO"
  className="p-2 rounded-lg hover:bg-primary/10 text-primary transition-colors disabled:opacity-50">
  {convertingId === b.id ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
  </button>
@@ -382,9 +382,9 @@ export default function BookingPage() {
  return <span className={`text-xs px-3 py-1 rounded-full font-medium border ${cfg.color}`}>{cfg.label}</span>;
  })()}
  {selectedBooking.spk && (
- <button onClick={() => router.push(`/app/spk/${selectedBooking.spk!.id}`)}
+ <button onClick={() => router.push(`/app/work-order/${selectedBooking.spk!.id}`)}
  className="text-xs px-3 py-1 rounded-full bg-purple-500/15 text-purple-500 border border-purple-500/30 font-medium hover:bg-purple-500/25 transition-colors flex items-center gap-1">
- <FileText size={12} /> {selectedBooking.spk.noSpk}
+ <FileText size={12} /> {selectedBooking.spk.noWo}
  </button>
  )}
  <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-hover text-muted-foreground capitalize">{selectedBooking.sumber || "landing"}</span>
@@ -455,12 +455,12 @@ export default function BookingPage() {
  {/* Drawer Footer Actions */}
  <div className="p-5 border-t border-surface-border space-y-2">
  {/* Convert to SPK - primary action */}
- {!selectedBooking.spkId && (selectedBooking.status === "baru" || selectedBooking.status === "dikonfirmasi") && (
+ {!selectedBooking.woId && (selectedBooking.status === "baru" || selectedBooking.status === "dikonfirmasi") && (
  <button onClick={() => convertToSpk(selectedBooking.id)} disabled={convertingId === selectedBooking.id}
  className="w-full bg-primary text-white py-2.5 rounded-xl font-bold text-sm hover: flex items-center justify-center gap-2 disabled:opacity-60">
  {convertingId === selectedBooking.id
  ? <><Loader2 size={16} className="animate-spin" /> Mengkonversi...</>
- : <><Sparkles size={16} /> Konversi ke SPK</>}
+ : <><Sparkles size={16} /> Konversi ke WO</>}
  </button>
  )}
 

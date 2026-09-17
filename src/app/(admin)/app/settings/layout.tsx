@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Shield, Key, Bell, Palette, MessageSquare, Database, Globe } from "lucide-react";
+import { Users, Shield, Key, Bell, Palette, MessageSquare, Database, Globe, QrCode } from "lucide-react";
 
 const settingsTabs = [
+ { icon: QrCode, label: "QRIS", href: "/app/settings/qris" },
  { icon: Users, label: "User", href: "/app/settings" },
  { icon: Shield, label: "Role Akses", href: "/app/settings/roles" },
  { icon: Key, label: "Keamanan", href: "/app/settings/keamanan" },

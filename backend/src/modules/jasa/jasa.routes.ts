@@ -78,14 +78,14 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
          LEFT JOIN sparepart sp ON sp.id = js.sparepartId
          WHERE js.jasaId = ?`, [id]),
       db.query(
-        `SELECT si.*, s.id AS spkId, s.noSpk, s.status AS spkStatus, s.tanggal AS spkTanggal
-         FROM spk_items si
-         LEFT JOIN spk s ON s.id = si.spkId
+        `SELECT si.*, s.id AS woId, s.noWo, s.status AS woStatus, s.tanggal AS spkTanggal
+         FROM wo_items si
+         LEFT JOIN work_orders s ON s.id = si.woId
          WHERE si.jasaId = ?
          ORDER BY si.createdAt DESC LIMIT 20`, [id]),
     ]);
     (data as any).sparepartBundles = bundles.map((b: any) => ({ ...b, sparepart: b }));
-    (data as any).spkItems = spkItems.map((si: any) => ({ ...si, spk: { id: si.spkId, noSpk: si.noSpk, status: si.spkStatus, tanggal: si.spkTanggal } }));
+    (data as any).spkItems = spkItems.map((si: any) => ({ ...si, spk: { id: si.woId, noWo: si.noWo, status: si.woStatus, tanggal: si.spkTanggal } }));
     sendSuccess(res, data);
   } catch (e) { next(e); }
 });
@@ -146,7 +146,7 @@ router.delete('/:id', requirePermission('master', 'full'), async (req: Request, 
     const id = Number(req.params.id);
 
     // Cek apakah jasa masih dipakai di SPK
-    const usedInSpk = await db.queryVal<number>('SELECT COUNT(*) FROM spk_items WHERE jasaId = ?', [id]);
+    const usedInSpk = await db.queryVal<number>('SELECT COUNT(*) FROM wo_items WHERE jasaId = ?', [id]);
     if (usedInSpk > 0) {
       throw new BadRequestError(
         `Jasa ini masih digunakan di ${usedInSpk} item SPK dan tidak dapat dihapus. Anda bisa menonaktifkan atau mengganti nama jasa ini.`

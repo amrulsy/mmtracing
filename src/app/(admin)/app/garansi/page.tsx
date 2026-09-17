@@ -14,7 +14,7 @@ interface Garansi {
  daysLeft: number;
  computedStatus: string; // 'aktif', 'hampir', 'expired'
  status: string;
- spk?: { noSpk: string; pelanggan?: { name: string }; kendaraan?: { name: string } };
+ spk?: { noWo: string; pelanggan?: { name: string }; kendaraan?: { name: string } };
 }
 
 interface GaransiClaim {
@@ -23,7 +23,7 @@ interface GaransiClaim {
  status: string;
  resolution?: string;
  createdAt: string;
- garansi?: { item: string; spk?: { noSpk: string; pelanggan?: { name: string } } };
+ garansi?: { item: string; spk?: { noWo: string; pelanggan?: { name: string } } };
 }
 
 export default function GaransiPage() {
@@ -129,7 +129,7 @@ export default function GaransiPage() {
  <p className="text-sm font-semibold truncate">{w.item}</p>
  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${tl.color}`}>{tl.text}</span>
  </div>
- <p className="text-[10px] text-muted-foreground truncate">{w.spk?.noSpk || "—"} • {w.spk?.pelanggan?.name || "—"} • {w.spk?.kendaraan?.name || "—"}</p>
+ <p className="text-[10px] text-muted-foreground truncate">{w.spk?.noWo || "—"} • {w.spk?.pelanggan?.name || "—"} • {w.spk?.kendaraan?.name || "—"}</p>
  </div>
  <div className="text-right shrink-0">
  {w.computedStatus === "expired" ? (
@@ -155,7 +155,7 @@ export default function GaransiPage() {
  <div className="flex items-start justify-between mb-2">
  <div>
  <p className="font-bold">{c.garansi?.item || "—"}</p>
- <p className="text-xs text-muted-foreground">{c.garansi?.spk?.noSpk} • {c.garansi?.spk?.pelanggan?.name} • Klaim: {formatDate(c.createdAt)}</p>
+ <p className="text-xs text-muted-foreground">{c.garansi?.spk?.noWo} • {c.garansi?.spk?.pelanggan?.name} • Klaim: {formatDate(c.createdAt)}</p>
  </div>
  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${c.status !== "selesai" ? "bg-primary/10 text-primary border-primary/20" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"}`}>{c.status}</span>
  </div>

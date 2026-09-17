@@ -6,6 +6,8 @@
  * - Force logout on refresh failure
  */
 
+import { readApiJson } from './apiResponse';
+
 const TOKEN_KEY = "mmt_customer_token";
 const REFRESH_KEY = "mmt_refresh_token";
 
@@ -84,7 +86,7 @@ export async function portalFetch(
       });
     }
 
-    const refreshed = await (refreshPromise || attemptRefresh());
+    const refreshed = refreshPromise ? await refreshPromise : await attemptRefresh();
 
     if (refreshed) {
       // Retry with new token
@@ -94,6 +96,14 @@ export async function portalFetch(
       res = await fetch(url, { ...options, headers: retryHeaders });
     } else {
       portalLogout();
+    }
+  }
+
+  // Intercept HTML errors (e.g., 500 Server Error) to prevent JSON.parse crash
+  if (!res.ok) {
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.includes("text/html")) {
+      return new Response(JSON.stringify({ success: false, message: "Terjadi kesalahan pada server. Silakan coba lagi nanti." }), { status: res.status, headers: { "Content-Type": "application/json" } });
     }
   }
 
@@ -109,5 +119,5 @@ export async function portalApi<T = any>(
   options?: RequestInit
 ): Promise<{ success: boolean; data: T; message: string }> {
   const res = await portalFetch(url, options);
-  return res.json();
+  return readApiJson(res);
 }

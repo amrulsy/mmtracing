@@ -139,11 +139,11 @@ export const pelangganAuthController = {
       
       // Get SPKs (Surat Perintah Kerja)
       const spk = await db.query(
-        `SELECT id, noSpk, status, progress, totalHarga, totalBayar, 
+        `SELECT id, noWo, status, progress, totalHarga, totalBayar, 
                 (totalHarga - COALESCE(totalBayar,0)) AS sisaTagihan,
                 (totalHarga - COALESCE(diskon,0)) AS totalTagihan,
                 mode, createdAt
-         FROM spk 
+         FROM work_orders 
          WHERE pelangganId = ? 
          ORDER BY createdAt DESC LIMIT 20`,
         [customerId]
@@ -163,7 +163,7 @@ export const pelangganAuthController = {
         );
       }
 
-      sendSuccess(res, { spk, bookings }, 'Riwayat berhasil diambil');
+      sendSuccess(res, { spk, activeWo: spk, workOrder: spk, bookings }, 'Riwayat berhasil diambil');
     } catch (error) {
       next(error);
     }
@@ -173,20 +173,20 @@ export const pelangganAuthController = {
     try {
       // @ts-ignore
       const customerId = req.customerId;
-      const spkId = Number(req.params.id);
+      const woId = Number(req.params.id);
 
       // Verify ownership
-      const spk = await db.queryOne<any>("SELECT * FROM spk WHERE id = ? AND pelangganId = ?", [spkId, customerId]);
-      if (!spk) throw new NotFoundError('SPK tidak ditemukan atau Anda tidak memiliki akses');
+      const spk = await db.queryOne<any>("SELECT * FROM work_orders WHERE id = ? AND pelangganId = ?", [woId, customerId]);
+      if (!spk) throw new NotFoundError('Work Order tidak ditemukan atau Anda tidak memiliki akses');
 
       // Fetch related data
       const [kendaraan, mekanik, items, stages, photos, pembayaran] = await Promise.all([
         spk.kendaraanId ? db.queryOne("SELECT * FROM kendaraan WHERE id = ?", [spk.kendaraanId]) : null,
         spk.mekanikId ? db.queryOne("SELECT * FROM mekanik WHERE id = ?", [spk.mekanikId]) : null,
-        db.query("SELECT i.*, sp.name AS spName, j.name AS jName FROM spk_items i LEFT JOIN sparepart sp ON sp.id = i.sparepartId LEFT JOIN jasa j ON j.id = i.jasaId WHERE i.spkId = ?", [spkId]),
-        db.query("SELECT * FROM spk_stages WHERE spkId = ? ORDER BY urutan ASC", [spkId]),
-        db.query("SELECT * FROM spk_photos WHERE spkId = ? ORDER BY createdAt DESC", [spkId]),
-        db.query("SELECT * FROM pembayaran WHERE spkId = ? LIMIT 1", [spkId])
+        db.query("SELECT i.*, sp.name AS spName, j.name AS jName FROM wo_items i LEFT JOIN sparepart sp ON sp.id = i.sparepartId LEFT JOIN jasa j ON j.id = i.jasaId WHERE i.woId = ?", [woId]),
+        db.query("SELECT * FROM wo_stages WHERE woId = ? ORDER BY urutan ASC", [woId]),
+        db.query("SELECT * FROM wo_photos WHERE woId = ? ORDER BY createdAt DESC", [woId]),
+        db.query("SELECT * FROM pembayaran WHERE woId = ? LIMIT 1", [woId])
       ]);
 
       const enrichedItems = items.map((i: any) => ({
@@ -248,9 +248,9 @@ export const pelangganAuthController = {
       const customerId = req.customerId;
 
       const tagihan = await db.query(`
-        SELECT p.*, s.noSpk, s.status AS spkStatus
+        SELECT p.*, s.noWo, s.status AS woStatus
         FROM pembayaran p
-        JOIN spk s ON s.id = p.spkId
+        JOIN work_orders s ON s.id = p.woId
         WHERE s.pelangganId = ?
         ORDER BY p.createdAt DESC
       `, [customerId]);
@@ -364,9 +364,9 @@ export const pelangganAuthController = {
       const customerId = req.customerId;
 
       const rows = await db.query(`
-        SELECT g.*, s.noSpk 
+        SELECT g.*, s.noWo 
         FROM garansi g
-        JOIN spk s ON s.id = g.spkId
+        JOIN work_orders s ON s.id = g.woId
         WHERE s.pelangganId = ?
         ORDER BY g.endDate ASC
       `, [customerId]);
@@ -410,7 +410,7 @@ export const pelangganAuthController = {
 
       const garansi = await db.queryOne<any>(`
         SELECT g.* FROM garansi g
-        JOIN spk s ON s.id = g.spkId
+        JOIN work_orders s ON s.id = g.woId
         WHERE g.id = ? AND s.pelangganId = ?
       `, [garansiId, customerId]);
 
@@ -436,14 +436,14 @@ export const pelangganAuthController = {
       const limitNum = Math.min(100, Math.max(1, Number(limit)));
       const skip = (Math.max(1, Number(page)) - 1) * limitNum;
 
-      const spkIdsRes = await db.query("SELECT id FROM spk WHERE pelangganId = ?", [customerId]);
+      const spkIdsRes = await db.query("SELECT id FROM work_orders WHERE pelangganId = ?", [customerId]);
       const spkIds = spkIdsRes.map((r: any) => r.id);
 
       let whereClause = "pelangganId = ?";
       let params: any[] = [customerId];
 
       if (spkIds.length > 0) {
-        whereClause = `(pelangganId = ? OR spkId IN (?))`;
+        whereClause = `(pelangganId = ? OR woId IN (?))`;
         params.push(spkIds);
       }
 
@@ -471,14 +471,14 @@ export const pelangganAuthController = {
       // @ts-ignore
       const customerId = req.customerId;
 
-      const spkIdsRes = await db.query("SELECT id FROM spk WHERE pelangganId = ?", [customerId]);
+      const spkIdsRes = await db.query("SELECT id FROM work_orders WHERE pelangganId = ?", [customerId]);
       const spkIds = spkIdsRes.map((r: any) => r.id);
 
       let whereClause = "pelangganId = ?";
       let params: any[] = [customerId];
 
       if (spkIds.length > 0) {
-        whereClause = `(pelangganId = ? OR spkId IN (?))`;
+        whereClause = `(pelangganId = ? OR woId IN (?))`;
         params.push(spkIds);
       }
 
@@ -493,21 +493,21 @@ export const pelangganAuthController = {
     try {
       // @ts-ignore
       const customerId = req.customerId;
-      const { spkId, rating, comment, tags } = req.body;
+      const { woId, rating, comment, tags } = req.body;
 
-      if (!spkId || !rating || rating < 1 || rating > 5) {
-        throw new BadRequestError('SPK ID dan Rating (1-5) wajib diisi');
+      if (!woId || !rating || rating < 1 || rating > 5) {
+        throw new BadRequestError('Work Order ID dan Rating (1-5) wajib diisi');
       }
 
-      const spk = await db.queryOne<{ id: number, status: string }>("SELECT id, status FROM spk WHERE id = ? AND pelangganId = ?", [spkId, customerId]);
-      if (!spk) throw new NotFoundError('SPK tidak ditemukan atau Anda tidak memiliki akses');
+      const spk = await db.queryOne<{ id: number, status: string }>("SELECT id, status FROM work_orders WHERE id = ? AND pelangganId = ?", [woId, customerId]);
+      if (!spk) throw new NotFoundError('Work Order tidak ditemukan atau Anda tidak memiliki akses');
       if (spk.status !== 'selesai') throw new BadRequestError('Review hanya dapat diberikan untuk servis yang sudah selesai');
 
-      const existing = await db.queryOne("SELECT id FROM customer_reviews WHERE spkId = ?", [spkId]);
+      const existing = await db.queryOne("SELECT id FROM customer_reviews WHERE woId = ?", [woId]);
       if (existing) throw new ConflictError('Anda sudah memberikan review untuk SPK ini');
 
       await db.insert('customer_reviews', {
-        spkId, pelangganId: customerId, rating, comment,
+        woId, pelangganId: customerId, rating, comment,
         tags: tags ? JSON.stringify(tags) : null,
         isPublic: true
       });
@@ -522,9 +522,9 @@ export const pelangganAuthController = {
     try {
       // @ts-ignore
       const customerId = req.customerId;
-      const spkId = Number(req.params.spkId);
+      const woId = Number(req.params.woId);
 
-      const review = await db.queryOne("SELECT * FROM customer_reviews WHERE spkId = ? AND pelangganId = ?", [spkId, customerId]);
+      const review = await db.queryOne("SELECT * FROM customer_reviews WHERE woId = ? AND pelangganId = ?", [woId, customerId]);
       
       sendSuccess(res, review || null, 'Data review berhasil diambil');
     } catch (error) {

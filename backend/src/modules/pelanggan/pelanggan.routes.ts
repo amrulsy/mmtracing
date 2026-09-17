@@ -63,7 +63,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const [rows, totalRow] = await Promise.all([
       db.query(
         `SELECT p.*, lt.name AS loyaltyTierName, lt.minPoints AS loyaltyTierMinPoints,
-                (SELECT COUNT(*) FROM spk WHERE pelangganId = p.id) AS _countSpk
+                (SELECT COUNT(*) FROM work_orders WHERE pelangganId = p.id) AS _countSpk
          FROM pelanggan p
          LEFT JOIN loyalty_tiers lt ON lt.id = p.loyaltyTierId
          ${where} ORDER BY p.updatedAt DESC LIMIT ? OFFSET ?`,
@@ -94,7 +94,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const [kendaraans, spks, loyaltyPts, loyaltyTier] = await Promise.all([
       db.query('SELECT * FROM kendaraan WHERE pelangganId = ? AND deletedAt IS NULL', [id]),
       db.query(
-        `SELECT s.*, m.name AS mekanikName FROM spk s LEFT JOIN mekanik m ON m.id = s.mekanikId
+        `SELECT s.*, m.name AS mekanikName FROM work_orders s LEFT JOIN mekanik m ON m.id = s.mekanikId
          WHERE s.pelangganId = ? ORDER BY s.createdAt DESC LIMIT 10`, [id]),
       db.query('SELECT * FROM loyalty_points WHERE pelangganId = ? ORDER BY createdAt DESC LIMIT 20', [id]),
       data.loyaltyTierId ? db.queryOne('SELECT * FROM loyalty_tiers WHERE id = ?', [data.loyaltyTierId]) : null,
@@ -223,7 +223,7 @@ router.post('/:id/merge-into', requirePermission('master', 'full'), validate(mer
 
     const result = await db.transaction(async (tx) => {
       const ken = await tx.execute('UPDATE kendaraan SET pelangganId = ? WHERE pelangganId = ?', [targetId, sourceId]);
-      const spk = await tx.execute('UPDATE spk SET pelangganId = ? WHERE pelangganId = ?', [targetId, sourceId]);
+      const spk = await tx.execute('UPDATE work_orders SET pelangganId = ? WHERE pelangganId = ?', [targetId, sourceId]);
       const loy = await tx.execute('UPDATE loyalty_points SET pelangganId = ? WHERE pelangganId = ?', [targetId, sourceId]);
       await tx.update('pelanggan', { deletedAt: new Date() }, 'id = ?', [sourceId]);
       await tx.insert('activity_logs', {

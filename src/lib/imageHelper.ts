@@ -1,6 +1,7 @@
 /**
  * Loads an image from a URL, draws it to an off-screen HTML canvas,
  * and extracts the raw ImageData needed for ESC/POS dithering.
+ * Optimized for Web Bluetooth transfer speed.
  */
 export async function loadImageToImageData(url: string, maxWidth: number = 384): Promise<ImageData> {
   return new Promise((resolve, reject) => {
@@ -8,13 +9,15 @@ export async function loadImageToImageData(url: string, maxWidth: number = 384):
     img.crossOrigin = "Anonymous";
     
     img.onload = () => {
-      // Limit actual drawn image size to make Bluetooth transfer faster (max 250x150)
-      const MAX_DRAW_WIDTH = 250;
-      const MAX_DRAW_HEIGHT = 150;
+      // Limit actual drawn image size to make Bluetooth transfer faster
+      // Smaller dimensions drastically reduce payload size for BLE
+      const MAX_DRAW_WIDTH = 160;
+      const MAX_DRAW_HEIGHT = 100;
       
       let drawWidth = img.width;
       let drawHeight = img.height;
       
+      // Scale down if necessary
       if (drawWidth > MAX_DRAW_WIDTH) {
         const ratio = MAX_DRAW_WIDTH / drawWidth;
         drawWidth = MAX_DRAW_WIDTH;
@@ -26,14 +29,16 @@ export async function loadImageToImageData(url: string, maxWidth: number = 384):
         drawWidth = Math.round(drawWidth * ratio);
       }
       
-      // Keep canvas width = maxWidth (e.g. 384) to guarantee centering
-      // Ensure maxWidth is a multiple of 8 for standard ESC/POS bytes
-      const canvasWidth = Math.floor(maxWidth / 8) * 8;
-      const canvasHeight = drawHeight;
+      // Ensure canvas width is a multiple of 8 for standard ESC/POS bytes
+      // We do NOT pad to maxWidth here; the printer's align(1) will center it.
+      const canvasWidth = Math.floor(drawWidth / 8) * 8;
+      
+      // Re-adjust drawHeight slightly if we cropped width
+      const finalHeight = drawHeight;
       
       const canvas = document.createElement("canvas");
       canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
+      canvas.height = finalHeight;
       const ctx = canvas.getContext("2d");
       
       if (!ctx) {
@@ -42,13 +47,12 @@ export async function loadImageToImageData(url: string, maxWidth: number = 384):
       
       // Fill with white background
       ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      ctx.fillRect(0, 0, canvasWidth, finalHeight);
       
-      // Draw image centered
-      const xOffset = Math.round((canvasWidth - drawWidth) / 2);
-      ctx.drawImage(img, xOffset, 0, drawWidth, drawHeight);
+      // Draw image
+      ctx.drawImage(img, 0, 0, canvasWidth, finalHeight);
       
-      resolve(ctx.getImageData(0, 0, canvasWidth, canvasHeight));
+      resolve(ctx.getImageData(0, 0, canvasWidth, finalHeight));
     };
     
     img.onerror = () => reject(new Error(`Failed to load image from URL: ${url}`));

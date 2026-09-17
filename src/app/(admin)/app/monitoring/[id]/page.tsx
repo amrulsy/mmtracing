@@ -116,9 +116,9 @@ export default function MonitoringDetailPage() {
 
  {/* RIGHT: Sidebar */}
  <div className="space-y-6">
- {/* Info SPK */}
+ {/* Info Work Order */}
  <div className="glass-panel p-6">
- <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Info SPK</h3>
+ <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Info Work Order</h3>
  <div className="space-y-3 text-sm">
  <div className="flex justify-between"><span className="text-muted-foreground">Pelanggan</span><span className="font-medium">Anton</span></div>
  <div className="flex justify-between"><span className="text-muted-foreground">Kendaraan</span><span className="font-medium">Toyota Avanza</span></div>
@@ -127,8 +127,8 @@ export default function MonitoringDetailPage() {
  <div className="flex justify-between"><span className="text-muted-foreground">Odometer</span><span className="font-medium">45,200 km</span></div>
  <div className="pt-3 border-t border-surface-border flex justify-between"><span className="font-bold">Estimasi</span><span className="font-bold text-primary">Rp 1.200.000</span></div>
  </div>
- <Link href="/app/spk/SPK-0046" className="w-full text-center block mt-4 text-sm border border-surface-border py-2 rounded-xl font-medium hover:bg-surface-hover transition-colors">
- Lihat Detail SPK
+ <Link href="/app/work-order/SPK-0046" className="w-full text-center block mt-4 text-sm border border-surface-border py-2 rounded-xl font-medium hover:bg-surface-hover transition-colors">
+ Lihat Detail Work Order
  </Link>
  </div>
 

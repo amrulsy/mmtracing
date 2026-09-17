@@ -9,7 +9,6 @@ import {
   Wrench,
   Wallet,
   MoreHorizontal,
-  X,
   CarFront,
   BarChart3,
   Package,
@@ -27,13 +26,14 @@ import {
   ScrollText,
   ClipboardCheck,
 } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 
 const primaryTabs = [
-  { name: "Home", href: "/app", icon: LayoutDashboard },
-  { name: "SPK", href: "/app/spk", icon: FileText },
-  { name: "Monitor", href: "/app/monitoring", icon: Wrench },
-  { name: "Bayar", href: "/app/pembayaran", icon: Wallet },
+  { name: "Beranda", href: "/app", icon: LayoutDashboard },
+  { name: "Pekerjaan", href: "/app/work-order", icon: FileText },
+  { name: "Progres", href: "/app/monitoring", icon: Wrench },
+  { name: "Tagihan", href: "/app/pembayaran", icon: Wallet },
   { name: "Lainnya", href: "#more", icon: MoreHorizontal },
 ];
 
@@ -109,49 +109,18 @@ export function BottomNav() {
 
   return (
     <>
-      {/* More Sheet Overlay */}
-      {showMore && (
-        <div
-          className="fixed inset-0 z-[90] bg-black/50 lg:hidden animate-in fade-in duration-200"
-          onClick={() => setShowMore(false)}
-        />
-      )}
-
-      {/* More Sheet */}
-      <div
-        className={cn(
-          "fixed bottom-0 left-0 right-0 z-[95] lg:hidden transition-transform duration-300 ease-out",
-          showMore ? "translate-y-0" : "translate-y-full"
-        )}
-      >
-        <div className="bg-background border-t border-surface-border rounded-t-3xl shadow-2xl max-h-[75vh] flex flex-col">
-          {/* Handle Bar */}
-          <div className="flex justify-center pt-3 pb-1">
-            <div className="w-10 h-1 rounded-full bg-surface-border" />
-          </div>
-
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-2 border-b border-surface-border">
-            <h3 className="font-bold text-lg">Menu</h3>
-            <button
-              onClick={() => setShowMore(false)}
-              className="p-1.5 rounded-full bg-surface-hover text-muted-foreground hover:text-foreground"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
+      <Modal open={showMore} onClose={() => setShowMore(false)} title="Menu lainnya" placement="bottom">
           {/* Menu Grid */}
           <div className="overflow-y-auto flex-1 pb-8 px-4">
             {moreMenuGroups.map((group, gi) => (
               <div key={gi} className="mt-4">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1 mb-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1 mb-2">
                   {group.label}
                 </p>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-3 min-[400px]:grid-cols-4 gap-1">
                   {group.items.map((item) => {
                     const isActive = item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href);
-                    const badge = (item as any).badgeKey === "booking" ? newBookingCount : 0;
+                    const badge = "badgeKey" in item && item.badgeKey === "booking" ? newBookingCount : 0;
                     return (
                       <Link
                         key={item.name}
@@ -172,12 +141,12 @@ export function BottomNav() {
                         >
                           <item.icon size={20} />
                           {badge > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center shadow-sm border-2 border-background animate-pulse">
+                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs font-bold flex items-center justify-center shadow-sm border-2 border-background animate-pulse">
                               {badge > 9 ? "9+" : badge}
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] font-medium leading-tight text-center">{item.name}</span>
+                        <span className="text-xs font-medium leading-tight text-center">{item.name}</span>
                       </Link>
                     );
                   })}
@@ -185,13 +154,12 @@ export function BottomNav() {
               </div>
             ))}
           </div>
-        </div>
-      </div>
+      </Modal>
 
       {/* Bottom Tab Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-[80] lg:hidden select-none">
+      <nav aria-label="Navigasi utama" className="fixed bottom-0 left-0 right-0 z-[80] lg:hidden select-none">
         <div className="bg-background border-t border-surface-border safe-bottom">
-          <div className="flex items-start justify-around px-2 pt-1.5 pb-2">
+          <div className="grid grid-cols-5 h-16 px-1">
             {primaryTabs.map((tab) => {
               const isMore = tab.href === "#more";
               const isActive = isMore
@@ -200,46 +168,19 @@ export function BottomNav() {
                   ? pathname === "/app"
                   : pathname.startsWith(tab.href);
 
-              return (
-                <button
-                  key={tab.name}
-                  onClick={() => {
-                    if (isMore) {
-                      setShowMore(!showMore);
-                    } else {
-                      setShowMore(false);
-                      window.location.href = tab.href;
-                    }
-                  }}
-                  className={cn(
-                    "flex flex-col items-center gap-0.5 min-w-[56px] py-1 rounded-xl transition-all duration-200 active:scale-90 relative",
-                    isActive && !isMore ? "text-primary" : isMore && showMore ? "text-primary" : "text-muted-foreground"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "relative w-10 h-7 flex items-center justify-center rounded-full transition-all duration-300",
-                      isActive && !isMore ? "bg-primary/10 scale-110" : ""
-                    )}
-                  >
-                    <tab.icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
-                    {isActive && !isMore && (
-                      <div className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary" />
-                    )}
-                    {/* Badge for 'Lainnya' tab if there's a notification inside */}
-                    {isMore && newBookingCount > 0 && (
-                      <span className="absolute -top-1 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background animate-pulse" />
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      "text-[10px] leading-none transition-all",
-                      isActive ? "font-bold" : "font-medium"
-                    )}
-                  >
-                    {tab.name}
-                  </span>
-                </button>
+              const content = (<>
+                  <tab.icon size={22} aria-hidden="true" />
+                  <span className="text-xs leading-tight">{tab.name}</span>
+                  {isMore && newBookingCount > 0 && <span className="absolute top-1 right-2 w-2 h-2 bg-primary rounded-full" />}
+                </>);
+              const className = cn(
+                    "flex min-w-0 flex-col items-center justify-center gap-1 min-h-12 rounded-xl relative",
+                isActive ? "text-primary font-bold" : "text-muted-foreground"
+              );
+              return isMore ? (
+                <button key={tab.href} type="button" aria-haspopup="dialog" aria-label={newBookingCount > 0 ? `Menu lainnya, ${newBookingCount} booking baru` : "Menu lainnya"} aria-expanded={showMore} onClick={() => setShowMore(true)} className={className}>{content}</button>
+              ) : (
+                <Link key={tab.href} href={tab.href} aria-current={isActive ? "page" : undefined} className={className}>{content}</Link>
               );
             })}
           </div>

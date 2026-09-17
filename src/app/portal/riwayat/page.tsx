@@ -40,7 +40,7 @@ export default function RiwayatPage() {
   const filtered = data.filter(spk => {
     const matchStatus = statusFilter === "semua" || spk.status === statusFilter;
     const matchSearch = !search || 
-      spk.noSpk.toLowerCase().includes(search.toLowerCase()) ||
+      spk.noWo.toLowerCase().includes(search.toLowerCase()) ||
       spk.mode?.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
@@ -82,7 +82,7 @@ export default function RiwayatPage() {
   }
 
   return (
-    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-28 animate-in fade-in duration-500">
+    <div className="max-w-sm md:max-w-2xl mx-auto p-4 space-y-6 pb-6 animate-in fade-in duration-500">
       <div className="flex items-center gap-3">
         <Link href="/portal/dashboard" className="p-2.5 bg-surface-hover/50 border border-surface-border hover:bg-surface-hover rounded-xl transition-colors md:hidden">
           <ArrowLeft size={18} />
@@ -115,7 +115,7 @@ export default function RiwayatPage() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Cari nomor SPK..."
+            placeholder="Cari Nomor WO..."
             className="w-full bg-surface-hover/50 border border-surface-border rounded-xl pl-11 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all focus:bg-background"
           />
         </div>
@@ -145,7 +145,7 @@ export default function RiwayatPage() {
               {search || statusFilter !== "semua" ? "Pencarian Tidak Ditemukan" : "Belum Ada Riwayat"}
             </p>
             <p className="text-sm text-muted-foreground">
-              {search || statusFilter !== "semua" ? "Coba sesuaikan filter atau kata kunci pencarian Anda." : "Riwayat servis Anda akan muncul di sini setelah membuat SPK."}
+              {search || statusFilter !== "semua" ? "Coba sesuaikan filter atau kata kunci pencarian Anda." : "Riwayat servis Anda akan muncul di sini setelah memBuat Work Order."}
             </p>
           </div>
         ) : (
@@ -155,7 +155,7 @@ export default function RiwayatPage() {
             return (
               <Link
                 key={spk.id}
-                href={`/portal/spk/${spk.id}`}
+                href={`/portal/work-order/${spk.id}`}
                 className={`block p-4 border rounded-xl hover:bg-surface-hover transition-all group relative overflow-hidden active:scale-[0.99] ${
                   isActive ? "bg-primary/5 border-primary/20" : "bg-surface-hover/50 border-surface-border"
                 }`}
@@ -165,7 +165,7 @@ export default function RiwayatPage() {
                 <div className="flex justify-between items-start mb-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider font-mono">{spk.noSpk}</p>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider font-mono">{spk.noWo}</p>
                       <ChevronRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-0.5">

@@ -30,11 +30,11 @@ export default function NotifikasiSettingsPage() {
  ]);
 
  const [events, setEvents] = useState<NotifEvent[]>([
- { name: "SPK Baru Dibuat", app: true, wa: true, email: false },
+ { name: "WO Baru Dibuat", app: true, wa: true, email: false },
  { name: "Pembayaran Diterima", app: true, wa: true, email: true },
  { name: "Stok Menipis", app: true, wa: false, email: false },
  { name: "Kendala Pengerjaan", app: true, wa: true, email: false },
- { name: "SPK Selesai", app: true, wa: true, email: false },
+ { name: "WO Selesai", app: true, wa: true, email: false },
  { name: "Garansi Hampir Expired", app: true, wa: false, email: false },
  { name: "Reminder Pelunasan", app: true, wa: true, email: true },
  { name: "Booking Baru", app: true, wa: true, email: false },

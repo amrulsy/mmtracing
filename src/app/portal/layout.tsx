@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
-      <header className="border-b border-surface-border bg-background sticky top-0 z-50">
+      <header className="border-b border-surface-border bg-background sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="font-black text-xl tracking-tighter flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white text-sm font-black">M</div>
@@ -24,14 +24,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           
           <div className="flex items-center gap-3">
             <Link href="/track" className="text-xs font-bold text-primary hover:text-primary/80 transition-colors hidden sm:block">
-              Lacak SPK
+              Lacak Work Order
             </Link>
             <PortalHeaderActions />
           </div>
         </div>
       </header>
       
-      <main className="flex-1 w-full relative pb-16 md:pb-0">
+      <main className="flex-1 w-full relative pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
         {children}
       </main>
       

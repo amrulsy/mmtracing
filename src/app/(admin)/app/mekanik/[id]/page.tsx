@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/loading-skeleton";
 
 interface SpkItem {
  id: number;
- noSpk: string;
+ noWo: string;
  status: string;
  createdAt: string;
  pelanggan?: { name: string };
@@ -145,11 +145,11 @@ export default function MekanikDetailPage({ params }: { params: Promise<{ id: st
  {/* Stats */}
  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
  <div className="glass-panel p-4 text-center">
- <p className="text-xs text-muted-foreground">Total SPK Selesai</p>
+ <p className="text-xs text-muted-foreground">Total WO selesai</p>
  <p className="text-2xl font-bold mt-1 text-emerald-500">{totalFinished}</p>
  </div>
  <div className="glass-panel p-4 text-center">
- <p className="text-xs text-muted-foreground">SPK Aktif</p>
+ <p className="text-xs text-muted-foreground">WO Aktif</p>
  <p className="text-2xl font-bold mt-1 text-blue-500">{activeSpk.length}</p>
  </div>
  <div className="glass-panel p-4 text-center">
@@ -168,16 +168,16 @@ export default function MekanikDetailPage({ params }: { params: Promise<{ id: st
  <div className="grid md:grid-cols-2 gap-6">
  {/* SPK Aktif */}
  <div className="glass-panel p-6">
- <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">SPK Sedang Ditangani</h3>
+ <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">WO Sedang Ditangani</h3>
  <div className="space-y-3">
  {activeSpk.length === 0 ? (
  <div className="p-4 border-2 border-dashed border-surface-border rounded-xl text-center">
- <p className="text-sm text-muted-foreground">Tidak ada SPK aktif — Siap terima SPK baru</p>
+ <p className="text-sm text-muted-foreground">Tidak ada WO aktif — Siap terima SPK baru</p>
  </div>
  ) : activeSpk.map(s => (
- <Link key={s.id} href={`/app/spk/${s.id}`} className="block p-3 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 transition-colors">
+ <Link key={s.id} href={`/app/work-order/${s.id}`} className="block p-3 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 transition-colors">
  <div className="flex justify-between items-start mb-1">
- <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-background border border-surface-border">{s.noSpk}</span>
+ <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-background border border-surface-border">{s.noWo}</span>
  <span className={`text-[10px] font-bold uppercase ${getSpkStatusStyle(s.status)}`}>{s.status}</span>
  </div>
  <p className="font-semibold text-sm">{s.kendaraan?.name || "—"} — {s.kendaraan?.noPolisi}</p>
@@ -222,11 +222,11 @@ export default function MekanikDetailPage({ params }: { params: Promise<{ id: st
  {historySpk.length === 0 ? (
  <p className="text-sm text-muted-foreground text-center py-4">Belum ada riwayat pekerjaan selesai</p>
  ) : historySpk.map(h => (
- <Link key={h.id} href={`/app/spk/${h.id}`} className="flex items-center gap-4 p-3 rounded-xl border border-surface-border hover:bg-surface-hover/30 transition-colors">
+ <Link key={h.id} href={`/app/work-order/${h.id}`} className="flex items-center gap-4 p-3 rounded-xl border border-surface-border hover:bg-surface-hover/30 transition-colors">
  <CheckCircle size={16} className="text-emerald-500 shrink-0" />
  <div className="flex-1 min-w-0">
  <p className="text-sm font-medium truncate">{h.kendaraan?.name || "—"} — {h.kendaraan?.noPolisi || ""}</p>
- <p className="text-[10px] text-muted-foreground">{h.noSpk} • {h.pelanggan?.name || "—"} • {formatDate(h.createdAt)}</p>
+ <p className="text-[10px] text-muted-foreground">{h.noWo} • {h.pelanggan?.name || "—"} • {formatDate(h.createdAt)}</p>
  </div>
  {h.totalHarga != null && (
  <span className="text-xs font-bold font-mono text-emerald-500 shrink-0">{formatRp(h.totalHarga)}</span>

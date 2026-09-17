@@ -1,4 +1,6 @@
 import type { ApiResponse, PaginatedResponse } from './types';
+import { ApiError, readApiJson } from './apiResponse';
+export { ApiError } from './apiResponse';
 
 const BASE_URL = '/api/v1';
 
@@ -77,13 +79,13 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
     try {
       const errorJson = await res.json();
       if (errorJson.message) errorMessage = errorJson.message;
-    } catch (e) {
+    } catch {
       // Ignored if not JSON
     }
     throw new ApiError(errorMessage, 401);
   }
 
-  const json = await res.json();
+  const json = await readApiJson<{ success?: boolean; message?: string }>(res);
 
   if (!res.ok || json.success === false) {
     throw new ApiError(json.message || 'Terjadi kesalahan', res.status);
@@ -126,17 +128,3 @@ export const api = {
     return request<ApiResponse<T>>(endpoint, { method: 'POST', body: formData });
   },
 };
-
-// ==========================================
-// Error class
-// ==========================================
-
-export class ApiError extends Error {
-  public status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-  }
-}

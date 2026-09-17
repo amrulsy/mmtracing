@@ -7,11 +7,12 @@ const withPWA = withPWAInit({
   register: true,
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: true,
+  reloadOnOnline: false,
 });
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  allowedDevOrigins: ["localhost", "127.0.0.1", "192.168.1.15", "192.168.1.13", "192.168.43.1"],
   turbopack: {},
   async rewrites() {
     const backend = process.env.BACKEND_URL || "http://127.0.0.1:5000";

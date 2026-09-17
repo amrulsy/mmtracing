@@ -231,7 +231,19 @@
    ═══════════════════════════════════════ */
 @media print {
   @page { size: A4; margin: 1.5cm; }
-  html, body { background: white !important; color: black !important; font-size: 12pt !important; }
+  html, body { 
+    background: white !important; 
+    color: black !important; 
+    font-size: 12pt !important; 
+    overflow: visible !important; 
+    height: auto !important; 
+  }
+  .print-wrapper {
+    position: relative !important;
+    overflow: visible !important;
+    height: auto !important;
+    inset: auto !important;
+  }
   nav, aside, header, footer, [data-sidebar], [data-no-print] { display: none !important; }
   button, a[href^="/"] { display: none !important; }
   /* Show print-only elements */

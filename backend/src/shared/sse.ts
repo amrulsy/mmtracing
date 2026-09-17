@@ -2,9 +2,9 @@ import { Response } from 'express';
 
 /** SSE event types */
 export type SSEEvent = 
-  | 'spk:updated' 
-  | 'spk:selesai' 
-  | 'spk:kendala' 
+  | 'wo:updated' 
+  | 'wo:selesai' 
+  | 'wo:kendala' 
   | 'pembayaran:lunas' 
   | 'pembayaran:bayar'
   | 'inventaris:stok-update'

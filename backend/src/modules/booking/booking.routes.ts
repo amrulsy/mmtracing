@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import db from '../../config/db';
 import { authMiddleware, requireRole, requirePermission } from '../../middleware/auth';
-import { sendSuccess, generateSpkNo } from '../../shared/utils';
+import { sendSuccess, generateWoNo } from '../../shared/utils';
 
 const router = Router();
 
@@ -30,10 +30,10 @@ router.get('/', authMiddleware, async (req: Request, res: Response, next: NextFu
     const [data, totalRow] = await Promise.all([
       db.query(
         `SELECT b.*, p.id AS pId, p.name AS pName, p.phone AS pPhone,
-                s.id AS sId, s.noSpk, s.status AS sStatus
+                s.id AS sId, s.noWo, s.status AS sStatus
          FROM bookings b
          LEFT JOIN pelanggan p ON p.id = b.pelangganId
-         LEFT JOIN spk s ON s.id = b.spkId
+         LEFT JOIN work_orders s ON s.id = b.woId
          ${where} ORDER BY b.createdAt DESC LIMIT ? OFFSET ?`,
         [...params, limit, skip]),
       db.queryOne<{ c: number }>(`SELECT COUNT(*) AS c FROM bookings b ${where}`, params),
@@ -42,7 +42,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response, next: NextFu
     const rows = data.map((r: any) => ({
       ...r,
       pelanggan: r.pId ? { id: r.pId, name: r.pName, phone: r.pPhone } : null,
-      spk: r.sId ? { id: r.sId, noSpk: r.noSpk, status: r.sStatus } : null,
+      spk: r.sId ? { id: r.sId, noWo: r.noWo, status: r.sStatus } : null,
     }));
 
     sendSuccess(res, {
@@ -70,7 +70,7 @@ router.get('/stats', authMiddleware, async (_req: Request, res: Response, next: 
       db.queryVal<number>("SELECT COUNT(*) FROM bookings WHERE status = 'baru'"),
       db.queryVal<number>("SELECT COUNT(*) FROM bookings WHERE status = 'dikonfirmasi'"),
       db.queryVal<number>('SELECT COUNT(*) FROM bookings WHERE createdAt >= ?', [today]),
-      db.queryVal<number>('SELECT COUNT(*) FROM bookings WHERE spkId IS NOT NULL'),
+      db.queryVal<number>('SELECT COUNT(*) FROM bookings WHERE woId IS NOT NULL'),
     ]);
     const total = r1, baru = r2, dikonfirmasi = r3, todayCount = r4, converted = r5;
 
@@ -121,12 +121,12 @@ router.put('/:id', authMiddleware, requirePermission('monitoring', 'edit'), asyn
 
     await db.update('bookings', { ...updateData, updatedAt: new Date() }, 'id = ?', [id]);
     const booking = await db.queryOne<any>(
-      `SELECT b.*, p.id AS pId, p.name AS pName, s.id AS sId, s.noSpk
-       FROM bookings b LEFT JOIN pelanggan p ON p.id = b.pelangganId LEFT JOIN spk s ON s.id = b.spkId
+      `SELECT b.*, p.id AS pId, p.name AS pName, s.id AS sId, s.noWo
+       FROM bookings b LEFT JOIN pelanggan p ON p.id = b.pelangganId LEFT JOIN work_orders s ON s.id = b.woId
        WHERE b.id = ?`, [id]);
     if (booking) {
       booking.pelanggan = booking.pId ? { id: booking.pId, name: booking.pName } : null;
-      booking.spk = booking.sId ? { id: booking.sId, noSpk: booking.noSpk } : null;
+      booking.spk = booking.sId ? { id: booking.sId, noWo: booking.noWo } : null;
     }
 
     sendSuccess(res, booking, 'Status booking diperbarui');
@@ -144,8 +144,8 @@ router.post('/:id/convert-to-spk', authMiddleware, requirePermission('monitoring
       res.status(404).json({ success: false, message: 'Booking tidak ditemukan' });
       return;
     }
-    if (booking.spkId) {
-      res.status(400).json({ success: false, message: `Booking sudah dikonversi ke SPK #${booking.spkId}` });
+    if (booking.woId) {
+      res.status(400).json({ success: false, message: `Booking sudah dikonversi ke SPK #${booking.woId}` });
       return;
     }
 
@@ -194,9 +194,9 @@ router.post('/:id/convert-to-spk', authMiddleware, requirePermission('monitoring
     const userId = (req as any).user?.id || 1;
 
     // Create SPK
-    const noSpk = generateSpkNo();
-    const spkId = await db.insert('spk', {
-      noSpk,
+    const noWo = generateWoNo();
+    const woId = await db.insert('spk', {
+      noWo,
       pelangganId: pelangganId!,
       kendaraanId,
       mode,
@@ -206,14 +206,14 @@ router.post('/:id/convert-to-spk', authMiddleware, requirePermission('monitoring
     });
 
     // Link booking to SPK and update status
-    await db.update('bookings', { spkId, pelangganId, status: 'dikonfirmasi', updatedAt: new Date() }, 'id = ?', [bookingId]);
+    await db.update('bookings', { woId, pelangganId, status: 'dikonfirmasi', updatedAt: new Date() }, 'id = ?', [bookingId]);
 
     sendSuccess(res, {
-      spkId,
-      noSpk,
+      woId,
+      noWo,
       pelangganId,
       kendaraanId,
-    }, `Booking berhasil dikonversi ke SPK ${noSpk}`);
+    }, `Booking berhasil dikonversi ke SPK ${noWo}`);
   } catch (e) {
     next(e);
   }

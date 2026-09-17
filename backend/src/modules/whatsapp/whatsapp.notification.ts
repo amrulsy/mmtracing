@@ -72,71 +72,75 @@ async function trySend(phone: string | null | undefined, eventName: string, mode
 }
 
 // ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 // PUBLIC NOTIFICATION FUNCTIONS — Called from business logic
 // ══════════════════════════════════════════════════════════════
 
-/** 1. SPK Dibuat — called after SPK creation */
-export async function notifySpkCreated(spkId: number) {
+/** 1. Work Order Dibuat — called after WO creation */
+export async function notifyWoCreated(woId: number) {
   try {
-    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
-    if (!spk) return;
-    await trySend(spk.pelangganPhone, 'SPK Dibuat', spk.mode, {
-      nama: spk.pelangganName,
-      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
-      no_spk: spk.noSpk,
-      estimasi: spk.estimasiSelesai ? new Date(spk.estimasiSelesai).toLocaleDateString('id-ID') : 'Segera',
-      minimum_dp: `Rp ${Number(spk.minimumDp || 0).toLocaleString('id-ID')}`,
-      total: `Rp ${Number(spk.totalHarga || 0).toLocaleString('id-ID')}`,
+    const wo = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM work_orders s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [woId]);
+    if (!wo) return;
+    await trySend(wo.pelangganPhone, 'Work Order Dibuat', wo.mode, {
+      nama: wo.pelangganName,
+      kendaraan: wo.kendaraanName ? `${wo.kendaraanName} (${wo.kendaraanPlat})` : '-',
+      no_wo: wo.noWo,
+      no_spk: wo.noWo, // backward compatibility
+      estimasi: wo.estimasiSelesai ? new Date(wo.estimasiSelesai).toLocaleDateString('id-ID') : 'Segera',
+      minimum_dp: `Rp ${Number(wo.minimumDp || 0).toLocaleString('id-ID')}`,
+      total: `Rp ${Number(wo.totalHarga || 0).toLocaleString('id-ID')}`,
     });
   } catch (e: any) {
-    logger.error('[WA] notifySpkCreated error:', e.message);
+    logger.error('[WA] notifyWoCreated error:', e.message);
   }
 }
 
 /** 2. Progress Update — called after progress change */
-export async function notifyProgressUpdate(spkId: number) {
+export async function notifyProgressUpdate(woId: number) {
   try {
-    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
-    if (!spk) return;
-    const stages = await db.query('SELECT nama, status FROM spk_stages WHERE spkId = ? ORDER BY urutan ASC', [spkId]);
+    const wo = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM work_orders s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [woId]);
+    if (!wo) return;
+    const stages = await db.query('SELECT nama, status FROM wo_stages WHERE woId = ? ORDER BY urutan ASC', [woId]);
     const currentStage = stages.find((s: any) => s.status === 'in_progress') || stages.find((s: any) => s.status === 'done');
-    await trySend(spk.pelangganPhone, 'Progress Update', spk.mode, {
-      nama: spk.pelangganName,
-      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
-      judul_proyek: spk.judulProyek || '-',
-      progress: String(spk.progress),
+    await trySend(wo.pelangganPhone, 'Progress Update', wo.mode, {
+      nama: wo.pelangganName,
+      kendaraan: wo.kendaraanName ? `${wo.kendaraanName} (${wo.kendaraanPlat})` : '-',
+      judul_proyek: wo.judulProyek || '-',
+      progress: String(wo.progress),
       stage: currentStage?.nama || 'Pengerjaan Umum',
-      no_spk: spk.noSpk,
+      no_wo: wo.noWo,
+      no_spk: wo.noWo,
     });
   } catch (e: any) {
     logger.error('[WA] notifyProgressUpdate error:', e.message);
   }
 }
 
-/** 3. Selesai & Siap Ambil — called when SPK status becomes 'selesai' */
-export async function notifySpkSelesai(spkId: number) {
+/** 3. Selesai & Siap Ambil — called when WO status becomes 'selesai' */
+export async function notifyWoSelesai(woId: number) {
   try {
-    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
-    if (!spk) return;
-    const pembayaran = await db.queryOne<any>('SELECT totalTagihan, sisaBayar FROM pembayaran WHERE spkId = ? LIMIT 1', [spkId]);
-    const totalDisplay = pembayaran ? Number(pembayaran.totalTagihan) : Number(spk.totalHarga);
-    await trySend(spk.pelangganPhone, 'Selesai & Siap Ambil', spk.mode, {
-      nama: spk.pelangganName,
-      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
-      judul_proyek: spk.judulProyek || '-',
+    const wo = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM work_orders s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [woId]);
+    if (!wo) return;
+    const pembayaran = await db.queryOne<any>('SELECT totalTagihan, sisaBayar FROM pembayaran WHERE woId = ? LIMIT 1', [woId]);
+    const totalDisplay = pembayaran ? Number(pembayaran.totalTagihan) : Number(wo.totalHarga);
+    await trySend(wo.pelangganPhone, 'Selesai & Siap Ambil', wo.mode, {
+      nama: wo.pelangganName,
+      kendaraan: wo.kendaraanName ? `${wo.kendaraanName} (${wo.kendaraanPlat})` : '-',
+      judul_proyek: wo.judulProyek || '-',
       total: `Rp ${totalDisplay.toLocaleString('id-ID')}`,
       sisa: pembayaran ? `Rp ${Number(pembayaran.sisaBayar).toLocaleString('id-ID')}` : '-',
-      no_spk: spk.noSpk,
+      no_wo: wo.noWo,
+      no_spk: wo.noWo,
     });
   } catch (e: any) {
-    logger.error('[WA] notifySpkSelesai error:', e.message);
+    logger.error('[WA] notifyWoSelesai error:', e.message);
   }
 }
 
 /** 4. Reminder Pembayaran — called when payment is partially paid */
 export async function notifyReminderPembayaran(pembayaranId: number) {
   try {
-    const p = await db.queryOne<any>('SELECT pb.*, s.mode, s.noSpk, s.judulProyek, pl.name AS pelangganName, pl.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM pembayaran pb JOIN spk s ON s.id = pb.spkId LEFT JOIN pelanggan pl ON pl.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE pb.id = ?', [pembayaranId]);
+    const p = await db.queryOne<any>('SELECT pb.*, s.mode, s.noWo, s.judulProyek, pl.name AS pelangganName, pl.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM pembayaran pb JOIN work_orders s ON s.id = pb.woId LEFT JOIN pelanggan pl ON pl.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE pb.id = ?', [pembayaranId]);
     if (!p) return;
     await trySend(p.pelangganPhone, 'Reminder Pembayaran', p.mode, {
       nama: p.pelangganName,
@@ -144,7 +148,8 @@ export async function notifyReminderPembayaran(pembayaranId: number) {
       judul_proyek: p.judulProyek || '-',
       sisa: `Rp ${Number(p.sisaBayar).toLocaleString('id-ID')}`,
       invoice: p.noInvoice,
-      no_spk: p.noSpk,
+      no_wo: p.noWo,
+      no_spk: p.noWo,
       public_id: p.publicId,
     });
   } catch (e: any) {
@@ -152,44 +157,46 @@ export async function notifyReminderPembayaran(pembayaranId: number) {
   }
 }
 
-/** 5. SPK Kendala — called when SPK is pending due to technical issues */
-export async function notifySpkKendala(spkId: number, approvalLink?: string) {
+/** 5. Work Order Kendala — called when WO is pending due to technical issues */
+export async function notifyWoKendala(woId: number, approvalLink?: string) {
   try {
-    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
-    if (!spk) return;
-    await trySend(spk.pelangganPhone, 'SPK Kendala', spk.mode, {
-      nama: spk.pelangganName,
-      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
-      no_spk: spk.noSpk,
+    const wo = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM work_orders s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [woId]);
+    if (!wo) return;
+    await trySend(wo.pelangganPhone, 'Work Order Kendala', wo.mode, {
+      nama: wo.pelangganName,
+      kendaraan: wo.kendaraanName ? `${wo.kendaraanName} (${wo.kendaraanPlat})` : '-',
+      no_wo: wo.noWo,
+      no_spk: wo.noWo,
       link_approval: approvalLink || '-',
     });
   } catch (e: any) {
-    logger.error('[WA] notifySpkKendala error:', e.message);
+    logger.error('[WA] notifyWoKendala error:', e.message);
   }
 }
 
-/** 6. Gate Pass & Garansi & Point — called when invoice LUNAS & SPK Selesai */
-export async function notifyGatePassReleased(spkId: number, invoiceNo: string) {
+/** 6. Gate Pass & Garansi & Point — called when invoice LUNAS & WO Selesai */
+export async function notifyGatePassReleased(woId: number, invoiceNo: string) {
   try {
-    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
-    if (!spk) return;
+    const wo = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM work_orders s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [woId]);
+    if (!wo) return;
 
     const [pembayaran, garansi, pointsRow] = await Promise.all([
-      db.queryOne<any>('SELECT publicId FROM pembayaran WHERE spkId = ? LIMIT 1', [spkId]),
-      db.queryOne<any>('SELECT endDate FROM garansi WHERE spkId = ? ORDER BY endDate DESC LIMIT 1', [spkId]),
-      db.queryVal<number>("SELECT COALESCE(SUM(points),0) FROM loyalty_points WHERE refType = 'transaksi' AND refId = ? AND type = 'earn'", [spkId]),
+      db.queryOne<any>('SELECT publicId FROM pembayaran WHERE woId = ? LIMIT 1', [woId]),
+      db.queryOne<any>('SELECT endDate FROM garansi WHERE woId = ? ORDER BY endDate DESC LIMIT 1', [woId]),
+      db.queryVal<number>("SELECT COALESCE(SUM(points),0) FROM loyalty_points WHERE refType = 'transaksi' AND refId = ? AND type = 'earn'", [woId]),
     ]);
     const points = pointsRow || 0;
     const endDate = garansi ? new Date(garansi.endDate).toLocaleDateString('id-ID') : '-';
 
-    await trySend(spk.pelangganPhone, 'Lunas & Gate Pass', spk.mode, {
-      nama: spk.pelangganName,
-      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
-      judul_proyek: spk.judulProyek || '-',
+    await trySend(wo.pelangganPhone, 'Lunas & Gate Pass', wo.mode, {
+      nama: wo.pelangganName,
+      kendaraan: wo.kendaraanName ? `${wo.kendaraanName} (${wo.kendaraanPlat})` : '-',
+      judul_proyek: wo.judulProyek || '-',
       poin: String(points),
       batas_garansi: endDate,
       invoice: invoiceNo,
-      no_spk: spk.noSpk,
+      no_wo: wo.noWo,
+      no_spk: wo.noWo,
       public_id: pembayaran?.publicId || '',
     });
   } catch (e: any) {
@@ -197,18 +204,19 @@ export async function notifyGatePassReleased(spkId: number, invoiceNo: string) {
   }
 }
 
-/** 7. SPK Dibatalkan — called when SPK cancelled */
-export async function notifySpkBatal(spkId: number) {
+/** 7. Work Order Dibatalkan — called when WO cancelled */
+export async function notifyWoBatal(woId: number) {
   try {
-    const spk = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM spk s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [spkId]);
-    if (!spk) return;
-    await trySend(spk.pelangganPhone, 'SPK Dibatalkan', spk.mode, {
-      nama: spk.pelangganName,
-      kendaraan: spk.kendaraanName ? `${spk.kendaraanName} (${spk.kendaraanPlat})` : '-',
-      no_spk: spk.noSpk,
+    const wo = await db.queryOne<any>('SELECT s.*, p.name AS pelangganName, p.phone AS pelangganPhone, k.name AS kendaraanName, k.plat AS kendaraanPlat FROM work_orders s LEFT JOIN pelanggan p ON p.id = s.pelangganId LEFT JOIN kendaraan k ON k.id = s.kendaraanId WHERE s.id = ?', [woId]);
+    if (!wo) return;
+    await trySend(wo.pelangganPhone, 'Work Order Dibatalkan', wo.mode, {
+      nama: wo.pelangganName,
+      kendaraan: wo.kendaraanName ? `${wo.kendaraanName} (${wo.kendaraanPlat})` : '-',
+      no_wo: wo.noWo,
+      no_spk: wo.noWo,
     });
   } catch (e: any) {
-    logger.error('[WA] notifySpkBatal error:', e.message);
+    logger.error('[WA] notifyWoBatal error:', e.message);
   }
 }
 

@@ -152,7 +152,7 @@ export default function PembayaranPage() {
  <thead className="text-xs text-muted-foreground uppercase bg-surface-hover/50 border-b border-surface-border">
  <tr>
  <th className="px-6 py-4 font-semibold">Invoice / Tgl</th>
- <th className="px-6 py-4 font-semibold">SPK / Pelanggan</th>
+ <th className="px-6 py-4 font-semibold">WO / Pelanggan</th>
  <th className="px-6 py-4 font-semibold">Total</th>
  <th className="px-6 py-4 font-semibold">Dibayar</th>
  <th className="px-6 py-4 font-semibold">Status</th>
@@ -170,7 +170,7 @@ export default function PembayaranPage() {
  return (
  <tr key={item.id} className="bg-surface hover:bg-surface-hover/50 transition-colors">
  <td className="px-6 py-4"><div className="font-semibold font-mono text-primary">{item.noInvoice}</div><div className="text-xs text-muted-foreground">{formatDate(item.createdAt)}</div></td>
- <td className="px-6 py-4 text-xs">{item.spk?.noSpk || "—"} • {item.spk?.pelanggan?.name || "—"}</td>
+ <td className="px-6 py-4 text-xs">{item.spk?.noWo || "—"} • {item.spk?.pelanggan?.name || "—"}</td>
  <td className="px-6 py-4 font-medium font-mono">{formatRp(item.totalTagihan)}</td>
  <td className="px-6 py-4 text-xs flex items-center gap-1.5">
  {item.status === "lunas" ? <Receipt size={14} className="text-emerald-500" /> : <CreditCard size={14} className="text-muted-foreground" />}
@@ -222,7 +222,7 @@ export default function PembayaranPage() {
  <div className="flex justify-between items-start">
  <div>
  <p className="font-mono text-sm font-bold text-primary">{item.noInvoice}</p>
- <p className="text-[10px] text-muted-foreground">{formatDate(item.createdAt)} • {item.spk?.noSpk} • {item.spk?.pelanggan?.name || "—"}</p>
+ <p className="text-[10px] text-muted-foreground">{formatDate(item.createdAt)} • {item.spk?.noWo} • {item.spk?.pelanggan?.name || "—"}</p>
  </div>
  <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${statusStyle(item.status)}`}>{item.status}</span>
  </div>

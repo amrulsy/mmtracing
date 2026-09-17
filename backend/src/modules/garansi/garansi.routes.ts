@@ -29,11 +29,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     if (type) { conds.push('g.type = ?'); params.push(type); }
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
     const rows = await db.query(
-      `SELECT g.*, s.noSpk, s.pelangganId, s.kendaraanId,
+      `SELECT g.*, s.noWo, s.pelangganId, s.kendaraanId,
               p.name AS pelangganName, p.phone AS pelangganPhone,
               k.name AS kendaraanName, k.plat AS kendaraanPlat
        FROM garansi g
-       LEFT JOIN spk s ON s.id = g.spkId
+       LEFT JOIN work_orders s ON s.id = g.woId
        LEFT JOIN pelanggan p ON p.id = s.pelangganId
        LEFT JOIN kendaraan k ON k.id = s.kendaraanId
        ${where} ORDER BY g.endDate ASC`, params);
@@ -53,7 +53,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       else computedStatus = 'aktif';
       return {
         ...g, daysLeft, computedStatus,
-        spk: { id: g.spkId, noSpk: g.noSpk, pelanggan: { id: g.pelangganId, name: g.pelangganName, phone: g.pelangganPhone }, kendaraan: g.kendaraanId ? { id: g.kendaraanId, name: g.kendaraanName, plat: g.kendaraanPlat } : null },
+        spk: { id: g.woId, noWo: g.noWo, pelanggan: { id: g.pelangganId, name: g.pelangganName, phone: g.pelangganPhone }, kendaraan: g.kendaraanId ? { id: g.kendaraanId, name: g.kendaraanName, plat: g.kendaraanPlat } : null },
         claims: claimMap.get(g.id) || [],
       };
     });
@@ -88,16 +88,16 @@ router.get('/claims', async (_req: Request, res: Response, next: NextFunction) =
   try {
     const data = await db.query(
       `SELECT gc.*, g.itemName, g.type AS garansiType, g.startDate, g.endDate, g.status AS garansiStatus,
-              s.noSpk, p.name AS pelangganName, p.phone AS pelangganPhone
+              s.noWo, p.name AS pelangganName, p.phone AS pelangganPhone
        FROM garansi_claims gc
        LEFT JOIN garansi g ON g.id = gc.garansiId
-       LEFT JOIN spk s ON s.id = g.spkId
+       LEFT JOIN work_orders s ON s.id = g.woId
        LEFT JOIN pelanggan p ON p.id = s.pelangganId
        ORDER BY gc.createdAt DESC`);
     const rows = data.map((r: any) => ({
       ...r,
       garansi: { id: r.garansiId, itemName: r.itemName, type: r.garansiType, startDate: r.startDate, endDate: r.endDate, status: r.garansiStatus,
-        spk: { noSpk: r.noSpk, pelanggan: { name: r.pelangganName, phone: r.pelangganPhone } } },
+        spk: { noWo: r.noWo, pelanggan: { name: r.pelangganName, phone: r.pelangganPhone } } },
     }));
     sendSuccess(res, rows);
   } catch (e) { next(e); }

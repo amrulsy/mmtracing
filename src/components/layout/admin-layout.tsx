@@ -55,7 +55,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         <Sidebar />
         <div className="flex-1 lg:pl-64 flex flex-col min-h-screen relative overflow-x-hidden">
           <Topbar />
-          <main className="flex-1 pt-[104px] lg:pt-8 px-4 lg:px-8 pb-24 lg:pb-8 relative z-10 w-full max-w-7xl mx-auto">
+          <main className="flex-1 pt-[calc(128px+env(safe-area-inset-top))] lg:pt-8 px-4 lg:px-8 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-8 relative z-10 w-full max-w-7xl mx-auto">
             {children}
           </main>
         </div>

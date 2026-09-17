@@ -1,29 +1,29 @@
 /**
  * Gate-Pass: Shared logic for issuing warranty (Garansi) and loyalty points
- * upon SPK completion + invoice payment (lunas).
+ * upon Work Order completion + invoice payment (lunas).
  * 
  * Called from two places:
- * 1. spk.service.ts — when SPK is marked 'selesai' and invoice was already 'lunas'
- * 2. pembayaran.routes.ts — when invoice is marked 'lunas' and SPK is already 'selesai'
+ * 1. wo.service.ts — when WO is marked 'selesai' and invoice was already 'lunas'
+ * 2. pembayaran.routes.ts — when invoice is marked 'lunas' and WO is already 'selesai'
  */
 
 import type { Queryable } from '../config/db';
 
-export async function releaseGatePass(tx: Queryable, spkId: number): Promise<void> {
-  const spk = await tx.queryOne<any>('SELECT * FROM spk WHERE id = ?', [spkId]);
-  if (!spk) return;
+export async function releaseGatePass(tx: Queryable, woId: number): Promise<void> {
+  const wo = await tx.queryOne<any>('SELECT * FROM work_orders WHERE id = ?', [woId]);
+  if (!wo) return;
 
   // ── Guard: jangan terbitkan garansi/poin duplikat ─────────────
-  const existingGaransi = await tx.queryVal<number>('SELECT COUNT(*) FROM garansi WHERE spkId = ?', [spkId]);
+  const existingGaransi = await tx.queryVal<number>('SELECT COUNT(*) FROM garansi WHERE woId = ?', [woId]);
   if (existingGaransi > 0) return; // Already issued
 
   // Fetch items with jasa data, and stages
   const [items, stages] = await Promise.all([
     tx.query(
       `SELECT si.*, j.garansiHari AS jasaGaransiHari
-       FROM spk_items si LEFT JOIN jasa j ON j.id = si.jasaId
-       WHERE si.spkId = ?`, [spkId]),
-    tx.query('SELECT * FROM spk_stages WHERE spkId = ?', [spkId]),
+       FROM wo_items si LEFT JOIN jasa j ON j.id = si.jasaId
+       WHERE si.woId = ?`, [woId]),
+    tx.query('SELECT * FROM wo_stages WHERE woId = ?', [woId]),
   ]);
 
   // ── 1. Terbitkan Garansi ──────────────────────────────────────
@@ -39,7 +39,7 @@ export async function releaseGatePass(tx: Queryable, spkId: number): Promise<voi
       daysGaransi = item.jasaGaransiHari;
       typeGaransi = 'jasa';
     }
-    if (spk.mode === 'modifikasi') {
+    if (wo.mode === 'modifikasi') {
       daysGaransi = 90;
       typeGaransi = 'modif';
     }
@@ -49,7 +49,7 @@ export async function releaseGatePass(tx: Queryable, spkId: number): Promise<voi
     endDate.setDate(endDate.getDate() + daysGaransi);
 
     await tx.insert('garansi', {
-      spkId,
+      woId,
       itemName: item.nama,
       type: typeGaransi,
       startDate,
@@ -59,18 +59,18 @@ export async function releaseGatePass(tx: Queryable, spkId: number): Promise<voi
 
   // ── 2. Terbitkan Loyalty Points (1 poin per Rp 10.000) ───────
   const pembayaran = await tx.queryOne<{ totalTagihan: number }>(
-    'SELECT totalTagihan FROM pembayaran WHERE spkId = ? LIMIT 1', [spkId]);
-  const totalNum = pembayaran ? Number(pembayaran.totalTagihan) : Number(spk.totalHarga);
+    'SELECT totalTagihan FROM pembayaran WHERE woId = ? LIMIT 1', [woId]);
+  const totalNum = pembayaran ? Number(pembayaran.totalTagihan) : Number(wo.totalHarga);
   if (totalNum > 0) {
     const points = Math.floor(totalNum / 10000);
     if (points > 0) {
       await tx.insert('loyalty_points', {
-        pelangganId: spk.pelangganId,
+        pelangganId: wo.pelangganId,
         type: 'earn',
         points,
-        description: `Poin dari ${spk.noSpk}`,
+        description: `Poin dari ${wo.noWo}`,
         refType: 'transaksi',
-        refId: spk.id,
+        refId: wo.id,
       });
     }
   }

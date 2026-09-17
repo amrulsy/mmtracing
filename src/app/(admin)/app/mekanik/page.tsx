@@ -153,7 +153,7 @@ export default function MekanikPage() {
  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-surface-border">
  <div className="text-center">
  <p className="text-lg font-bold">{m._count?.spk || 0}</p>
- <p className="text-[10px] text-muted-foreground">Total SPK</p>
+ <p className="text-[10px] text-muted-foreground">Total WO</p>
  </div>
  <div className="text-center">
  <p className="text-lg font-bold flex items-center justify-center gap-0.5"><Phone size={14} className="text-muted-foreground" />{m.phone || "—"}</p>

@@ -1,0 +1,22 @@
+import { Request, Response, NextFunction } from 'express';
+export declare const pelangganAuthController: {
+    register(req: Request, res: Response, next: NextFunction): Promise<void>;
+    login(req: Request, res: Response, next: NextFunction): Promise<void>;
+    refreshToken(req: Request, res: Response, next: NextFunction): Promise<void>;
+    me(req: Request, res: Response, next: NextFunction): Promise<void>;
+    history(req: Request, res: Response, next: NextFunction): Promise<void>;
+    spkDetail(req: Request, res: Response, next: NextFunction): Promise<void>;
+    updateProfile(req: Request, res: Response, next: NextFunction): Promise<void>;
+    uploadAvatar(req: Request, res: Response, next: NextFunction): Promise<void>;
+    getPembayaran(req: Request, res: Response, next: NextFunction): Promise<void>;
+    getLoyalty(req: Request, res: Response, next: NextFunction): Promise<void>;
+    getLoyaltyHistory(req: Request, res: Response, next: NextFunction): Promise<void>;
+    getLoyaltyRewards(req: Request, res: Response, next: NextFunction): Promise<void>;
+    redeemLoyalty(req: Request, res: Response, next: NextFunction): Promise<Response<any, Record<string, any>> | undefined>;
+    getGaransi(req: Request, res: Response, next: NextFunction): Promise<void>;
+    claimGaransi(req: Request, res: Response, next: NextFunction): Promise<void>;
+    getNotifikasi(req: Request, res: Response, next: NextFunction): Promise<void>;
+    markReadAllNotifikasi(req: Request, res: Response, next: NextFunction): Promise<void>;
+    submitReview(req: Request, res: Response, next: NextFunction): Promise<void>;
+    checkReview(req: Request, res: Response, next: NextFunction): Promise<void>;
+};

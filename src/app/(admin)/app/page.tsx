@@ -89,7 +89,7 @@ export default function DashboardPage() {
  );
  }
 
- const { kpi, mekanikAktif, recentSpk, recentActivity } = data;
+ const { kpi, mekanikAktif, recentWo, recentActivity } = data;
 
  const statusStyle = (s: string) => {
  switch (s.toLowerCase()) {
@@ -135,7 +135,7 @@ export default function DashboardPage() {
  <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Dashboard</h1>
  <p className="text-muted-foreground text-sm">Ringkasan operasional bengkel — {today}</p>
  </div>
- <Link href="/app/spk/create" className="hidden sm:flex items-center gap-1.5 bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-none hover:bg-red-700 transition-colors">
+ <Link href="/app/work-order/create" className="hidden sm:flex items-center gap-1.5 bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-none hover:bg-red-700 transition-colors">
  <Plus size={16} /> SPK Baru
  </Link>
  </div>
@@ -143,11 +143,11 @@ export default function DashboardPage() {
  {/* KPI Cards */}
  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
  {[
- { label: "Antrian SPK", value: String(kpi.spkAntri), icon: LayoutDashboard, iconColor: "text-blue-500", iconBg: "bg-blue-500/10" },
- { label: "Dikerjakan", value: String(kpi.spkDikerjakan), sub: `${mekanikAktif.filter(m => m.status !== 'off').length} mekanik aktif`, icon: Wrench, iconColor: "text-amber-500", iconBg: "bg-amber-500/10" },
- { label: "Selesai Hari Ini", value: String(kpi.spkSelesaiHariIni), icon: CheckCircle2, iconColor: "text-emerald-500", iconBg: "bg-emerald-500/10" },
+ { label: "Antrian WO", value: String(kpi.woAntri), icon: LayoutDashboard, iconColor: "text-blue-500", iconBg: "bg-blue-500/10" },
+ { label: "Dikerjakan", value: String(kpi.woDikerjakan), sub: `${mekanikAktif.filter(m => m.status !== 'off').length} mekanik aktif`, icon: Wrench, iconColor: "text-amber-500", iconBg: "bg-amber-500/10" },
+ { label: "Selesai Hari Ini", value: String(kpi.woSelesaiHariIni), icon: CheckCircle2, iconColor: "text-emerald-500", iconBg: "bg-emerald-500/10" },
  { label: "Pendapatan", value: formatRp(kpi.pendapatanHariIni), sub: `Bulan: ${formatRp(kpi.pendapatanBulan)}`, icon: TrendingUp, iconColor: "text-primary", iconBg: "bg-primary/10" },
- { label: "Kendala", value: String(kpi.spkKendala), sub: kpi.spkKendala > 0 ? "Perlu perhatian" : "Aman", icon: AlertTriangle, iconColor: "text-red-500", iconBg: "bg-red-500/10", alert: kpi.spkKendala > 0 },
+ { label: "Kendala", value: String(kpi.woKendala), sub: kpi.woKendala > 0 ? "Perlu perhatian" : "Aman", icon: AlertTriangle, iconColor: "text-red-500", iconBg: "bg-red-500/10", alert: kpi.woKendala > 0 },
  ].map((kpiCard, i) => (
  <div key={i} className={`glass-panel p-3 lg:p-4 flex items-center gap-3 relative overflow-hidden group ${kpiCard.alert ? "border-red-500/30 bg-red-500/[0.03]" : ""} ${i === 4 ? "col-span-2 lg:col-span-1" : ""}`}>
  <div className={`w-10 h-10 rounded-xl ${kpiCard.iconBg} ${kpiCard.iconColor} flex items-center justify-center shrink-0`}>
@@ -166,7 +166,7 @@ export default function DashboardPage() {
  <div className="lg:hidden">
  <div className="flex gap-2 overflow-x-auto pb-1">
  {[
- { icon: Plus, label: "SPK Baru", href: "/app/spk/create", primary: true },
+ { icon: Plus, label: "WO Baru", href: "/app/work-order/create", primary: true },
  { icon: CreditCard, label: "Pembayaran", href: "/app/pembayaran" },
  { icon: CalendarPlus, label: "Booking", href: "/app/jadwal" },
  { icon: Search, label: "Cari", href: "/app/kendaraan" },
@@ -195,10 +195,10 @@ export default function DashboardPage() {
  <ChevronRight size={14} className="shrink-0 opacity-50" />
  </Link>
  )}
- {kpi.spkKendala > 0 && (
- <Link href="/app/spk" className="flex items-center gap-3 p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400 transition-colors hover:opacity-80">
+ {kpi.woKendala > 0 && (
+ <Link href="/app/work-order" className="flex items-center gap-3 p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-600 dark:text-amber-400 transition-colors hover:opacity-80">
  <Clock size={16} className="shrink-0" />
- <p className="text-xs flex-1">{kpi.spkKendala} SPK mengalami kendala — perlu tindakan</p>
+ <p className="text-xs flex-1">{kpi.woKendala} SPK mengalami kendala — perlu tindakan</p>
  <ChevronRight size={14} className="shrink-0 opacity-50" />
  </Link>
  )}
@@ -254,8 +254,8 @@ export default function DashboardPage() {
  }, { offset: 0, elements: [] as React.ReactNode[] }).elements}
  </svg>
  <div className="absolute inset-0 flex flex-col items-center justify-center">
- <p className="text-lg font-bold">{kpi.spkAntri + kpi.spkDikerjakan}</p>
- <p className="text-[9px] text-muted-foreground">SPK Aktif</p>
+ <p className="text-lg font-bold">{kpi.woAntri + kpi.woDikerjakan}</p>
+ <p className="text-[9px] text-muted-foreground">WO Aktif</p>
  </div>
  </div>
  </div>
@@ -277,20 +277,20 @@ export default function DashboardPage() {
  <div className="glass-panel p-3 sm:p-4 lg:p-6 lg:col-span-2">
  <div className="flex items-center justify-between mb-3">
  <h2 className="font-bold text-sm lg:text-base">📋 SPK Terbaru</h2>
- <Link href="/app/spk" className="text-xs text-primary font-medium hover:underline flex items-center gap-1">Lihat Semua <ChevronRight size={12} /></Link>
+ <Link href="/app/work-order" className="text-xs text-primary font-medium hover:underline flex items-center gap-1">Lihat Semua <ChevronRight size={12} /></Link>
  </div>
  <div className="space-y-2">
- {recentSpk.length === 0 ? (
- <p className="text-sm text-muted-foreground py-4 text-center">Belum ada data SPK</p>
+ {recentWo.length === 0 ? (
+ <p className="text-sm text-muted-foreground py-4 text-center">Belum ada data Work Order</p>
  ) : (
- recentSpk.map((spk) => (
- <Link key={spk.id} href={`/app/spk/${spk.id}`} className="flex items-center gap-3 p-3 rounded-xl border border-surface-border hover:bg-surface-hover/30 transition-colors active:scale-[0.99] block">
+ recentWo.map((spk) => (
+ <Link key={spk.id} href={`/app/work-order/${spk.id}`} className="flex items-center gap-3 p-3 rounded-xl border border-surface-border hover:bg-surface-hover/30 transition-colors active:scale-[0.99] block">
  <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
  <FileText size={16} />
  </div>
  <div className="flex-1 min-w-0">
  <div className="flex items-center gap-2">
- <span className="text-[10px] font-mono text-muted-foreground">{spk.noSpk}</span>
+ <span className="text-[10px] font-mono text-muted-foreground">{spk.noWo}</span>
  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${statusStyle(spk.status)}`}>{spk.status}</span>
  </div>
  <p className="text-sm font-medium truncate">
@@ -329,7 +329,7 @@ export default function DashboardPage() {
  </div>
  <div className="flex-1 min-w-0">
  <p className="text-xs font-medium">{m.name}</p>
- <p className="text-[10px] text-muted-foreground">{isWorking ? m.spk![0].noSpk : "Menunggu tugas"}</p>
+ <p className="text-[10px] text-muted-foreground">{isWorking ? m.spk![0].noWo : "Menunggu tugas"}</p>
  </div>
  {isWorking && <Zap size={12} className="text-amber-500" />}
  </div>
@@ -373,7 +373,7 @@ export default function DashboardPage() {
  {/* Quick Actions Desktop */}
  <div className="hidden lg:grid grid-cols-5 gap-3">
  {[
- { icon: Plus, label: "Buat SPK Baru", href: "/app/spk/create", primary: true },
+ { icon: Plus, label: "Buat Work Order Baru", href: "/app/work-order/create", primary: true },
  { icon: CreditCard, label: "Terima Pembayaran", href: "/app/pembayaran" },
  { icon: CalendarPlus, label: "Tambah Booking", href: "/app/jadwal" },
  { icon: Search, label: "Cari Pelanggan", href: "/app/kendaraan" },

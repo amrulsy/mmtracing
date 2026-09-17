@@ -18,7 +18,7 @@ router.get('/pendapatan', async (req: Request, res: Response, next: NextFunction
       `SELECT pd.jumlah, pd.tanggal, s.mode
        FROM pembayaran_detail pd
        JOIN pembayaran p ON p.id = pd.pembayaranId
-       JOIN spk s ON s.id = p.spkId
+       JOIN work_orders s ON s.id = p.woId
        WHERE pd.tanggal >= ? AND pd.tanggal <= ?
        ORDER BY pd.tanggal ASC`, [start, end]);
 
@@ -47,8 +47,8 @@ async function computeLabaRugi(start: Date, end: Date, basis: 'cash' | 'accrual'
   const [cashInRow, pengeluaranRow, completedSpkRow, spkItems] = await Promise.all([
     db.queryOne<any>('SELECT COALESCE(SUM(jumlah),0) AS total FROM pembayaran_detail WHERE tanggal >= ? AND tanggal <= ?', [start, end]),
     db.queryOne<any>('SELECT COALESCE(SUM(jumlah),0) AS total FROM pengeluaran WHERE tanggal >= ? AND tanggal <= ?', [start, end]),
-    db.queryOne<any>("SELECT COALESCE(SUM(totalHarga),0) AS sumHarga, COALESCE(SUM(diskon),0) AS sumDiskon FROM spk WHERE status = 'selesai' AND completedAt >= ? AND completedAt <= ?", [start, end]),
-    db.query("SELECT i.type, i.hargaModal, i.qty FROM spk_items i JOIN spk s ON s.id = i.spkId WHERE s.status = 'selesai' AND s.completedAt >= ? AND s.completedAt <= ?", [start, end]),
+    db.queryOne<any>("SELECT COALESCE(SUM(totalHarga),0) AS sumHarga, COALESCE(SUM(diskon),0) AS sumDiskon FROM work_orders WHERE status = 'selesai' AND completedAt >= ? AND completedAt <= ?", [start, end]),
+    db.query("SELECT i.type, i.hargaModal, i.qty FROM wo_items i JOIN work_orders s ON s.id = i.woId WHERE s.status = 'selesai' AND s.completedAt >= ? AND s.completedAt <= ?", [start, end]),
   ]);
 
   const totalPengeluaran = Number(pengeluaranRow?.total || 0);
@@ -101,8 +101,8 @@ router.get('/mekanik', async (req: Request, res: Response, next: NextFunction) =
     end.setHours(23, 59, 59, 999);
 
     const [data, revenueRaw] = await Promise.all([
-      db.query('SELECT m.*, (SELECT COUNT(*) FROM spk WHERE mekanikId = m.id) AS spkCount FROM mekanik m ORDER BY m.totalSpk DESC'),
-      db.query("SELECT mekanikId, SUM(totalBayar) AS sumBayar, COUNT(*) AS cnt FROM spk WHERE status = 'selesai' AND completedAt >= ? AND completedAt <= ? GROUP BY mekanikId", [start, end]),
+      db.query('SELECT m.*, (SELECT COUNT(*) FROM work_orders WHERE mekanikId = m.id) AS spkCount FROM mekanik m ORDER BY m.totalSpk DESC'),
+      db.query("SELECT mekanikId, SUM(totalBayar) AS sumBayar, COUNT(*) AS cnt FROM work_orders WHERE status = 'selesai' AND completedAt >= ? AND completedAt <= ? GROUP BY mekanikId", [start, end]),
     ]);
 
     const revenueMap = new Map(revenueRaw.map((r: any) => [r.mekanikId, Number(r.sumBayar || 0)]));
@@ -130,10 +130,10 @@ router.get('/pelanggan', async (req: Request, res: Response, next: NextFunction)
     end.setHours(23, 59, 59, 999);
 
     const [topSpenders, totalPelangganRow, pelangganBaruRow, repeatData] = await Promise.all([
-      db.query('SELECT p.*, (SELECT COUNT(*) FROM spk WHERE pelangganId = p.id) AS spkCount FROM pelanggan p ORDER BY p.totalTrx DESC LIMIT 10'),
+      db.query('SELECT p.*, (SELECT COUNT(*) FROM work_orders WHERE pelangganId = p.id) AS spkCount FROM pelanggan p ORDER BY p.totalTrx DESC LIMIT 10'),
       db.queryVal<number>('SELECT COUNT(*) FROM pelanggan'),
       db.queryVal<number>('SELECT COUNT(*) FROM pelanggan WHERE createdAt >= ? AND createdAt <= ?', [start, end]),
-      db.query("SELECT pelangganId, COUNT(*) AS cnt FROM spk WHERE status = 'selesai' GROUP BY pelangganId"),
+      db.query("SELECT pelangganId, COUNT(*) AS cnt FROM work_orders WHERE status = 'selesai' GROUP BY pelangganId"),
     ]);
     const totalPelanggan = totalPelangganRow ?? 0;
     const pelangganBaru = pelangganBaruRow ?? 0;
@@ -197,8 +197,8 @@ router.get('/kpi', async (req: Request, res: Response, next: NextFunction) => {
     const [curr, prev, currSpkStats, prevSpkStats, mekanikAktif] = await Promise.all([
       computeLabaRugi(start, end, basis),
       computeLabaRugi(prevStart, prevEnd, basis),
-      db.queryOne<any>("SELECT COUNT(*) AS cnt, AVG(totalHarga) AS avgHarga FROM spk WHERE status = 'selesai' AND completedAt >= ? AND completedAt <= ?", [start, end]),
-      db.queryOne<any>("SELECT COUNT(*) AS cnt, AVG(totalHarga) AS avgHarga FROM spk WHERE status = 'selesai' AND completedAt >= ? AND completedAt <= ?", [prevStart, prevEnd]),
+      db.queryOne<any>("SELECT COUNT(*) AS cnt, AVG(totalHarga) AS avgHarga FROM work_orders WHERE status = 'selesai' AND completedAt >= ? AND completedAt <= ?", [start, end]),
+      db.queryOne<any>("SELECT COUNT(*) AS cnt, AVG(totalHarga) AS avgHarga FROM work_orders WHERE status = 'selesai' AND completedAt >= ? AND completedAt <= ?", [prevStart, prevEnd]),
       db.queryVal<number>("SELECT COUNT(*) FROM mekanik WHERE status IN ('available','busy')"),
     ]);
 
@@ -238,7 +238,7 @@ router.get('/kpi', async (req: Request, res: Response, next: NextFunction) => {
 router.get('/layanan', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await db.query(
-      "SELECT mode, COUNT(*) AS _count, COALESCE(SUM(totalHarga),0) AS _sum FROM spk WHERE deletedAt IS NULL GROUP BY mode");
+      "SELECT mode, COUNT(*) AS _count, COALESCE(SUM(totalHarga),0) AS _sum FROM work_orders WHERE deletedAt IS NULL GROUP BY mode");
     sendSuccess(res, data);
   } catch (e) { next(e); }
 });
@@ -254,7 +254,7 @@ router.get('/top-items', async (req: Request, res: Response, next: NextFunction)
     // DB-level groupBy supaya tidak ada batasan 1000 baris
     const rows = await db.query(
       `SELECT i.type, i.nama, SUM(i.qty) AS sumQty, SUM(i.subtotal) AS sumSubtotal
-       FROM spk_items i JOIN spk s ON s.id = i.spkId
+       FROM wo_items i JOIN work_orders s ON s.id = i.woId
        WHERE s.status = 'selesai' AND s.completedAt >= ? AND s.completedAt <= ?
        GROUP BY i.type, i.nama`, [start, end]);
 

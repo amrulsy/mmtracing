@@ -9,15 +9,11 @@ import { toast } from "sonner";
 import { PrinterSelectModal } from "./PrinterSelectModal";
 import { Settings } from "lucide-react";
 
-export type PrintFormat = "thermal-58" | "thermal-80" | "a4";
+import { usePrintSettings, type PrintFormat } from "@/hooks/usePrintSettings";
 
-const FORMAT_OPTIONS: { value: PrintFormat; label: string; icon: React.ElementType; desc: string; color: string }[] = [
-  { value: "thermal-58", label: "Thermal 58mm", icon: Receipt, desc: "Struk kecil", color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
-  { value: "thermal-80", label: "Thermal 80mm", icon: Receipt, desc: "Struk standar", color: "bg-blue-500/10 text-blue-600 border-blue-500/30" },
-  { value: "a4", label: "A4 Full", icon: FileText, desc: "Kertas penuh", color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
-];
+export type { PrintFormat };
 
-const STORAGE_KEY = "mm_print_format";
+
 
 interface PrintToolbarProps {
   backHref: string;
@@ -27,25 +23,13 @@ interface PrintToolbarProps {
 }
 
 export function usePrintFormat(): [PrintFormat, (f: PrintFormat) => void] {
-  const [format, setFormatState] = useState<PrintFormat>("a4");
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as PrintFormat | null;
-    if (saved && ["thermal-58", "thermal-80", "a4"].includes(saved)) {
-      setFormatState(saved);
-    }
-  }, []);
-
-  const setFormat = (f: PrintFormat) => {
-    setFormatState(f);
-    localStorage.setItem(STORAGE_KEY, f);
-  };
+  const [format, setFormat] = usePrintSettings();
 
   // Apply body class and dynamic @page styles
   useEffect(() => {
     // 1. Manage body classes
     document.body.classList.remove("print-thermal-58", "print-thermal-80", "print-a4");
-    document.body.classList.add(`print-${format}`);
+    document.body.classList.add(`print-thermal-80`);
 
     // 2. Manage dynamic @page styles to override browser defaults
     let styleTag = document.getElementById("dynamic-print-style");
@@ -55,16 +39,12 @@ export function usePrintFormat(): [PrintFormat, (f: PrintFormat) => void] {
       document.head.appendChild(styleTag);
     }
 
-    if (format.startsWith("thermal")) {
-      styleTag.innerHTML = `@page { size: auto; margin: 0mm; }`;
-    } else {
-      styleTag.innerHTML = `@page { size: A4; margin: 15mm; }`;
-    }
+    styleTag.innerHTML = `@page { size: auto; margin: 0mm; }`;
 
     return () => {
-      document.body.classList.remove("print-thermal-58", "print-thermal-80", "print-a4");
+      document.body.classList.remove("print-thermal-80");
     };
-  }, [format]);
+  }, []);
 
   return [format, setFormat];
 }
@@ -126,7 +106,7 @@ export function PrintToolbar({ backHref, title, onShareWhatsApp, onPrintBluetoot
     }
   };
 
-  const isThermal = format.startsWith("thermal");
+  const isThermal = true;
 
   return (
     <div className="print:hidden sticky top-0 z-50 bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-700 shadow-sm">
@@ -223,49 +203,13 @@ export function PrintToolbar({ backHref, title, onShareWhatsApp, onPrintBluetoot
             <p className="font-bold flex items-center gap-1.5 text-sm mb-1">
               <Info size={14} /> Penting: Pengaturan Browser
             </p>
-            {isThermal ? (
-              <>
-                <p>• <b>Margins:</b> Pilih <b>"None"</b> atau <b>"Minimum"</b> agar struk tidak terpotong.</p>
-                <p>• <b>Scale:</b> Pilih <b>"100%"</b> (jangan "Fit to page").</p>
-                <p>• <b>Headers & Footers:</b> Pastikan <b>Dimatikan</b> agar tanggal/URL tidak ikut tercetak.</p>
-                <p className="mt-2 text-[10px] opacity-80 italic">* Pengaturan ini muncul setelah Anda menekan tombol "Cetak" di atas.</p>
-              </>
-            ) : (
-              <>
-                <p>• <b>Paper Size:</b> Pastikan memilih <b>A4</b>.</p>
-                <p>• <b>Margins:</b> Disarankan pilih <b>Default</b>.</p>
-              </>
-            )}
+            <p>• <b>Margins:</b> Pilih <b>"None"</b> atau <b>"Minimum"</b> agar struk tidak terpotong.</p>
+            <p>• <b>Scale:</b> Pilih <b>"100%"</b> (jangan "Fit to page").</p>
+            <p>• <b>Headers & Footers:</b> Pastikan <b>Dimatikan</b> agar tanggal/URL tidak ikut tercetak.</p>
+            <p className="mt-2 text-[10px] opacity-80 italic">* Pengaturan ini muncul setelah Anda menekan tombol "Cetak" di atas.</p>
           </div>
         )}
 
-        {/* Format selector */}
-        <div className="flex gap-2">
-          {FORMAT_OPTIONS.map(opt => {
-            const isActive = format === opt.value;
-            const Icon = opt.icon;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => setFormat(opt.value)}
-                className={`flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl border-2 transition-all text-left ${
-                  isActive
-                    ? `${opt.color} border-current shadow-sm scale-[1.02]`
-                    : "border-gray-200 dark:border-zinc-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-zinc-800"
-                }`}
-              >
-                <Icon size={18} className={isActive ? "" : "opacity-50"} />
-                <div className="min-w-0">
-                  <p className={`text-xs font-bold leading-tight ${isActive ? "" : "text-gray-700 dark:text-gray-300"}`}>{opt.label}</p>
-                  <p className="text-[10px] opacity-70">{opt.desc}</p>
-                </div>
-                {isActive && (
-                  <Monitor size={12} className="ml-auto shrink-0 opacity-60" />
-                )}
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
@@ -291,7 +235,7 @@ export function PrintPageWrapper({ children }: { children: React.ReactNode }) {
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[99999] bg-white dark:bg-zinc-900 overflow-y-auto">
+    <div className="print-wrapper fixed inset-0 z-[99999] bg-white dark:bg-zinc-900 overflow-y-auto">
       {children}
     </div>,
     document.body
