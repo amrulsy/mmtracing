@@ -3,7 +3,7 @@ import { BadRequestError } from '../../shared/errors';
 export interface MidtransTransaction {
   status_code: string; order_id: string; transaction_id: string;
   gross_amount: string; currency: string; payment_type: string;
-  transaction_status: string; fraud_status?: string;
+  transaction_status: string; fraud_status?: string; status_message?: string;
   actions?: { name: string; url: string }[];
 }
 export function midtransBase(environment: string) {

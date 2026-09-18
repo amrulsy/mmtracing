@@ -156,7 +156,7 @@ export default function PortalDashboard() {
           <p className="text-xs font-bold text-primary mt-4">Lihat detail Work Order →</p>
         </Link>
       ) : featuredBooking ? (
-        <Link href={`/track?bookingId=${featuredBooking.id}`} className="block glass-panel p-5 sm:p-6 border-l-4 border-l-primary hover:bg-surface-hover/70 transition-colors group">
+        <Link href="/portal/booking/riwayat" className="block glass-panel p-5 sm:p-6 border-l-4 border-l-primary hover:bg-surface-hover/70 transition-colors group">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary mb-2">Reservasi terdekat</p>
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0"><h2 className="text-lg font-black truncate">{featuredBooking.layanan}</h2><p className="text-xs text-muted-foreground mt-1">{featuredBooking.tanggal ? new Date(featuredBooking.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "long" }) : "Tanggal menunggu konfirmasi"}</p></div>
@@ -350,7 +350,7 @@ export default function PortalDashboard() {
           <h2 className="text-sm font-black flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
             <Calendar size={16} className="text-primary" /> Reservasi
             <span className="text-[10px] bg-surface-hover px-1.5 py-0.5 rounded-full font-normal ml-auto">{bookings.length}</span>
-            {bookings.length > 3 && <Link href="/portal/booking" className="text-[10px] normal-case tracking-normal text-primary hover:underline">Lihat semua</Link>}
+            {bookings.length > 0 && <Link href="/portal/booking/riwayat" className="text-[10px] normal-case tracking-normal text-primary hover:underline">Kelola booking</Link>}
           </h2>
           {bookings.length === 0 ? (
             <div className="p-8 text-center bg-surface-hover/30 border border-surface-border rounded-2xl">
@@ -364,7 +364,7 @@ export default function PortalDashboard() {
           ) : (
             <div className="space-y-2.5">
               {recentBookings.map(b => (
-                <Link key={b.id} href={`/track?bookingId=${b.id}`} className="block p-4 bg-surface-hover/50 border border-surface-border rounded-xl hover:bg-surface-hover transition-colors group">
+                <Link key={b.id} href="/portal/booking/riwayat" className="block p-4 bg-surface-hover/50 border border-surface-border rounded-xl hover:bg-surface-hover transition-colors group">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold truncate">{b.layanan}</p>

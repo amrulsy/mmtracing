@@ -29,6 +29,7 @@ const router = Router();
 router.post('/register', registerLimiter, pelangganAuthController.register);
 router.post('/login', loginLimiter, pelangganAuthController.login);
 router.post('/refresh-token', pelangganAuthController.refreshToken);
+router.post('/logout', pelangganAuthController.logout);
 
 // OTP-based (Passwordless)
 router.post('/request-otp', otpLimiter, pelangganOtpController.requestOtp);
@@ -40,9 +41,13 @@ router.get('/dashboard', customerAuthMiddleware, pelangganAuthController.dashboa
 router.put('/profile', customerAuthMiddleware, pelangganAuthController.updateProfile);
 router.post('/avatar', customerAuthMiddleware, upload.single('image'), pelangganAuthController.uploadAvatar);
 router.get('/history', customerAuthMiddleware, pelangganAuthController.history);
+router.get('/bookings', customerAuthMiddleware, pelangganAuthController.bookings);
+router.post('/bookings/:id/cancel', customerAuthMiddleware, pelangganAuthController.cancelBooking);
+router.post('/bookings/:id/reschedule', customerAuthMiddleware, pelangganAuthController.rescheduleBooking);
 router.get('/spk/:id', customerAuthMiddleware, pelangganAuthController.spkDetail);
 router.get('/wo/:id', customerAuthMiddleware, pelangganAuthController.spkDetail);
 router.get('/work-order/:id', customerAuthMiddleware, pelangganAuthController.spkDetail);
+router.post('/work-order/:id/estimate-approval', customerAuthMiddleware, pelangganAuthController.respondEstimateApproval);
 router.get('/pembayaran', customerAuthMiddleware, pelangganAuthController.getPembayaran);
 
 // Loyalty endpoints

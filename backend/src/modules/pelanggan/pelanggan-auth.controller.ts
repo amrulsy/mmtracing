@@ -7,8 +7,32 @@ import { ensureVoucherSchema, issueVoucher } from '../loyalty/voucher.service';
 import { env } from '../../config/env';
 import { sendSuccess } from '../../shared/utils';
 import { UnauthorizedError, BadRequestError, NotFoundError, ConflictError } from '../../shared/errors';
+import { ensureEstimateApprovalSchema } from '../work-order/estimate-approval';
+import type { CustomerAuthRequest } from '../../middleware/customerAuth';
+import { notifyBookingRescheduled, notifyBookingStatus, notifyEstimateApprovalResponse } from '../whatsapp/whatsapp.notification';
+
+const REFRESH_COOKIE = 'mmt_customer_refresh';
+
+function readCookie(req: Request, name: string): string | undefined {
+  return req.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1);
+}
+
+function setRefreshCookie(res: Response, refreshToken: string) {
+  res.cookie(REFRESH_COOKIE, refreshToken, {
+    httpOnly: true,
+    secure: env.nodeEnv === 'production',
+    sameSite: 'lax',
+    path: '/api/v1/customer-auth',
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
+}
 
 export const pelangganAuthController = {
+  async logout(_req: Request, res: Response) {
+    res.clearCookie(REFRESH_COOKIE, { path: '/api/v1/customer-auth' });
+    sendSuccess(res, null, 'Sesi berhasil diakhiri');
+  },
+
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const { name, phone, password } = req.body;
@@ -75,9 +99,10 @@ export const pelangganAuthController = {
         { expiresIn: env.jwt.refreshExpiresIn } as jwt.SignOptions
       );
 
+      setRefreshCookie(res, refreshToken);
+
       sendSuccess(res, {
         token,
-        refreshToken,
         user: { id: user.id, name: user.name, phone }
       }, 'Login berhasil');
     } catch (error) {
@@ -87,7 +112,7 @@ export const pelangganAuthController = {
 
   async refreshToken(req: Request, res: Response, next: NextFunction) {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.body?.refreshToken || readCookie(req, REFRESH_COOKIE);
       if (!refreshToken) throw new BadRequestError('Refresh token wajib diisi');
 
       const decoded = jwt.verify(refreshToken, env.jwt.refreshSecret) as { userId: number, isCustomer?: boolean, isRefresh?: boolean };
@@ -110,7 +135,9 @@ export const pelangganAuthController = {
         { expiresIn: env.jwt.refreshExpiresIn } as jwt.SignOptions
       );
 
-      sendSuccess(res, { token: newToken, refreshToken: newRefreshToken }, 'Token berhasil diperbarui');
+      setRefreshCookie(res, newRefreshToken);
+
+      sendSuccess(res, { token: newToken }, 'Token berhasil diperbarui');
     } catch (error) {
       next(new UnauthorizedError('Refresh token tidak valid atau sudah kedaluwarsa'));
     }
@@ -121,7 +148,7 @@ export const pelangganAuthController = {
       // @ts-ignore
       const customerId = req.customerId;
       
-      const user = await db.queryOne("SELECT id, name, phone, email, address, totalTrx, photoUrl, loyaltyTierId, createdAt FROM pelanggan WHERE id = ?", [customerId]);
+      const user = await db.queryOne("SELECT id, name, phone, email, address, totalTrx, photoUrl AS avatar, loyaltyTierId, createdAt FROM pelanggan WHERE id = ?", [customerId]);
       if (!user) throw new UnauthorizedError('User tidak ditemukan');
 
       // Also fetch registered vehicles
@@ -138,7 +165,7 @@ export const pelangganAuthController = {
     try {
       // @ts-ignore
       const customerId = req.customerId;
-      const user = await db.queryOne<any>('SELECT id, name, phone, email, address, totalTrx, photoUrl, loyaltyTierId, createdAt FROM pelanggan WHERE id = ?', [customerId]);
+      const user = await db.queryOne<any>('SELECT id, name, phone, email, address, totalTrx, photoUrl AS avatar, loyaltyTierId, createdAt FROM pelanggan WHERE id = ?', [customerId]);
       if (!user) throw new UnauthorizedError('User tidak ditemukan');
       const [spks, bookings] = await Promise.all([
         db.query('SELECT id, noWo, status, progress, totalHarga, totalBayar, (totalHarga - COALESCE(totalBayar,0)) AS sisaTagihan, (totalHarga - COALESCE(diskon,0)) AS totalTagihan, mode, createdAt FROM work_orders WHERE pelangganId = ? ORDER BY createdAt DESC LIMIT 20', [customerId]),
@@ -186,8 +213,65 @@ export const pelangganAuthController = {
     }
   },
 
+  async bookings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const customerId = (req as CustomerAuthRequest).customerId!;
+      const customer = await db.queryOne<{ phone: string }>('SELECT phone FROM pelanggan WHERE id = ?', [customerId]);
+      if (!customer) throw new UnauthorizedError('Akun pelanggan tidak ditemukan');
+      const phone = customer.phone.replace(/[^0-9]/g, '');
+      const variants = [phone, phone.replace(/^62/, '0'), phone.replace(/^0/, '62')];
+      const rows = await db.query(`SELECT id, jenisKendaraan, merkTipe, layanan, tanggal, jamPreferensi, status, catatan, alasanPenolakan, woId, createdAt, updatedAt
+        FROM bookings WHERE pelangganId = ? OR whatsapp IN (?, ?, ?) ORDER BY createdAt DESC LIMIT 50`, [customerId, ...variants]);
+      sendSuccess(res, rows, 'Booking berhasil diambil');
+    } catch (error) { next(error); }
+  },
+
+  async cancelBooking(req: Request, res: Response, next: NextFunction) {
+    try {
+      const customerId = (req as CustomerAuthRequest).customerId!;
+      const id = Number(req.params.id);
+      const customer = await db.queryOne<{ phone: string }>('SELECT phone FROM pelanggan WHERE id = ?', [customerId]);
+      const phone = customer?.phone.replace(/[^0-9]/g, '') || '';
+      const booking = await db.queryOne<any>('SELECT * FROM bookings WHERE id = ? AND (pelangganId = ? OR whatsapp IN (?, ?, ?))', [id, customerId, phone, phone.replace(/^62/, '0'), phone.replace(/^0/, '62')]);
+      if (!booking) throw new NotFoundError('Booking tidak ditemukan atau Anda tidak memiliki akses');
+      if (!['baru', 'dikonfirmasi'].includes(booking.status)) throw new BadRequestError('Booking ini tidak dapat dibatalkan');
+      await db.transaction(async (tx) => {
+        await tx.update('bookings', { pelangganId: customerId, status: 'dibatalkan', updatedAt: new Date() }, 'id = ?', [id]);
+        await tx.execute('DELETE FROM jadwal WHERE pekerjaan = ?', [`Booking #${id}`]);
+      });
+      notifyBookingStatus(id, 'dibatalkan').catch(() => {});
+      sendSuccess(res, null, 'Booking berhasil dibatalkan');
+    } catch (error) { next(error); }
+  },
+
+  async rescheduleBooking(req: Request, res: Response, next: NextFunction) {
+    try {
+      const customerId = (req as CustomerAuthRequest).customerId!;
+      const id = Number(req.params.id);
+      const { tanggal, jamPreferensi } = req.body as { tanggal?: string; jamPreferensi?: string };
+      if (!tanggal || !jamPreferensi || Number.isNaN(new Date(tanggal).getTime())) throw new BadRequestError('Tanggal dan jam baru wajib valid');
+      const target = new Date(tanggal); target.setHours(0, 0, 0, 0);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (target <= today) throw new BadRequestError('Jadwal baru harus minimal besok');
+      const customer = await db.queryOne<{ phone: string }>('SELECT phone FROM pelanggan WHERE id = ?', [customerId]);
+      const phone = customer?.phone.replace(/[^0-9]/g, '') || '';
+      const booking = await db.queryOne<any>('SELECT * FROM bookings WHERE id = ? AND (pelangganId = ? OR whatsapp IN (?, ?, ?))', [id, customerId, phone, phone.replace(/^62/, '0'), phone.replace(/^0/, '62')]);
+      if (!booking) throw new NotFoundError('Booking tidak ditemukan atau Anda tidak memiliki akses');
+      if (!['baru', 'dikonfirmasi'].includes(booking.status)) throw new BadRequestError('Booking ini tidak dapat dijadwalkan ulang');
+      const occupied = await db.queryVal<number>("SELECT COUNT(*) FROM bookings WHERE id <> ? AND DATE(tanggal) = DATE(?) AND jamPreferensi = ? AND status IN ('baru', 'dikonfirmasi')", [id, tanggal, jamPreferensi]);
+      if ((occupied || 0) > 0) throw new BadRequestError('Slot waktu tersebut sudah terisi. Pilih jam lain.');
+      await db.transaction(async (tx) => {
+        await tx.update('bookings', { pelangganId: customerId, tanggal: target, jamPreferensi, updatedAt: new Date() }, 'id = ?', [id]);
+        if (booking.status === 'dikonfirmasi') await tx.update('jadwal', { tanggal: target, jamMulai: jamPreferensi, updatedAt: new Date() }, 'pekerjaan = ?', [`Booking #${id}`]);
+      });
+      notifyBookingRescheduled(id).catch(() => {});
+      sendSuccess(res, null, 'Jadwal booking berhasil diperbarui');
+    } catch (error) { next(error); }
+  },
+
   async spkDetail(req: Request, res: Response, next: NextFunction) {
     try {
+      await ensureEstimateApprovalSchema();
       // @ts-ignore
       const customerId = req.customerId;
       const woId = Number(req.params.id);
@@ -225,6 +309,22 @@ export const pelangganAuthController = {
     }
   },
 
+  async respondEstimateApproval(req: Request, res: Response, next: NextFunction) {
+    try {
+      await ensureEstimateApprovalSchema();
+      const customerId = (req as CustomerAuthRequest).customerId!;
+      const woId = Number(req.params.id);
+      const { decision, note } = req.body as { decision?: string; note?: string };
+      if (!['approved', 'rejected'].includes(String(decision))) throw new BadRequestError('Keputusan estimasi tidak valid');
+      const wo = await db.queryOne<any>('SELECT id, estimateApprovalStatus FROM work_orders WHERE id = ? AND pelangganId = ?', [woId, customerId]);
+      if (!wo) throw new NotFoundError('Work Order tidak ditemukan atau Anda tidak memiliki akses');
+      if (wo.estimateApprovalStatus !== 'pending') throw new BadRequestError('Tidak ada estimasi yang menunggu persetujuan');
+      await db.update('work_orders', { estimateApprovalStatus: decision, estimateApprovalNote: note?.trim() || null, estimateApprovedAt: new Date(), updatedAt: new Date() }, 'id = ?', [woId]);
+      notifyEstimateApprovalResponse(woId, decision as 'approved' | 'rejected').catch(() => {});
+      sendSuccess(res, null, decision === 'approved' ? 'Estimasi disetujui. Pengerjaan dapat dilanjutkan.' : 'Estimasi ditolak. Tim bengkel akan menghubungi Anda.');
+    } catch (error) { next(error); }
+  },
+
   async updateProfile(req: Request, res: Response, next: NextFunction) {
     try {
       // @ts-ignore
@@ -235,7 +335,7 @@ export const pelangganAuthController = {
 
       await db.update('pelanggan', { name, email, address, updatedAt: new Date() }, 'id = ?', [customerId]);
 
-      const updatedUser = await db.queryOne("SELECT id, name, phone, email, address, totalTrx, photoUrl, loyaltyTierId, createdAt FROM pelanggan WHERE id = ?", [customerId]);
+      const updatedUser = await db.queryOne("SELECT id, name, phone, email, address, totalTrx, photoUrl AS avatar, loyaltyTierId, createdAt FROM pelanggan WHERE id = ?", [customerId]);
       sendSuccess(res, updatedUser, 'Profil berhasil diperbarui');
     } catch (error) {
       next(error);

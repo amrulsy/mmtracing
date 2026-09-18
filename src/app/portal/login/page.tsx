@@ -4,15 +4,15 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Phone, KeyRound, ArrowRight, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { setPortalTokens, getPortalToken } from "@/lib/portalFetch";
+import { setPortalTokens, restorePortalSession } from "@/lib/portalFetch";
 
 export default function PortalLogin() {
   const router = useRouter();
 
   useEffect(() => {
-    if (getPortalToken()) {
-      router.replace("/portal/dashboard");
-    }
+    void restorePortalSession().then((restored) => {
+      if (restored) router.replace("/portal/dashboard");
+    });
   }, [router]);
   const [step, setStep] = useState<1 | 2>(1);
   const [phone, setPhone] = useState("");
@@ -44,7 +44,7 @@ export default function PortalLogin() {
       setStatus("idle");
       setMsg(data.message || "OTP terkirim!");
       setStep(2);
-    } catch (err) {
+    } catch {
       setStatus("error");
       setMsg("Koneksi gagal. Silakan coba lagi.");
     }
@@ -72,9 +72,9 @@ export default function PortalLogin() {
       }
 
       // Store token(s)
-      setPortalTokens(data.data.token, data.data.refreshToken);
+      setPortalTokens(data.data.token);
       router.push("/portal/dashboard");
-    } catch (err) {
+    } catch {
       setStatus("error");
       setMsg("Koneksi gagal. Silakan coba lagi.");
     }

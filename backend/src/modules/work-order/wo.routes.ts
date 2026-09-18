@@ -4,6 +4,10 @@ import { authMiddleware, requireRole, requirePermission } from '../../middleware
 import { validate } from '../../middleware/validate';
 import { createWoSchema, updateWoStatusSchema, updateWoSchema, assignMekanikSchema, addWoItemSchema, updateWoItemSchema, updateWoStageSchema, addWoStageSchema } from './wo.schema';
 import { upload } from '../../middleware/upload';
+import db from '../../config/db';
+import { sendSuccess } from '../../shared/utils';
+import { ensureEstimateApprovalSchema } from './estimate-approval';
+import { notifyEstimateApprovalRequested } from '../whatsapp/whatsapp.notification';
 
 const router = Router();
 
@@ -20,6 +24,20 @@ router.put('/:id/status', requirePermission('wo', 'edit'), validate(updateWoStat
 router.put('/:id/progress', requirePermission('wo', 'edit'), woController.updateProgress);
 router.put('/:id/mekanik', requirePermission('wo', 'edit'), validate(assignMekanikSchema), woController.assignMekanik);
 router.post('/:id/whatsapp', requirePermission('wo', 'view'), woController.sendWhatsapp);
+// Request a customer's approval after an estimate or additional work changes.
+router.post('/:id/estimate-approval/request', requirePermission('wo', 'edit'), async (req, res, next) => {
+  try {
+    await ensureEstimateApprovalSchema();
+    const id = Number(req.params.id);
+    const { note } = req.body as { note?: string };
+    const wo = await db.queryOne<{ id: number; totalHarga: number }>('SELECT id, totalHarga FROM work_orders WHERE id = ? AND deletedAt IS NULL', [id]);
+    if (!wo) return res.status(404).json({ success: false, message: 'Work Order tidak ditemukan' });
+    if (Number(wo.totalHarga) <= 0) return res.status(400).json({ success: false, message: 'Masukkan item atau tahap serta estimasi biaya terlebih dahulu.' });
+    await db.update('work_orders', { estimateApprovalStatus: 'pending', estimateApprovalNote: note?.trim() || null, estimateApprovedAt: null, updatedAt: new Date() }, 'id = ?', [id]);
+    notifyEstimateApprovalRequested(id).catch(() => {});
+    sendSuccess(res, null, 'Permintaan persetujuan estimasi telah dikirim ke portal pelanggan');
+  } catch (error) { next(error); }
+});
 router.post('/:id/restore', requirePermission('wo', 'full'), woController.restore);
 router.delete('/:id', requirePermission('wo', 'full'), woController.delete);
 

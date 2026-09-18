@@ -14,6 +14,7 @@ export default function NotifikasiPage() {
   const [data, setData] = useState<Notifikasi[]>([]);
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [error, setError] = useState<{ type: "auth" | "network" | "server"; message: string } | null>(null);
   const { refreshUnread } = useUnreadCount();
   const router = useRouter();
@@ -37,13 +38,17 @@ export default function NotifikasiPage() {
 
   const handleMarkAllRead = async () => {
     if (data.every(n => n.isRead)) return;
+    const previous = data;
     setMarkingAll(true);
+    setActionError("");
+    setData((current) => current.map(n => ({ ...n, isRead: true })));
     try {
-      await portalFetch("/api/v1/customer-auth/notifikasi/read-all", { method: "PUT" });
-      setData(data.map(n => ({ ...n, isRead: true })));
+      const response = await portalFetch("/api/v1/customer-auth/notifikasi/read-all", { method: "PUT" });
+      if (!response.ok) throw new Error("Gagal memperbarui notifikasi");
       refreshUnread();
     } catch {
-      // ignore
+      setData(previous);
+      setActionError("Tidak dapat menandai notifikasi. Silakan coba lagi.");
     } finally {
       setMarkingAll(false);
     }
@@ -51,9 +56,17 @@ export default function NotifikasiPage() {
 
   const handleNotificationClick = async (item: Notifikasi) => {
     if (!item.isRead) {
+      const previous = data;
       setData((current) => current.map((n) => n.id === item.id ? { ...n, isRead: true } : n));
       refreshUnread();
-      await portalFetch(`/api/v1/customer-auth/notifikasi/${item.id}/read`, { method: "PUT" }).catch(() => {});
+      try {
+        const response = await portalFetch(`/api/v1/customer-auth/notifikasi/${item.id}/read`, { method: "PUT" });
+        if (!response.ok) throw new Error("Gagal memperbarui notifikasi");
+      } catch {
+        setData(previous);
+        setActionError("Status baca tidak tersimpan. Silakan coba lagi.");
+        return;
+      }
     }
     const destination = item.link && item.link.startsWith("/") ? item.link : "/portal/dashboard";
     router.push(destination);
@@ -104,6 +117,8 @@ export default function NotifikasiPage() {
           </button>
         )}
       </div>
+
+      {actionError && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs font-medium text-red-500">{actionError}</p>}
 
       <div className="glass-panel overflow-hidden">
         {loading ? (

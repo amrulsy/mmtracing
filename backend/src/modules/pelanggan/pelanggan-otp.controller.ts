@@ -9,6 +9,19 @@ import { BadRequestError, UnauthorizedError } from '../../shared/errors';
 import logger from '../../config/logger';
 import { sendOtp } from '../whatsapp/whatsapp.notification';
 
+const REFRESH_COOKIE = 'mmt_customer_refresh';
+
+function setRefreshCookie(res: Response, refreshToken: string) {
+  res.cookie(REFRESH_COOKIE, refreshToken, {
+    httpOnly: true,
+    secure: env.nodeEnv === 'production',
+    sameSite: 'lax',
+    path: '/api/v1/customer-auth',
+    // The JWT remains the source of truth; this only instructs the browser when to drop it.
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
+}
+
 export const pelangganOtpController = {
   async requestOtp(req: Request, res: Response, next: NextFunction) {
     try {
@@ -25,9 +38,6 @@ export const pelangganOtpController = {
       
       // Store in Redis or Memory (Valid for 5 minutes)
       await safeSetex(`OTP:${phoneClean}`, 300, otp);
-
-      // Log OTP to terminal
-      logger.debug(`[WA-OTP] OTP untuk ${phoneClean}: ${otp}`);
 
       // Send via WhatsApp Queue
       await sendOtp(phoneClean, otp);
@@ -83,9 +93,10 @@ export const pelangganOtpController = {
         { expiresIn: env.jwt.refreshExpiresIn } as jwt.SignOptions
       );
 
+      setRefreshCookie(res, refreshToken);
+
       sendSuccess(res, {
         token,
-        refreshToken,
         user: { id: user.id, name: user.name, phone: phoneClean }
       }, 'Login berhasil');
     } catch (e) {

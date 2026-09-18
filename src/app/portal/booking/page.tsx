@@ -8,23 +8,21 @@ import { SkeletonCard } from "@/components/portal/PortalSkeleton";
 import { PortalError } from "@/components/portal/PortalError";
 import type { PortalProfile, Kendaraan } from "@/types/portal";
 
-const LAYANAN_OPTIONS = [
-  "Tune Up Ringan",
-  "Tune Up Besar",
-  "Bore Up / Oversize",
-  "Porting Polish",
-  "Servis Kopling",
-  "Servis Injeksi / Karburator",
-  "Custom / Modifikasi",
-  "Lainnya",
-];
+type BookingConfig = {
+  serviceOptions?: { id: string; desc?: string }[];
+  vehicleTypes?: string[];
+  timeSlots?: string[];
+};
 
-const JAM_OPTIONS = [
-  "08:00 - 10:00",
-  "10:00 - 12:00",
-  "13:00 - 15:00",
-  "15:00 - 17:00",
-];
+const FALLBACK_CONFIG: Required<BookingConfig> = {
+  serviceOptions: [
+    { id: "Servis Rutin", desc: "Perawatan dan pemeriksaan motor" },
+    { id: "Modifikasi", desc: "Diskusikan kebutuhan modifikasi" },
+    { id: "Jasa Bubut Custom", desc: "Konsultasi komponen custom" },
+  ],
+  vehicleTypes: ["Motor Matic", "Motor Sport", "Motor Bebek", "Tanpa Kendaraan (Bawa Part)"],
+  timeSlots: ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"],
+};
 
 export default function BookingPage() {
   const [profile, setProfile] = useState<PortalProfile | null>(null);
@@ -34,10 +32,12 @@ export default function BookingPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<{ type: "auth" | "network" | "server"; message: string } | null>(null);
   const [msg, setMsg] = useState({ text: "", type: "" });
+  const [config, setConfig] = useState<BookingConfig>(FALLBACK_CONFIG);
 
   const [form, setForm] = useState({
     kendaraanId: "",
     kendaraanManual: "",
+    jenisKendaraan: "",
     layanan: "",
     tanggal: "",
     jamPreferensi: "",
@@ -65,9 +65,16 @@ export default function BookingPage() {
 
   useEffect(() => { fetchProfile(); }, []);
 
+  useEffect(() => {
+    fetch("/api/v1/landing/booking-options")
+      .then((res) => res.json())
+      .then((json) => { if (json.success) setConfig(json.data); })
+      .catch(() => { /* The validated default keeps booking usable if config is temporarily unavailable. */ });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.layanan || !form.tanggal) return;
+    if (!form.layanan || !form.tanggal || !form.jenisKendaraan) return;
 
     setSubmitting(true);
     setMsg({ text: "", type: "" });
@@ -81,8 +88,9 @@ export default function BookingPage() {
         body: JSON.stringify({
           nama: profile?.name,
           whatsapp: profile?.phone,
-          jenisKendaraan: selectedKendaraan?.name || form.kendaraanManual || "Belum dipilih",
+          jenisKendaraan: form.jenisKendaraan,
           merkTipe: selectedKendaraan ? `${selectedKendaraan.name} (${selectedKendaraan.plat})` : form.kendaraanManual,
+          platNomor: selectedKendaraan?.plat,
           layanan: form.layanan,
           tanggal: form.tanggal,
           jamPreferensi: form.jamPreferensi,
@@ -210,6 +218,14 @@ export default function BookingPage() {
 
         {/* Layanan */}
         <div>
+          <label className={labelCls}><CarFront size={12} className="inline mr-1" />Jenis Kendaraan *</label>
+          <select required value={form.jenisKendaraan} onChange={e => setForm({ ...form, jenisKendaraan: e.target.value })} className={inputCls + " cursor-pointer"}>
+            <option value="">â€” Pilih jenis kendaraan â€”</option>
+            {(config.vehicleTypes || FALLBACK_CONFIG.vehicleTypes).map((type) => <option key={type} value={type}>{type}</option>)}
+          </select>
+        </div>
+
+        <div>
           <label className={labelCls}><Wrench size={12} className="inline mr-1" />Layanan yang Diinginkan *</label>
           <select
             required
@@ -218,8 +234,8 @@ export default function BookingPage() {
             className={inputCls + " cursor-pointer"}
           >
             <option value="">— Pilih layanan —</option>
-            {LAYANAN_OPTIONS.map(l => (
-              <option key={l} value={l}>{l}</option>
+            {(config.serviceOptions || FALLBACK_CONFIG.serviceOptions).map(l => (
+              <option key={l.id} value={l.id}>{l.id}{l.desc ? ` — ${l.desc}` : ""}</option>
             ))}
           </select>
         </div>
@@ -241,7 +257,7 @@ export default function BookingPage() {
         <div>
           <label className={labelCls}><Clock size={12} className="inline mr-1" />Jam Preferensi</label>
           <div className="grid grid-cols-2 gap-2">
-            {JAM_OPTIONS.map(j => (
+            {(config.timeSlots || FALLBACK_CONFIG.timeSlots).map(j => (
               <button
                 type="button"
                 key={j}
@@ -271,7 +287,7 @@ export default function BookingPage() {
 
         <button
           type="submit"
-          disabled={submitting || !form.layanan || !form.tanggal}
+          disabled={submitting || !form.layanan || !form.tanggal || !form.jenisKendaraan}
           className="w-full py-3.5 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98]"
         >
           {submitting ? <Loader2 className="animate-spin" size={18} /> : <Calendar size={18} />}

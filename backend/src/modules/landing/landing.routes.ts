@@ -136,6 +136,20 @@ const LANDING_DEFAULTS: Record<string, string> = {
   landing_seo: JSON.stringify({ title: "MMT Racing | Bengkel Motor & Jasa Bubut", description: "Informasi layanan bengkel motor dan jasa bubut custom.", canonicalUrl: "https://mmtracing.com" }),
 };
 
+type BookingConfig = { serviceOptions?: { id: string; desc?: string; category?: string }[]; vehicleTypes?: string[]; timeSlots?: string[]; closedDays?: string[]; slotCapacity?: number };
+
+async function getBookingConfig(): Promise<BookingConfig> {
+  const configRow = await db.queryOne<{ value: string }>("SELECT value FROM settings WHERE `key` = 'landing_booking' LIMIT 1");
+  try { return JSON.parse(configRow?.value || LANDING_DEFAULTS.landing_booking); }
+  catch { return JSON.parse(LANDING_DEFAULTS.landing_booking); }
+}
+
+// GET /landing/booking-options — public configuration shared by the landing page and customer portal.
+router.get('/booking-options', async (_req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await getBookingConfig()); }
+  catch (e) { next(e); }
+});
+
 // GET /landing/content — PUBLIC (no auth)
 router.get('/content', async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -247,9 +261,7 @@ router.get('/queue', async (_req: Request, res: Response, next: NextFunction) =>
 router.post('/booking', bookingLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { nama, whatsapp, jenisKendaraan, merkTipe, platNomor, layanan, tanggal, jamPreferensi, keluhan, kategori, _hp } = req.body;
-    const configRow = await db.queryOne<{ value: string }>("SELECT value FROM settings WHERE `key` = 'landing_booking' LIMIT 1");
-    let config: { serviceOptions?: { id: string }[]; vehicleTypes?: string[]; timeSlots?: string[]; closedDays?: string[]; slotCapacity?: number };
-    try { config = JSON.parse(configRow?.value || LANDING_DEFAULTS.landing_booking); } catch { config = JSON.parse(LANDING_DEFAULTS.landing_booking); }
+    const config = await getBookingConfig();
 
     // Honeypot check — if _hp field is filled, it's a bot
     if (_hp) {

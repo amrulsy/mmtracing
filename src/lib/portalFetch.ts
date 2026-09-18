@@ -8,32 +8,27 @@
 
 import { readApiJson } from './apiResponse';
 
-const TOKEN_KEY = "mmt_customer_token";
-const REFRESH_KEY = "mmt_refresh_token";
-
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 let logoutInProgress = false;
+let accessToken: string | null = null;
 
 async function attemptRefresh(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(REFRESH_KEY);
-  if (!refreshToken) return false;
-
   try {
     const res = await fetch("/api/v1/customer-auth/refresh-token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      // The refresh credential is an HttpOnly cookie. It is intentionally never
+      // exposed to JavaScript or persisted in localStorage.
+      credentials: "same-origin",
+      body: JSON.stringify({}),
     });
 
     if (!res.ok) return false;
 
     const data = await res.json();
     if (data.success && data.data?.token) {
-      localStorage.setItem(TOKEN_KEY, data.data.token);
-      if (data.data.refreshToken) {
-        localStorage.setItem(REFRESH_KEY, data.data.refreshToken);
-      }
+      accessToken = data.data.token;
       return true;
     }
     return false;
@@ -44,23 +39,37 @@ async function attemptRefresh(): Promise<boolean> {
 
 export function getPortalToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return accessToken;
 }
 
-export function setPortalTokens(token: string, refreshToken?: string) {
-  localStorage.setItem(TOKEN_KEY, token);
-  if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
+/** Restore the short-lived access token from the HttpOnly refresh cookie. */
+export async function restorePortalSession(): Promise<boolean> {
+  if (accessToken) return true;
+  if (!isRefreshing) {
+    isRefreshing = true;
+    refreshPromise = attemptRefresh().finally(() => {
+      isRefreshing = false;
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise ? await refreshPromise : false;
+}
+
+export function setPortalTokens(token: string) {
+  accessToken = token;
 }
 
 export function clearPortalTokens() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+  accessToken = null;
 }
 
 export function portalLogout() {
   if (logoutInProgress) return;
   logoutInProgress = true;
   clearPortalTokens();
+  // Keep the cookie server-owned, then ask the server to remove it before
+  // navigating away. `keepalive` makes this reliable during page teardown.
+  void fetch("/api/v1/customer-auth/logout", { method: "POST", credentials: "same-origin", keepalive: true });
   window.location.href = "/portal/login";
 }
 
@@ -68,10 +77,14 @@ export async function portalFetch(
   url: string,
   options?: RequestInit
 ): Promise<Response> {
-  const token = getPortalToken();
+  let token = getPortalToken();
   if (!token) {
-    portalLogout();
-    return new Response(JSON.stringify({ success: false, message: "No token" }), { status: 401 });
+    const refreshed = await restorePortalSession();
+    token = getPortalToken();
+    if (!refreshed || !token) {
+      portalLogout();
+      return new Response(JSON.stringify({ success: false, message: "No active session" }), { status: 401 });
+    }
   }
 
   const headers = new Headers(options?.headers);
@@ -117,7 +130,7 @@ export async function portalFetch(
  * Helper to do portalFetch and parse JSON in one call.
  * Returns { success, data, message } or throws.
  */
-export async function portalApi<T = any>(
+export async function portalApi<T = unknown>(
   url: string,
   options?: RequestInit
 ): Promise<{ success: boolean; data: T; message: string }> {

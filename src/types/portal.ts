@@ -89,6 +89,9 @@ export interface WODetail {
   items: WOItem[];
   photos: WOPhoto[];
   pembayaran: WOPembayaran | null;
+  estimateApprovalStatus?: "not_required" | "pending" | "approved" | "rejected";
+  estimateApprovalNote?: string | null;
+  estimateApprovedAt?: string | null;
 }
 export type SPKDetail = WODetail;
 
@@ -112,6 +115,10 @@ export interface PortalBooking {
   status: string;
   keluhan: string;
   createdAt: string;
+  updatedAt?: string;
+  catatan?: string | null;
+  alasanPenolakan?: string | null;
+  woId?: number | null;
 }
 
 // ============ Pembayaran ============

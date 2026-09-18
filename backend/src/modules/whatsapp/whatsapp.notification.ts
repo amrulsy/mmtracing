@@ -60,6 +60,34 @@ async function createPortalNotification(woId: number, type: string, title: strin
   }
 }
 
+export async function notifyEstimateApprovalRequested(woId: number) {
+  const wo = await db.queryOne<any>('SELECT s.noWo, s.mode, p.name AS pelangganName, p.phone AS pelangganPhone FROM work_orders s JOIN pelanggan p ON p.id = s.pelangganId WHERE s.id = ?', [woId]);
+  if (!wo) return;
+  const link = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/portal/work-order/${woId}`;
+  await trySend(wo.pelangganPhone, 'Persetujuan Estimasi', wo.mode, { nama: wo.pelangganName, no_wo: wo.noWo, no_spk: wo.noWo, link_portal: link }, `Halo ${wo.pelangganName || 'Pelanggan'}, ada estimasi baru untuk WO ${wo.noWo} yang perlu disetujui sebelum pengerjaan dilanjutkan.\n\nBuka portal: ${link}`);
+  await createPortalNotification(woId, 'estimasi', 'Persetujuan estimasi diperlukan', 'Ada estimasi Work Order yang perlu Anda setujui sebelum pengerjaan dilanjutkan.', `/portal/work-order/${woId}`);
+}
+
+export async function notifyEstimateApprovalResponse(woId: number, decision: 'approved' | 'rejected') {
+  const wo = await db.queryOne<any>('SELECT s.noWo, s.mode, p.name AS pelangganName, p.phone AS pelangganPhone FROM work_orders s JOIN pelanggan p ON p.id = s.pelangganId WHERE s.id = ?', [woId]);
+  if (!wo) return;
+  const link = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/portal/work-order/${woId}`;
+  const text = decision === 'approved' ? `Persetujuan estimasi WO ${wo.noWo} telah kami terima. Pengerjaan dapat dilanjutkan.` : `Penolakan estimasi WO ${wo.noWo} telah kami terima. Tim kami akan menghubungi Anda.`;
+  await trySend(wo.pelangganPhone, 'Respons Estimasi', wo.mode, { nama: wo.pelangganName, no_wo: wo.noWo, no_spk: wo.noWo, link_portal: link }, `Halo ${wo.pelangganName || 'Pelanggan'}, ${text}\n\nDetail WO: ${link}`);
+  await createPortalNotification(woId, 'estimasi', decision === 'approved' ? 'Estimasi disetujui' : 'Estimasi ditolak', text, `/portal/work-order/${woId}`);
+}
+
+export async function notifyBookingRescheduled(bookingId: number) {
+  const booking = await db.queryOne<any>('SELECT * FROM bookings WHERE id = ?', [bookingId]);
+  if (!booking?.whatsapp) return;
+  const date = new Date(booking.tanggal).toLocaleDateString('id-ID');
+  const link = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/portal/booking/riwayat`;
+  const text = `Jadwal booking #${booking.id} telah diubah menjadi ${date}${booking.jamPreferensi ? ` pukul ${booking.jamPreferensi}` : ''}.`;
+  let jid = String(booking.whatsapp).replace(/[^0-9]/g, ''); if (jid.startsWith('0')) jid = '62' + jid.slice(1);
+  await waQueue.add('send-message', { jid, text: `*MMT Racing*\n\nHalo ${booking.nama},\n${text}\n\nDetail booking: ${link}` }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
+  await createCustomerPortalNotification(await findCustomerByPhone(booking.whatsapp), 'booking', 'Jadwal booking diperbarui', text, '/portal/booking/riwayat');
+}
+
 async function createCustomerPortalNotification(pelangganId: number | null | undefined, type: string, title: string, message: string, link: string) {
   try {
     if (!pelangganId || !(await ensureNotificationSchema())) return;
@@ -397,13 +425,15 @@ export async function notifyBookingStatus(bookingId: number, status: string) {
     if (!statusText) return;
     let jid = String(booking.whatsapp).replace(/[^0-9]/g, '');
     if (jid.startsWith('0')) jid = '62' + jid.slice(1);
-    await waQueue.add('send-message', { jid, text: `*MMT Racing*\n\nHalo ${booking.nama},\n${statusText}\n\nBalas pesan ini bila Anda membutuhkan bantuan.` }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
+    const portalUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/portal/booking/riwayat`;
+    await waQueue.add('send-message', { jid, text: `*MMT Racing*\n\nHalo ${booking.nama},\n${statusText}\n\nKelola booking: ${portalUrl}\n\nBalas pesan ini bila Anda membutuhkan bantuan.` }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
     const titleByStatus: Record<string, string> = {
       dikonfirmasi: 'Booking dikonfirmasi',
       ditolak: 'Booking ditolak',
       dibatalkan: 'Booking dibatalkan',
     };
-    await createCustomerPortalNotification(await findCustomerByPhone(booking.whatsapp), 'booking', titleByStatus[status] || 'Status booking berubah', statusText, `/track?bookingId=${booking.id}`);
+    const portalLink = '/portal/booking/riwayat';
+    await createCustomerPortalNotification(await findCustomerByPhone(booking.whatsapp), 'booking', titleByStatus[status] || 'Status booking berubah', statusText, portalLink);
   } catch (e: any) {
     logger.error('[WA] notifyBookingStatus error:', e.message);
   }
